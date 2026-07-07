@@ -4,6 +4,12 @@
     "api/webhook.ts": {
       "maxDuration": 60,
       "includeFiles": "api/_lib/data/agrofit.json"
+    },
+    "api/cron/monitor.ts": {
+      "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/monitor", "schedule": "0 11 * * *" }
+  ]
 }

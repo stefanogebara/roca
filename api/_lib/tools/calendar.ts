@@ -79,3 +79,53 @@ export function vazioStatus(uf: string | null, date: Date): VazioStatus {
     : `📅 Vazio sanitário da soja no seu estado: ${fmt(w.start)} a ${fmt(w.end)} (${SOURCE_LINE}).`;
   return { known: true, active, line };
 }
+
+export interface CalendarTransition {
+  uf: string;
+  kind: 'vazio_start' | 'vazio_end';
+  date: string;
+  daysAway: number;
+}
+
+function daysBetween(fromIso: string, toIso: string): number {
+  const ms = Date.parse(toIso) - Date.parse(fromIso);
+  return Math.round(ms / 86_400_000);
+}
+
+/**
+ * Vazio sanitário transitions (start or end) falling within `withinDays` of the
+ * given date, across all grounded UFs. Feeds the daily monitor: a vazio ending
+ * soon means planting opens (proactive-alert opportunity); one starting soon
+ * means "clear volunteer soy now".
+ */
+export function upcomingTransitions(date: Date, withinDays = 7): CalendarTransition[] {
+  const today = date.toISOString().slice(0, 10);
+  const out: CalendarTransition[] = [];
+  for (const [uf, w] of Object.entries(VAZIO_SOJA_2026)) {
+    for (const [kind, d] of [
+      ['vazio_start', w.start],
+      ['vazio_end', w.end],
+    ] as const) {
+      const daysAway = daysBetween(today, d);
+      if (daysAway >= 0 && daysAway <= withinDays) {
+        out.push({ uf, kind, date: d, daysAway });
+      }
+    }
+  }
+  return out.sort((a, b) => a.daysAway - b.daysAway);
+}
+
+/**
+ * Heuristic: if `date` is past the latest vazio end across all states, the
+ * grounded 2026/27 windows are stale and a new season portaria likely exists —
+ * the monitor should flag "refresh the knowledge base".
+ */
+export function isCalendarStale(date: Date): boolean {
+  const iso = date.toISOString().slice(0, 10);
+  const latestEnd = Object.values(VAZIO_SOJA_2026)
+    .map((w) => w.end)
+    .sort()
+    .at(-1)!;
+  // Give a season's grace: stale only once we're ~2 months past the last window.
+  return daysBetween(latestEnd, iso) > 60;
+}

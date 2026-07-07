@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { vazioStatus, VAZIO_SOJA_2026 } from '../api/_lib/tools/calendar';
+import {
+  vazioStatus,
+  VAZIO_SOJA_2026,
+  upcomingTransitions,
+  isCalendarStale,
+} from '../api/_lib/tools/calendar';
 
 // Windows pinned from Portaria SDA/MAPA nº 1.579/2026
 // (knowledge/portaria-sda-mapa-1579-2026.txt).
@@ -48,5 +53,36 @@ describe('vazioStatus', () => {
     for (const uf of ['MT', 'MS', 'GO', 'PR', 'RS', 'BA', 'MG', 'SP', 'TO', 'MA', 'PI']) {
       expect(VAZIO_SOJA_2026[uf], `missing ${uf}`).toBeDefined();
     }
+  });
+});
+
+describe('upcomingTransitions (daily monitor)', () => {
+  it('flags a vazio end within the window (GO ends 2026-09-24)', () => {
+    const list = upcomingTransitions(new Date('2026-09-20T12:00:00Z'), 7);
+    const go = list.find((t) => t.uf === 'GO' && t.kind === 'vazio_end');
+    expect(go).toBeDefined();
+    expect(go!.daysAway).toBe(4);
+  });
+
+  it('flags a vazio start within the window (MT starts 2026-06-08)', () => {
+    const list = upcomingTransitions(new Date('2026-06-05T12:00:00Z'), 7);
+    expect(list.some((t) => t.uf === 'MT' && t.kind === 'vazio_start')).toBe(true);
+  });
+
+  it('returns nothing in a quiet stretch and sorts by proximity', () => {
+    expect(upcomingTransitions(new Date('2026-08-01T12:00:00Z'), 3)).toEqual([]);
+    const list = upcomingTransitions(new Date('2026-09-18T12:00:00Z'), 14);
+    for (let i = 1; i < list.length; i++) {
+      expect(list[i].daysAway).toBeGreaterThanOrEqual(list[i - 1].daysAway);
+    }
+  });
+});
+
+describe('isCalendarStale', () => {
+  it('is fresh during the 2026/27 season', () => {
+    expect(isCalendarStale(new Date('2026-07-07T12:00:00Z'))).toBe(false);
+  });
+  it('goes stale well past the last window', () => {
+    expect(isCalendarStale(new Date('2027-03-01T12:00:00Z'))).toBe(true);
   });
 });
