@@ -5,18 +5,19 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { InboundMessage } from './transport/types';
+import { createLogger } from './logger';
+import { requireEnv } from './env';
 
+const log = createLogger('db');
 let cached: SupabaseClient | null = null;
 
 export function getDb(): SupabaseClient {
   if (cached) return cached;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured');
-  }
-  cached = createClient(url, key, { auth: { persistSession: false } });
+  cached = createClient(
+    requireEnv('SUPABASE_URL'),
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { persistSession: false } }
+  );
   return cached;
 }
 
@@ -40,7 +41,7 @@ export async function upsertUser(
     .select()
     .single();
   if (error) {
-    console.error('upsertUser failed:', error.message);
+    log.error('upsertUser failed:', error.message);
     return null;
   }
   return data as UserRow;
@@ -56,7 +57,7 @@ export async function setFarmLocation(
   const { error } = await db
     .from('farms')
     .upsert({ user_id: userId, lat, lon }, { onConflict: 'user_id' });
-  if (error) console.error('setFarmLocation failed:', error.message);
+  if (error) log.error('setFarmLocation failed:', error.message);
 }
 
 /** Fetch a user's most recent farm location, if any. */
@@ -73,7 +74,7 @@ export async function getFarmLocation(
     .limit(1)
     .maybeSingle();
   if (error) {
-    console.error('getFarmLocation failed:', error.message);
+    log.error('getFarmLocation failed:', error.message);
     return null;
   }
   if (!data || data.lat == null || data.lon == null) return null;
@@ -94,7 +95,7 @@ export async function logMessage(
     intent: msg.intent ?? null,
     provider_message_id: msg.messageId ?? null,
   });
-  if (error) console.error('logMessage failed:', error.message);
+  if (error) log.error('logMessage failed:', error.message);
 }
 
 /** LGPD deletion: wipe a user's data on request. */
@@ -111,12 +112,8 @@ export async function deleteUserData(waId: string): Promise<boolean> {
   await db.from('farms').delete().eq('user_id', userId);
   const { error } = await db.from('users').delete().eq('id', userId);
   if (error) {
-    console.error('deleteUserData failed:', error.message);
+    log.error('deleteUserData failed:', error.message);
     return false;
   }
   return true;
-}
-
-export function toInboundKind(msg: InboundMessage): string {
-  return msg.kind;
 }

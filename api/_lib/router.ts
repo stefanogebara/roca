@@ -7,6 +7,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { InboundMessage } from './transport/types';
+import { MODELS } from './env';
 
 export type Intent =
   | 'pest_triage'
@@ -52,7 +53,7 @@ export async function routeIntent(
 
   try {
     const resp = await client.messages.create({
-      model: process.env.ROCA_ROUTER_MODEL || 'claude-haiku-4-5-20251001',
+      model: MODELS.router(),
       max_tokens: 12,
       system: ROUTER_INSTRUCTION,
       messages: [{ role: 'user', content: text }],

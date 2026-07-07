@@ -13,9 +13,10 @@ import { SYSTEM_PROMPT, PEST_HANDOFF_REMINDER } from './prompts/system';
 import { fetchHourlyWeather } from './tools/weather';
 import { sprayWindow, type SprayWindow } from './tools/deltaT';
 import { getFarmLocation } from './db';
+import { MODELS } from './env';
 
 function reasoningModel(): string {
-  return process.env.ROCA_REASONING_MODEL || 'claude-sonnet-5';
+  return MODELS.reasoning();
 }
 
 /** Format a spray-window result into a compact WhatsApp reply. */

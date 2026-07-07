@@ -15,6 +15,9 @@ import {
   logMessage,
   deleteUserData,
 } from './db';
+import { createLogger } from './logger';
+
+const log = createLogger('pipeline');
 
 let anthropic: Anthropic | null = null;
 function getAnthropic(): Anthropic {
@@ -76,7 +79,7 @@ export async function handleInbound(
     try {
       media = await adapter.fetchMedia(msg.mediaUrl);
     } catch (e) {
-      console.error('media fetch failed:', (e as Error).message);
+      log.error('media fetch failed:', (e as Error).message);
     }
   }
 
@@ -84,14 +87,14 @@ export async function handleInbound(
   try {
     replyText = await reason(msg, intent, { client, userId, media });
   } catch (e) {
-    console.error('reasoning failed:', (e as Error).message);
+    log.error('reasoning failed:', (e as Error).message);
     replyText =
       'Tive um problema pra processar isso agora. Tenta de novo daqui a pouco, ou manda de outro jeito.';
   }
 
   const gate = checkOutbound(replyText);
   if (!gate.safe) {
-    console.error('compliance gate tripped:', gate.flags.join('; '));
+    log.error('compliance gate tripped:', gate.flags.join('; '));
   }
   let finalText = gate.text;
 

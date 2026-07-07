@@ -11,9 +11,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { TwilioAdapter } from './_lib/transport/twilio';
 import { handleInbound } from './_lib/pipeline';
 import type { TransportRequest } from './_lib/transport/types';
+import { createLogger } from './_lib/logger';
 
 const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
 const adapter = new TwilioAdapter();
+const log = createLogger('webhook');
 
 export default async function handler(
   req: VercelRequest,
@@ -55,7 +57,7 @@ export default async function handler(
     await handleInbound(adapter, msg);
     ack();
   } catch (e) {
-    console.error('webhook error:', (e as Error).message);
+    log.error('webhook error:', (e as Error).message);
     ack();
   }
 }
