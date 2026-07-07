@@ -39,6 +39,23 @@ caminhos que já entregam valor real.
 `anthropic/claude-haiku-4.5` (roteador de intenção), `anthropic/claude-sonnet-5`
 (raciocínio/visão), `google/gemini-2.5-flash` (transcrição de áudio).
 
+### Stage 2 — grounding + monitor
+
+- **Grounding Agrofit** (diretriz principal: citar o registro, não inventar).
+  Uma fatia do dataset aberto do Agrofit/MAPA (só `SITUACAO=TRUE`) fica em
+  `api/_lib/data/agrofit.json`. Numa pergunta de praga, o tier barato extrai
+  `{cultura, praga}`, buscamos no Agrofit (match sem acento/hífen, bucket da
+  cultura pesa mais que "todas as culturas", com piso de confiança pra nunca
+  errar o alvo) e injetamos os **ingredientes ativos registrados** (sem dose) +
+  contagem de produtos. O modelo então explica grupos FRAC/rotação e reforça o
+  receituário. Reconstruir: `node scripts/agrofit-extract.mjs`.
+- **Monitor diário** (`api/cron/monitor.ts`, Part 9.3): 1 invocação/dia,
+  protegido por `CRON_SECRET`. Sinaliza transições de vazio sanitário nos
+  próximos 7 dias e se o calendário 2026/27 venceu (hora de buscar a portaria
+  nova). Cada rodada fica em `monitor_runs`.
+- **Sem dependência do SDK Twilio**: assinatura via `node:crypto` (conferida
+  byte a byte contra o SDK oficial) + `fetch`. Typecheck caiu de ~150s → ~5s.
+
 ## Arquitetura
 
 ```
