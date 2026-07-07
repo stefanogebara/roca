@@ -1,8 +1,13 @@
-# Roça 🌱
+# Stevi 🌱
 
 Assistente agronômico brasileiro que vive no WhatsApp. **Triagem, não prescrição.**
 
-Roça ajuda o produtor a entender a lavoura e saber o que perguntar — ele nunca
+> Nome do produto: **Stevi**. Identificadores de infra (pasta do repo, projeto
+> Vercel `roca`, projeto Supabase `roca`, domínio `roca-black.vercel.app`)
+> seguem como `roca` por enquanto — invisíveis pro produtor, e renomear o
+> domínio exigiria reconfigurar o webhook do Twilio. Trocar depois é barato.
+
+Stevi ajuda o produtor a entender a lavoura e saber o que perguntar — ele nunca
 prescreve defensivos (isso é ato do engenheiro agrônomo, via receituário). Tudo
 que ele afirma sobre agronomia é fundamentado (EMBRAPA/Agrofit/FRAC-BR) ou ele
 diz honestamente que não sabe e encaminha para um agrônomo.

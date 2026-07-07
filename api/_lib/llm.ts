@@ -66,7 +66,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://roca-black.vercel.app',
-      'X-Title': 'Roca',
+      'X-Title': 'Stevi',
     },
     body: JSON.stringify({
       model: opts.model,

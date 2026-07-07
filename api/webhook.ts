@@ -1,5 +1,5 @@
 /**
- * Roça WhatsApp webhook (Stage 0 — Twilio sandbox).
+ * Stevi WhatsApp webhook (Stage 0 — Twilio sandbox).
  *
  * Thin handler: verify signature → parse → run pipeline → ack. Reply is sent
  * asynchronously via the transport's REST API, so we return empty TwiML.
@@ -22,7 +22,7 @@ export default async function handler(
   res: VercelResponse
 ): Promise<void> {
   if (req.method === 'GET') {
-    res.status(200).json({ status: 'ok', service: 'roca-webhook' });
+    res.status(200).json({ status: 'ok', service: 'stevi-webhook' });
     return;
   }
   if (req.method !== 'POST') {
