@@ -15,6 +15,47 @@ import { sprayWindow, type SprayWindow } from './tools/deltaT';
 import { getFarmLocation } from './db';
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
+import { lookupPest, normalizeCrop, groundingBlock } from './tools/agrofit';
+import { createLogger } from './logger';
+
+const log = createLogger('reason');
+
+/**
+ * Extract {crop, pest} from a pest question using the cheap tier, so we can
+ * ground the answer in Agrofit. Returns nulls on any failure — grounding is
+ * best-effort and never blocks the reply.
+ */
+async function extractPestTarget(
+  text: string
+): Promise<{ crop: string | null; pest: string | null }> {
+  try {
+    const raw = await chat({
+      model: MODELS.router(),
+      maxTokens: 60,
+      system:
+        'Extraia cultura e praga/doença da mensagem do produtor. Responda SÓ um JSON: {"crop":"soja|milho|pastagem|outro","pest":"nome da praga ou doença, ou vazio"}. Sem texto extra.',
+      user: text,
+    });
+    const match = raw.match(/\{[^}]*\}/);
+    if (!match) return { crop: null, pest: null };
+    const parsed = JSON.parse(match[0]) as { crop?: string; pest?: string };
+    return {
+      crop: parsed.crop && parsed.crop !== 'outro' ? parsed.crop : null,
+      pest: parsed.pest || null,
+    };
+  } catch (e) {
+    log.error('pest target extraction failed:', (e as Error).message);
+    return { crop: null, pest: null };
+  }
+}
+
+/** Agrofit grounding for a pest question, or null if nothing matched. */
+async function pestGrounding(text: string): Promise<string | null> {
+  const target = await extractPestTarget(text);
+  if (!target.pest) return null;
+  const hit = lookupPest(normalizeCrop(target.crop), target.pest);
+  return hit ? groundingBlock(hit) : null;
+}
 
 /** Format a spray-window result into a compact WhatsApp reply. */
 export function phraseSpray(w: SprayWindow): string {
@@ -64,7 +105,18 @@ async function handleText(
   context: string | null
 ): Promise<string> {
   const extra = intent === 'pest_triage' ? '\n\n' + PEST_HANDOFF_REMINDER : '';
-  const ctx = context ? `\n\n[Dados derivados da lavoura]\n${context}` : '';
+
+  // Ground pest/disease questions in the Agrofit registry.
+  let grounding: string | null = null;
+  if (intent === 'pest_triage' && msg.text) {
+    grounding = await pestGrounding(msg.text);
+  }
+
+  const blocks: string[] = [];
+  if (grounding) blocks.push(`[Registro Agrofit — use isto como base, não invente]\n${grounding}`);
+  if (context) blocks.push(`[Dados derivados da lavoura]\n${context}`);
+  const ctx = blocks.length ? '\n\n' + blocks.join('\n\n') : '';
+
   return chat({
     model: MODELS.reasoning(),
     system: SYSTEM_PROMPT + extra,

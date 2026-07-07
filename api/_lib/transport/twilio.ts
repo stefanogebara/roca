@@ -1,12 +1,16 @@
 /**
  * Twilio WhatsApp Sandbox adapter (Stage 0 transport).
  *
- * Twilio posts URL-encoded form bodies and expects a TwiML reply, but we send
- * asynchronously via the REST API to keep the pipeline uniform with Cloud API.
- * The webhook returns empty TwiML immediately; the real answer is sent out-of-band.
+ * We talk to Twilio over plain HTTPS + node:crypto rather than the `twilio` SDK:
+ * the SDK ships ~1000 per-resource .d.ts files that dominated typecheck time,
+ * and we use exactly two things — request-signature validation and sending a
+ * message. Both are a few lines here.
+ *
+ * Twilio posts URL-encoded form bodies; we reply asynchronously via the REST API
+ * (empty TwiML ack in the webhook) to keep the pipeline uniform with Cloud API.
  */
 
-import twilio from 'twilio';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
   TransportAdapter,
   TransportRequest,
@@ -14,6 +18,8 @@ import type {
   OutboundMessage,
   InboundKind,
 } from './types';
+
+const TWILIO_API = 'https://api.twilio.com/2010-04-01';
 
 function formToObject(body: unknown): Record<string, string> {
   if (body && typeof body === 'object' && !Array.isArray(body)) {
@@ -35,31 +41,38 @@ function classifyMedia(mime: string | null): InboundKind {
   return 'unsupported';
 }
 
+/**
+ * Twilio's request signature: HMAC-SHA1 over (URL + each POST param key
+ * immediately followed by its value, sorted by key), base64-encoded, keyed by
+ * the auth token. Validated against the X-Twilio-Signature header.
+ */
+export function computeTwilioSignature(
+  authToken: string,
+  url: string,
+  params: Record<string, string>
+): string {
+  const sorted = Object.keys(params).sort();
+  const payload = url + sorted.map((k) => k + params[k]).join('');
+  return createHmac('sha1', authToken).update(payload, 'utf8').digest('base64');
+}
+
 export class TwilioAdapter implements TransportAdapter {
   readonly provider = 'twilio';
   readonly isSync = false;
-
-  private client: twilio.Twilio | null = null;
-
-  private getClient(): twilio.Twilio {
-    if (this.client) return this.client;
-    const sid = process.env.TWILIO_ACCOUNT_SID;
-    const token = process.env.TWILIO_AUTH_TOKEN;
-    if (!sid || !token) {
-      throw new Error('TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not configured');
-    }
-    this.client = twilio(sid, token);
-    return this.client;
-  }
 
   async verifySignature(req: TransportRequest): Promise<boolean> {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (!authToken) return false;
     const signature = req.headers['x-twilio-signature'];
     if (typeof signature !== 'string') return false;
+
     const host = req.headers['host'];
     const url = `https://${host}${req.url ?? ''}`;
-    return twilio.validateRequest(authToken, signature, url, formToObject(req.body));
+    const expected = computeTwilioSignature(authToken, url, formToObject(req.body));
+
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    return a.length === b.length && timingSafeEqual(a, b);
   }
 
   async parseInbound(req: TransportRequest): Promise<InboundMessage | null> {
@@ -101,18 +114,35 @@ export class TwilioAdapter implements TransportAdapter {
   }
 
   async send(msg: OutboundMessage): Promise<void> {
-    const fromNumber = process.env.TWILIO_WHATSAPP_FROM;
-    if (!fromNumber) throw new Error('TWILIO_WHATSAPP_FROM not configured');
-    await this.getClient().messages.create({
-      from: fromNumber,
-      to: `whatsapp:${msg.to}`,
-      body: msg.text,
+    const sid = process.env.TWILIO_ACCOUNT_SID;
+    const token = process.env.TWILIO_AUTH_TOKEN;
+    const from = process.env.TWILIO_WHATSAPP_FROM;
+    if (!sid || !token || !from) {
+      throw new Error('Twilio credentials / TWILIO_WHATSAPP_FROM not configured');
+    }
+    const auth = Buffer.from(`${sid}:${token}`).toString('base64');
+    const body = new URLSearchParams({
+      From: from,
+      To: `whatsapp:${msg.to}`,
+      Body: msg.text,
     });
+    const res = await fetch(`${TWILIO_API}/Accounts/${sid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Twilio send failed ${res.status}: ${text.slice(0, 200)}`);
+    }
   }
 
   /**
-   * Twilio media URLs require basic-auth with the account credentials.
-   * Returns the media as a base64 data payload for Claude vision.
+   * Fetch inbound media (image/voice). Twilio media URLs require basic-auth with
+   * the account credentials. Returns base64 + mime for the LLM.
    */
   async fetchMedia(url: string): Promise<{ base64: string; mime: string }> {
     const sid = process.env.TWILIO_ACCOUNT_SID;

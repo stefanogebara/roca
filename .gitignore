@@ -5,5 +5,9 @@ node_modules/
 .vercel/
 dist/
 coverage/
+tsc-out.txt
+
+# Raw Agrofit dump (368 MB) — we commit the extracted slice, not the source.
+knowledge/agrofit/*.csv
 
 .vercel
