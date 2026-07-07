@@ -98,6 +98,20 @@ export async function logMessage(
   if (error) log.error('logMessage failed:', error.message);
 }
 
+/**
+ * Record that the LGPD consent note was delivered. Until the user objects (or
+ * asks for deletion), continued use after being informed is the working basis;
+ * this timestamp is what stops the note repeating on every message.
+ */
+export async function markConsentNotified(userId: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('users')
+    .update({ consent_lgpd_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) log.error('markConsentNotified failed:', error.message);
+}
+
 /** LGPD deletion: wipe a user's data on request. */
 export async function deleteUserData(waId: string): Promise<boolean> {
   const db = getDb();

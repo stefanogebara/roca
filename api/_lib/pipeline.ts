@@ -14,6 +14,7 @@ import {
   setFarmLocation,
   logMessage,
   deleteUserData,
+  markConsentNotified,
 } from './db';
 import { createLogger } from './logger';
 
@@ -101,6 +102,7 @@ export async function handleInbound(
   if (firstContact) finalText += CONSENT_NOTE;
 
   await adapter.send({ to: msg.from, text: finalText });
+  if (firstContact && userId) await markConsentNotified(userId);
   await logMessage(userId, 'out', {
     kind: 'text',
     text: finalText,
