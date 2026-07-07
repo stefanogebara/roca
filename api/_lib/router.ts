@@ -5,9 +5,12 @@
  * path: general reasoning with the handoff, never a confident prescription.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import type { InboundMessage } from './transport/types';
+import { chat } from './llm';
 import { MODELS } from './env';
+import { createLogger } from './logger';
+
+const log = createLogger('router');
 
 export type Intent =
   | 'pest_triage'
@@ -40,10 +43,7 @@ const VALID: Intent[] = [
  * Route a message to an intent. Structural fast-paths first; LLM classification
  * for text. Defaults to 'general' (safe path) if classification is unclear.
  */
-export async function routeIntent(
-  msg: InboundMessage,
-  client: Anthropic
-): Promise<Intent> {
+export async function routeIntent(msg: InboundMessage): Promise<Intent> {
   // Structural signals beat the LLM.
   if (msg.kind === 'image') return 'pest_triage';
   if (msg.kind === 'location') return 'onboarding';
@@ -52,18 +52,18 @@ export async function routeIntent(
   if (!text) return 'general';
 
   try {
-    const resp = await client.messages.create({
+    const raw = await chat({
       model: MODELS.router(),
-      max_tokens: 12,
       system: ROUTER_INSTRUCTION,
-      messages: [{ role: 'user', content: text }],
+      user: text,
+      maxTokens: 12,
     });
-    const raw =
-      resp.content[0]?.type === 'text' ? resp.content[0].text.trim().toLowerCase() : '';
-    const match = VALID.find((v) => raw.includes(v));
+    const lowered = raw.toLowerCase();
+    const match = VALID.find((v) => lowered.includes(v));
     return match ?? 'general';
-  } catch {
+  } catch (e) {
     // Never fail the whole message on a classification error — degrade to safe path.
+    log.error('intent classification failed:', (e as Error).message);
     return 'general';
   }
 }

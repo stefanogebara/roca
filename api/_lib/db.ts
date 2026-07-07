@@ -47,17 +47,68 @@ export async function upsertUser(
   return data as UserRow;
 }
 
-/** Persist the latest known farm location so weather/soil can be derived. */
+/** Persist the latest known farm location; returns the farm id for caching. */
 export async function setFarmLocation(
   userId: string,
   lat: number,
   lon: number
-): Promise<void> {
+): Promise<string | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('farms')
+    .upsert({ user_id: userId, lat, lon }, { onConflict: 'user_id' })
+    .select('id')
+    .single();
+  if (error) {
+    log.error('setFarmLocation failed:', error.message);
+    return null;
+  }
+  return (data as { id: string }).id;
+}
+
+/** Store the derived UF on the user (drives vazio sanitário awareness). */
+export async function setUserState(userId: string, uf: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('users').update({ state: uf }).eq('id', userId);
+  if (error) log.error('setUserState failed:', error.message);
+}
+
+/** Read the user's stored UF, if known. */
+export async function getUserState(userId: string): Promise<string | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('users')
+    .select('state')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    log.error('getUserState failed:', error.message);
+    return null;
+  }
+  return (data as { state: string | null } | null)?.state ?? null;
+}
+
+/** Cache derived soil data per farm (soil is effectively static). */
+export async function setCachedSoil(farmId: string, soil: unknown): Promise<void> {
   const db = getDb();
   const { error } = await db
-    .from('farms')
-    .upsert({ user_id: userId, lat, lon }, { onConflict: 'user_id' });
-  if (error) log.error('setFarmLocation failed:', error.message);
+    .from('farm_derived')
+    .upsert({ farm_id: farmId, soil_json: soil, fetched_at: new Date().toISOString() });
+  if (error) log.error('setCachedSoil failed:', error.message);
+}
+
+export async function getCachedSoil<T>(farmId: string): Promise<T | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('farm_derived')
+    .select('soil_json')
+    .eq('farm_id', farmId)
+    .maybeSingle();
+  if (error) {
+    log.error('getCachedSoil failed:', error.message);
+    return null;
+  }
+  return ((data as { soil_json: T | null } | null)?.soil_json as T) ?? null;
 }
 
 /** Fetch a user's most recent farm location, if any. */
@@ -84,7 +135,13 @@ export async function getFarmLocation(
 export async function logMessage(
   userId: string | null,
   direction: 'in' | 'out',
-  msg: { kind: string; text: string | null; intent?: string | null; messageId?: string }
+  msg: {
+    kind: string;
+    text: string | null;
+    intent?: string | null;
+    messageId?: string;
+    transcript?: string | null;
+  }
 ): Promise<void> {
   const db = getDb();
   const { error } = await db.from('messages').insert({
@@ -92,6 +149,7 @@ export async function logMessage(
     direction,
     kind: msg.kind,
     raw: msg.text,
+    transcript: msg.transcript ?? null,
     intent: msg.intent ?? null,
     provider_message_id: msg.messageId ?? null,
   });

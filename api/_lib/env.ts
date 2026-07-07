@@ -11,7 +11,10 @@ export function requireEnv(name: string): string {
   return value;
 }
 
+// OpenRouter slugs. Reason by tier: cheap classifier vs. flagship reasoning;
+// transcription needs an audio-capable multimodal model.
 export const MODELS = {
-  router: () => process.env.ROCA_ROUTER_MODEL || 'claude-haiku-4-5-20251001',
-  reasoning: () => process.env.ROCA_REASONING_MODEL || 'claude-sonnet-5',
+  router: () => process.env.ROCA_ROUTER_MODEL || 'anthropic/claude-haiku-4.5',
+  reasoning: () => process.env.ROCA_REASONING_MODEL || 'anthropic/claude-sonnet-5',
+  transcribe: () => process.env.ROCA_TRANSCRIBE_MODEL || 'google/gemini-2.5-flash',
 };

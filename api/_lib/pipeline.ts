@@ -1,17 +1,19 @@
 /**
- * The message pipeline: normalize → route → onboard/derive → reason → compliance
- * gate → persist → reply. Transport-agnostic; the webhook hands it an adapter.
+ * The message pipeline: normalize (ASR for voice) → route → farm card or
+ * reason → compliance gate → persist → reply. Transport-agnostic; the webhook
+ * hands it an adapter.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import type { TransportAdapter, InboundMessage } from './transport/types';
 import { TwilioAdapter } from './transport/twilio';
-import { routeIntent } from './router';
+import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
+import { buildFarmCard } from './farmcard';
+import { transcribeVoice } from './transcribe';
 import { checkOutbound } from './compliance';
+import type { ChatImage } from './llm';
 import {
   upsertUser,
-  setFarmLocation,
   logMessage,
   deleteUserData,
   markConsentNotified,
@@ -20,23 +22,13 @@ import { createLogger } from './logger';
 
 const log = createLogger('pipeline');
 
-let anthropic: Anthropic | null = null;
-function getAnthropic(): Anthropic {
-  if (anthropic) return anthropic;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-  anthropic = new Anthropic({ apiKey });
-  return anthropic;
-}
-
 const LGPD_DELETE = /\b(apaga|apagar|exclui|excluir|delet)\w*\s+(meus?\s+)?dados\b/i;
 const CONSENT_NOTE =
   '\n\n_Pra te dar conselhos melhores eu guardo sua localização e o histórico da conversa. É só o necessário, e você pode pedir "apaga meus dados" quando quiser. Mais tarde posso te conectar com um agrônomo de verdade se precisar._';
 
-/**
- * Whether this is the user's first message (so we append the LGPD/consent note).
- * upsertUser returns the row; a freshly-created row has no consent timestamp yet.
- */
+const FALLBACK_REPLY =
+  'Tive um problema pra processar isso agora. Tenta de novo daqui a pouco, ou manda de outro jeito.';
+
 function isFirstContact(user: { consent_lgpd_at: string | null } | null): boolean {
   return !!user && user.consent_lgpd_at == null;
 }
@@ -45,8 +37,6 @@ export async function handleInbound(
   adapter: TransportAdapter,
   msg: InboundMessage
 ): Promise<void> {
-  const client = getAnthropic();
-
   // LGPD deletion short-circuit — honour it before anything else.
   if (msg.text && LGPD_DELETE.test(msg.text)) {
     await deleteUserData(msg.from);
@@ -61,36 +51,52 @@ export async function handleInbound(
   const userId = user?.id ?? null;
   const firstContact = isFirstContact(user);
 
-  await logMessage(userId, 'in', {
-    kind: msg.kind,
-    text: msg.text,
-    messageId: msg.messageId,
-  });
-
-  // Location messages: persist and (if that's all they sent) reflect the payback moment.
-  if (msg.kind === 'location' && msg.location && userId) {
-    await setFarmLocation(userId, msg.location.lat, msg.location.lon);
-  }
-
-  const intent = await routeIntent(msg, client);
-
-  // Fetch image media lazily, only for pest triage on the Twilio path.
-  let media: { base64: string; mime: string } | null = null;
-  if (msg.kind === 'image' && msg.mediaUrl && adapter instanceof TwilioAdapter) {
+  // Media fetch (image or voice) — Twilio-specific, lazy, fail-soft.
+  let media: ChatImage | null = null;
+  let transcript: string | null = null;
+  if (msg.mediaUrl && adapter instanceof TwilioAdapter) {
     try {
-      media = await adapter.fetchMedia(msg.mediaUrl);
+      const fetched = await adapter.fetchMedia(msg.mediaUrl);
+      if (msg.kind === 'image') {
+        media = { base64: fetched.base64, mime: fetched.mime };
+      } else if (msg.kind === 'voice') {
+        transcript = await transcribeVoice(fetched.base64, fetched.mime);
+      }
     } catch (e) {
       log.error('media fetch failed:', (e as Error).message);
     }
   }
 
+  // A transcribed voice note becomes a normal text message downstream.
+  const effective: InboundMessage =
+    msg.kind === 'voice' && transcript ? { ...msg, kind: 'text', text: transcript } : msg;
+
+  await logMessage(userId, 'in', {
+    kind: msg.kind,
+    text: effective.text,
+    transcript,
+    messageId: msg.messageId,
+  });
+
+  let intent: Intent;
   let replyText: string;
-  try {
-    replyText = await reason(msg, intent, { client, userId, media });
-  } catch (e) {
-    log.error('reasoning failed:', (e as Error).message);
+
+  if (msg.kind === 'voice' && !transcript) {
+    intent = 'general';
     replyText =
-      'Tive um problema pra processar isso agora. Tenta de novo daqui a pouco, ou manda de outro jeito.';
+      'Recebi seu áudio mas não consegui entender direito. 🙉 Pode escrever em texto, ou mandar o áudio de novo mais pertinho do celular?';
+  } else if (effective.kind === 'location' && effective.location) {
+    // Pin drop → the payback moment. Deterministic, no LLM needed.
+    intent = 'onboarding';
+    replyText = await buildFarmCard(userId, effective.location.lat, effective.location.lon);
+  } else {
+    intent = await routeIntent(effective);
+    try {
+      replyText = await reason(effective, intent, { userId, media });
+    } catch (e) {
+      log.error('reasoning failed:', (e as Error).message);
+      replyText = FALLBACK_REPLY;
+    }
   }
 
   const gate = checkOutbound(replyText);

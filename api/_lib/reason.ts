@@ -1,26 +1,23 @@
 /**
  * Reasoning engine. Takes a routed message + any derived field data and produces
  * the farmer-facing reply. Two special paths bypass free-form generation:
- *   - spray_window: deterministic Delta T verdict, phrased by a short LLM pass.
- *   - pest_triage (image): Claude vision with the handoff reminder.
- * Everything else is grounded PT-BR reasoning under the system prompt.
+ *   - spray_window: deterministic Delta T verdict, deterministic phrasing.
+ *   - location pin: onboarding payback moment (instant personalized read).
+ * Everything else is grounded PT-BR reasoning under the system prompt, via
+ * OpenRouter (vision included for leaf photos).
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import type { InboundMessage } from './transport/types';
 import type { Intent } from './router';
 import { SYSTEM_PROMPT, PEST_HANDOFF_REMINDER } from './prompts/system';
 import { fetchHourlyWeather } from './tools/weather';
 import { sprayWindow, type SprayWindow } from './tools/deltaT';
 import { getFarmLocation } from './db';
+import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
 
-function reasoningModel(): string {
-  return MODELS.reasoning();
-}
-
 /** Format a spray-window result into a compact WhatsApp reply. */
-function phraseSpray(w: SprayWindow): string {
+export function phraseSpray(w: SprayWindow): string {
   const emoji = { go: '✅', caution: '⚠️', 'no-go': '🚫' } as const;
   const label = { go: 'Pode pulverizar', caution: 'Atenção', 'no-go': 'Melhor não' } as const;
   const lines = [`${emoji[w.now.verdict]} ${label[w.now.verdict]} agora.`];
@@ -49,67 +46,39 @@ async function handleSpray(
   }
 }
 
-async function handleVision(
-  msg: InboundMessage,
-  mediaBase64: string,
-  mediaMime: string,
-  client: Anthropic
-): Promise<string> {
-  const resp = await client.messages.create({
-    model: reasoningModel(),
-    max_tokens: 700,
+async function handleVision(msg: InboundMessage, media: ChatImage): Promise<string> {
+  return chat({
+    model: MODELS.reasoning(),
     system: SYSTEM_PROMPT + '\n\n' + PEST_HANDOFF_REMINDER,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mediaMime as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
-              data: mediaBase64,
-            },
-          },
-          {
-            type: 'text',
-            text:
-              (msg.text ? `O produtor disse: "${msg.text}". ` : '') +
-              'Olhe a foto da lavoura. Diga o que provavelmente é (com grau de confiança honesto), explique o porquê em uma linha, oriente o manejo em princípio (MIP) e encaminhe a decisão de produto/dose pro agrônomo com receituário. Se não der pra identificar com segurança, diga isso e peça uma foto melhor ou indique procurar um agrônomo. Resposta curta, tamanho WhatsApp.',
-          },
-        ],
-      },
-    ],
+    maxTokens: 700,
+    image: media,
+    user:
+      (msg.text ? `O produtor disse: "${msg.text}". ` : '') +
+      'Olhe a foto da lavoura. Diga o que provavelmente é (com grau de confiança honesto), explique o porquê em uma linha, oriente o manejo em princípio (MIP) e encaminhe a decisão de produto/dose pro agrônomo com receituário. Se não der pra identificar com segurança, diga isso e peça uma foto melhor ou indique procurar um agrônomo. Resposta curta, tamanho WhatsApp.',
   });
-  return resp.content[0]?.type === 'text'
-    ? resp.content[0].text
-    : 'Não consegui analisar a imagem. Pode mandar de novo, mais de perto e com boa luz?';
 }
 
 async function handleText(
   msg: InboundMessage,
   intent: Intent,
-  client: Anthropic,
   context: string | null
 ): Promise<string> {
   const extra = intent === 'pest_triage' ? '\n\n' + PEST_HANDOFF_REMINDER : '';
   const ctx = context ? `\n\n[Dados derivados da lavoura]\n${context}` : '';
-  const resp = await client.messages.create({
-    model: reasoningModel(),
-    max_tokens: 600,
+  return chat({
+    model: MODELS.reasoning(),
     system: SYSTEM_PROMPT + extra,
-    messages: [{ role: 'user', content: (msg.text ?? '') + ctx }],
+    maxTokens: 600,
+    user: (msg.text ?? '') + ctx,
   });
-  return resp.content[0]?.type === 'text'
-    ? resp.content[0].text
-    : 'Desculpa, não entendi. Pode reescrever?';
 }
 
 export interface ReasonDeps {
-  client: Anthropic;
   userId: string | null;
   /** Pre-fetched media (image) as base64, when the transport supplied it. */
-  media?: { base64: string; mime: string } | null;
+  media?: ChatImage | null;
+  /** Extra derived context (farm card facts) to ground the reply. */
+  context?: string | null;
 }
 
 /** Produce a reply for a routed message. */
@@ -126,25 +95,13 @@ export async function reason(
     return handleSpray(msg, deps.userId);
   }
 
-  // A shared pin is the onboarding payback moment: acknowledge + give an
-  // immediate, personalized read (spray window now), then ask the one next
-  // question (crop). Never route a text-less message into free-form reasoning.
-  if (msg.kind === 'location' && msg.location) {
-    const spray = await handleSpray(msg, deps.userId);
-    return (
-      'Prontinho, guardei a localização da sua lavoura. 📍\n\nJá te adianto o clima de agora:\n' +
-      spray +
-      '\n\nMe conta: o que você planta aí? Soja, milho, pasto?'
-    );
+  if (msg.kind === 'image' && deps.media) {
+    return handleVision(msg, deps.media);
   }
 
   if (!msg.text) {
     return 'Recebi sua mensagem, mas não consegui ler o conteúdo. Me manda em texto ou áudio que eu te ajudo!';
   }
 
-  if (msg.kind === 'image' && deps.media) {
-    return handleVision(msg, deps.media.base64, deps.media.mime, deps.client);
-  }
-
-  return handleText(msg, intent, deps.client, null);
+  return handleText(msg, intent, deps.context ?? null);
 }
