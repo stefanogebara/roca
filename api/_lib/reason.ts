@@ -68,7 +68,7 @@ async function handleText(
   return chat({
     model: MODELS.reasoning(),
     system: SYSTEM_PROMPT + extra,
-    maxTokens: 600,
+    maxTokens: 900,
     user: (msg.text ?? '') + ctx,
   });
 }

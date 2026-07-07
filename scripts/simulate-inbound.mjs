@@ -36,6 +36,15 @@ if (locArg) {
   params.Longitude = lon;
 }
 
+const mediaUrlArg = process.argv.find((a) => a.startsWith('--media-url='));
+const mediaTypeArg = process.argv.find((a) => a.startsWith('--media-type='));
+if (mediaUrlArg) {
+  params.NumMedia = '1';
+  params.MediaUrl0 = mediaUrlArg.split('=').slice(1).join('=');
+  params.MediaContentType0 = mediaTypeArg ? mediaTypeArg.split('=')[1] : 'image/jpeg';
+  params.Body = '';
+}
+
 // Twilio signature: URL + params sorted by key, each key+value appended, HMAC-SHA1, base64.
 const sorted = Object.keys(params).sort();
 const payload = WEBHOOK_URL + sorted.map((k) => k + params[k]).join('');
