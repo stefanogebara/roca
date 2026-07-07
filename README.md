@@ -10,17 +10,29 @@ diz honestamente que não sabe e encaminha para um agrônomo.
 Este é o **Stage 0** do dossiê: o loop do WhatsApp ponta a ponta, com dois
 caminhos que já entregam valor real.
 
-## O que já funciona
+## O que já funciona (Stage 0 + Stage 1)
 
-- **Path A — Triagem de praga/doença por foto** (Claude vision) com o handoff do
+- **Triagem de praga/doença por foto** (visão multimodal) com o handoff do
   receituário embutido.
-- **Path B — Janela de pulverização** ("posso pulverizar hoje?") → veredito
-  Delta T (go / atenção / não) a partir de temperatura, umidade, vento e chuva
-  (Open-Meteo, sem chave de API).
-- **Onboarding por localização** — manda o pin, a gente deriva o clima.
-- **Consentimento LGPD** na primeira interação + `"apaga meus dados"` funcional.
+- **Janela de pulverização** ("posso pulverizar hoje?") → veredito Delta T
+  (go / atenção / não) com temperatura, umidade, vento e chuva (Open-Meteo).
+- **Farm card no pin** — manda a localização e volta: solo (SoilGrids, com
+  cache e fallback pra instabilidade do ISRIC), janela de pulverização agora,
+  e situação do **vazio sanitário** do estado.
+- **Vazio sanitário 2026/27 fundamentado** — janelas por UF da Portaria
+  SDA/MAPA nº 1.579/2026 (fonte crua em `knowledge/`); estados com subdivisão
+  regional recebem resposta com ressalva; UF desconhecida = silêncio (nunca
+  inventar).
+- **Áudio (voice note) PT-BR** — transcrição via modelo multimodal e o
+  transcript segue o fluxo normal.
+- **Consentimento LGPD** na primeira interação (uma vez só) + `"apaga meus
+  dados"` funcional.
 - **Portão de conformidade** que bloqueia qualquer resposta com cara de
   prescrição (produto + dose) e a substitui por um encaminhamento seguro.
+
+**LLM**: tudo via **OpenRouter** (uma chave, tiers por env):
+`anthropic/claude-haiku-4.5` (roteador de intenção), `anthropic/claude-sonnet-5`
+(raciocínio/visão), `google/gemini-2.5-flash` (transcrição de áudio).
 
 ## Arquitetura
 
