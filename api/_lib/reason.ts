@@ -1,0 +1,133 @@
+/**
+ * Reasoning engine. Takes a routed message + any derived field data and produces
+ * the farmer-facing reply. Two special paths bypass free-form generation:
+ *   - spray_window: deterministic Delta T verdict, phrased by a short LLM pass.
+ *   - pest_triage (image): Claude vision with the handoff reminder.
+ * Everything else is grounded PT-BR reasoning under the system prompt.
+ */
+
+import Anthropic from '@anthropic-ai/sdk';
+import type { InboundMessage } from './transport/types';
+import type { Intent } from './router';
+import { SYSTEM_PROMPT, PEST_HANDOFF_REMINDER } from './prompts/system';
+import { fetchHourlyWeather } from './tools/weather';
+import { sprayWindow, type SprayWindow } from './tools/deltaT';
+import { getFarmLocation } from './db';
+
+function reasoningModel(): string {
+  return process.env.ROCA_REASONING_MODEL || 'claude-sonnet-5';
+}
+
+/** Format a spray-window result into a compact WhatsApp reply. */
+function phraseSpray(w: SprayWindow): string {
+  const emoji = { go: '✅', caution: '⚠️', 'no-go': '🚫' } as const;
+  const label = { go: 'Pode pulverizar', caution: 'Atenção', 'no-go': 'Melhor não' } as const;
+  const lines = [`${emoji[w.now.verdict]} ${label[w.now.verdict]} agora.`];
+  lines.push(w.now.reasons.map((r) => `• ${r}`).join('\n'));
+  if (w.bestUpcoming) {
+    const hour = w.bestUpcoming.time.slice(11, 16);
+    lines.push(`\n🕐 Janela melhor hoje: por volta das ${hour} (Delta T ${w.bestUpcoming.deltaT} °C).`);
+  }
+  return lines.join('\n');
+}
+
+async function handleSpray(
+  msg: InboundMessage,
+  userId: string | null
+): Promise<string> {
+  let coords = msg.location;
+  if (!coords && userId) coords = await getFarmLocation(userId);
+  if (!coords) {
+    return 'Pra te dizer se dá pra pulverizar, preciso saber onde fica sua lavoura. Manda sua localização aqui pelo WhatsApp (clipe 📎 → Localização) que eu calculo o Delta T, vento e chuva pra você.';
+  }
+  try {
+    const hours = await fetchHourlyWeather(coords, 12);
+    return phraseSpray(sprayWindow(hours));
+  } catch {
+    return 'Não consegui puxar o clima da sua região agora. Como referência: a janela boa de Delta T é entre 2 e 8 °C, vento fraco (abaixo de ~10 km/h) e sem chuva próxima. Tenta de novo daqui a pouco.';
+  }
+}
+
+async function handleVision(
+  msg: InboundMessage,
+  mediaBase64: string,
+  mediaMime: string,
+  client: Anthropic
+): Promise<string> {
+  const resp = await client.messages.create({
+    model: reasoningModel(),
+    max_tokens: 700,
+    system: SYSTEM_PROMPT + '\n\n' + PEST_HANDOFF_REMINDER,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaMime as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
+              data: mediaBase64,
+            },
+          },
+          {
+            type: 'text',
+            text:
+              (msg.text ? `O produtor disse: "${msg.text}". ` : '') +
+              'Olhe a foto da lavoura. Diga o que provavelmente é (com grau de confiança honesto), explique o porquê em uma linha, oriente o manejo em princípio (MIP) e encaminhe a decisão de produto/dose pro agrônomo com receituário. Se não der pra identificar com segurança, diga isso e peça uma foto melhor ou indique procurar um agrônomo. Resposta curta, tamanho WhatsApp.',
+          },
+        ],
+      },
+    ],
+  });
+  return resp.content[0]?.type === 'text'
+    ? resp.content[0].text
+    : 'Não consegui analisar a imagem. Pode mandar de novo, mais de perto e com boa luz?';
+}
+
+async function handleText(
+  msg: InboundMessage,
+  intent: Intent,
+  client: Anthropic,
+  context: string | null
+): Promise<string> {
+  const extra = intent === 'pest_triage' ? '\n\n' + PEST_HANDOFF_REMINDER : '';
+  const ctx = context ? `\n\n[Dados derivados da lavoura]\n${context}` : '';
+  const resp = await client.messages.create({
+    model: reasoningModel(),
+    max_tokens: 600,
+    system: SYSTEM_PROMPT + extra,
+    messages: [{ role: 'user', content: (msg.text ?? '') + ctx }],
+  });
+  return resp.content[0]?.type === 'text'
+    ? resp.content[0].text
+    : 'Desculpa, não entendi. Pode reescrever?';
+}
+
+export interface ReasonDeps {
+  client: Anthropic;
+  userId: string | null;
+  /** Pre-fetched media (image) as base64, when the transport supplied it. */
+  media?: { base64: string; mime: string } | null;
+}
+
+/** Produce a reply for a routed message. */
+export async function reason(
+  msg: InboundMessage,
+  intent: Intent,
+  deps: ReasonDeps
+): Promise<string> {
+  if (intent === 'smalltalk') {
+    return 'Opa! Eu sou o Roça, seu ajudante de lavoura aqui no WhatsApp. 🌱 Você pode me mandar foto de uma folha ou praga pra eu dar uma olhada, perguntar "posso pulverizar hoje?" (me manda sua localização), ou tirar dúvidas sobre soja, milho e pasto. Importante: eu ajudo a entender e a saber o que perguntar — quem prescreve produto é o agrônomo. Como posso ajudar?';
+  }
+
+  if (intent === 'spray_window') {
+    return handleSpray(msg, deps.userId);
+  }
+
+  if (msg.kind === 'image' && deps.media) {
+    return handleVision(msg, deps.media.base64, deps.media.mime, deps.client);
+  }
+
+  return handleText(msg, intent, deps.client, null);
+}
