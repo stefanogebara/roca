@@ -126,6 +126,22 @@ export async function reason(
     return handleSpray(msg, deps.userId);
   }
 
+  // A shared pin is the onboarding payback moment: acknowledge + give an
+  // immediate, personalized read (spray window now), then ask the one next
+  // question (crop). Never route a text-less message into free-form reasoning.
+  if (msg.kind === 'location' && msg.location) {
+    const spray = await handleSpray(msg, deps.userId);
+    return (
+      'Prontinho, guardei a localização da sua lavoura. 📍\n\nJá te adianto o clima de agora:\n' +
+      spray +
+      '\n\nMe conta: o que você planta aí? Soja, milho, pasto?'
+    );
+  }
+
+  if (!msg.text) {
+    return 'Recebi sua mensagem, mas não consegui ler o conteúdo. Me manda em texto ou áudio que eu te ajudo!';
+  }
+
   if (msg.kind === 'image' && deps.media) {
     return handleVision(msg, deps.media.base64, deps.media.mime, deps.client);
   }
