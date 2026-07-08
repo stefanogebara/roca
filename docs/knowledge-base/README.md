@@ -79,11 +79,12 @@ culturas". For each `(crop, pest)` it accumulates:
   dosage/description removed by `cleanActive` so only the active name remains,
 - a count of matching registered products.
 
-Focus crops are matched by regex on the `CULTURA` column: `soja`, `milho`, and a
-pasture group (`pastagem|pasto|capim|forrage|braqui`). Rows tagged "todas as
-culturas" are kept in a separate `todas` bucket and unioned into every crop at query
-time. `MODO_DE_ACAO` is intentionally dropped (it's inconsistent free text, not the
-FRAC/IRAC group — the model infers groups from the actives instead).
+Focus crops are matched by regex on the `CULTURA` column: `soja`, `milho`, a
+pasture group (`pastagem|pasto|capim|forrage|braqui`), `café` (`Café`), and
+`citros` (`Citros`/`Limão`). Rows tagged "todas as culturas" are kept in a
+separate `todas` bucket and unioned into every crop at query time. `MODO_DE_ACAO`
+is intentionally dropped (it's inconsistent free text, not the FRAC/IRAC group —
+the model infers groups from the actives instead).
 
 Run it from the repo root:
 
@@ -113,7 +114,7 @@ fresh CSV.
     "source": "Agrofit / MAPA — produtos formulados (dados.agricultura.gov.br)",
     "generated_from": "produtos_formulados.csv",
     "filter": "SITUACAO=TRUE (registro ativo)",
-    "crops": { "soja": 741, "milho": 614, "pastagem": 20, "todas": 224 }
+    "crops": { "soja": 741, "milho": 614, "pastagem": 20, "cafe": 531, "citros": 567, "todas": 224 }
   },
   "data": {
     "soja": {

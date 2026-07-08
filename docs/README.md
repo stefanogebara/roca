@@ -36,7 +36,7 @@ names).
 - **Core logic:** `api/_lib/pipeline.ts` orchestrates the loop; `api/_lib/`
   holds the router, reasoner, compliance gate, transport adapters, tools, and DB
   layer.
-- **Focus crops (v1):** soja (soy), milho (corn), pastagem (pasture).
+- **Focus crops:** soja (soy), milho (corn), pastagem (pasture), café (coffee), citros (citrus). All five are grounded in the Agrofit registry slice.
 - **Language:** all farmer-facing text is Brazilian Portuguese; code and docs are
   English.
 
