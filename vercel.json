@@ -7,9 +7,13 @@
     },
     "api/cron/monitor.ts": {
       "maxDuration": 30
+    },
+    "api/cron/digest.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [
-    { "path": "/api/cron/monitor", "schedule": "0 11 * * *" }
+    { "path": "/api/cron/monitor", "schedule": "0 11 * * *" },
+    { "path": "/api/cron/digest", "schedule": "0 21 * * *" }
   ]
 }
