@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Stevi">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1F7A4C"/>
+      <stop offset="1" stop-color="#0F3D27"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded app tile -->
+  <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#tile)"/>
+  <!-- subtle top sheen -->
+  <rect x="2" y="2" width="44" height="21" rx="13" fill="#ffffff" opacity="0.06"/>
+  <!-- soil seed -->
+  <circle cx="24" cy="34.5" r="2.6" fill="#D96A3F"/>
+  <!-- stem -->
+  <path d="M24 35 C 23.2 30 23.2 27 24 24" fill="none" stroke="#F7F1E4" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- right leaf -->
+  <path d="M24 25.5 C 27.5 19 33 16 38 16.4 C 37 22 31.5 26.5 24 25.5 Z" fill="#F7F1E4"/>
+  <!-- left leaf -->
+  <path d="M24 25.5 C 20.5 19 15 16 10 16.4 C 11 22 16.5 26.5 24 25.5 Z" fill="#EAE0CB"/>
+</svg>

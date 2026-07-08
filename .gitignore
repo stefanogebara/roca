@@ -10,4 +10,7 @@ tsc-out.txt
 # Raw Agrofit dump (368 MB) — we commit the extracted slice, not the source.
 knowledge/agrofit/*.csv
 
+# Landing-page dev artifacts (browser-verification screenshots + OG template)
+web/_shots/
+
 .vercel
