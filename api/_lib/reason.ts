@@ -87,15 +87,86 @@ async function handleSpray(
   }
 }
 
+interface VisionId {
+  pest: string | null;
+  crop: string | null;
+  confidence: 'alta' | 'media' | 'baixa';
+  evidence: string | null;
+}
+
+/** Step 1 of photo triage: identify the pest/disease as structured data. */
+async function identifyFromPhoto(msg: InboundMessage, media: ChatImage): Promise<VisionId | null> {
+  try {
+    const raw = await chat({
+      model: MODELS.reasoning(),
+      maxTokens: 220,
+      image: media,
+      system:
+        'Você é um agrônomo experiente olhando a foto de uma lavoura brasileira. Identifique a praga ou doença mais provável. Responda SÓ um JSON, sem texto extra: {"pest":"nome comum em pt-BR ou vazio se não der","crop":"soja|milho|pastagem|cafe|citros|outro","confidence":"alta|media|baixa","evidence":"uma linha curta do que você observa na imagem"}.',
+      user: msg.text ? `O produtor disse: "${msg.text}".` : 'Analise a foto.',
+    });
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const p = JSON.parse(match[0]) as Partial<VisionId>;
+    const confidence = p.confidence === 'alta' || p.confidence === 'baixa' ? p.confidence : 'media';
+    return {
+      pest: p.pest?.trim() || null,
+      crop: p.crop && p.crop !== 'outro' ? p.crop : null,
+      confidence,
+      evidence: p.evidence?.trim() || null,
+    };
+  } catch (e) {
+    log.error('photo identification failed:', (e as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Photo triage, grounded. Vision identifies → we look the pest up in Agrofit →
+ * a compose pass writes the WhatsApp answer using the registry as its base. If
+ * identification fails we fall back to a single direct vision answer, so a photo
+ * always gets a useful, safe reply.
+ */
 async function handleVision(msg: InboundMessage, media: ChatImage): Promise<string> {
+  const id = await identifyFromPhoto(msg, media);
+
+  if (!id || (!id.pest && id.confidence === 'baixa')) {
+    // Fallback: direct vision answer (still carries the handoff via the prompt).
+    return chat({
+      model: MODELS.reasoning(),
+      system: SYSTEM_PROMPT + '\n\n' + PEST_HANDOFF_REMINDER,
+      maxTokens: 700,
+      image: media,
+      user:
+        (msg.text ? `O produtor disse: "${msg.text}". ` : '') +
+        'Olhe a foto. Diga o que provavelmente é com confiança honesta, explique o porquê em uma linha, oriente o manejo (MIP) e encaminhe produto/dose ao agrônomo com receituário. Se não der pra identificar com segurança, diga isso e peça uma foto melhor. Resposta curta, tamanho WhatsApp.',
+    });
+  }
+
+  let grounding: string | null = null;
+  if (id.pest && id.confidence !== 'baixa') {
+    const hit = lookupPest(normalizeCrop(id.crop), id.pest);
+    if (hit) grounding = groundingBlock(hit);
+  }
+
+  const parts: string[] = [];
+  parts.push(
+    `Identificação visual: ${id.pest ?? 'incerta'} (confiança ${id.confidence}${id.crop ? `, cultura ${id.crop}` : ''}).`
+  );
+  if (id.evidence) parts.push(`O que se vê: ${id.evidence}.`);
+  if (grounding) parts.push(`\n[Registro Agrofit — use como base, não invente]\n${grounding}`);
+
   return chat({
     model: MODELS.reasoning(),
     system: SYSTEM_PROMPT + '\n\n' + PEST_HANDOFF_REMINDER,
-    maxTokens: 700,
-    image: media,
+    maxTokens: 900,
     user:
-      (msg.text ? `O produtor disse: "${msg.text}". ` : '') +
-      'Olhe a foto da lavoura. Diga o que provavelmente é (com grau de confiança honesto), explique o porquê em uma linha, oriente o manejo em princípio (MIP) e encaminhe a decisão de produto/dose pro agrônomo com receituário. Se não der pra identificar com segurança, diga isso e peça uma foto melhor ou indique procurar um agrônomo. Resposta curta, tamanho WhatsApp.',
+      `${parts.join('\n')}\n\n` +
+      `Com base nisso, escreva a resposta pro produtor no WhatsApp: confirme o provável diagnóstico com honestidade sobre a confiança, explique o porquê em uma linha, oriente o manejo em princípio (MIP: monitorar, controle biológico, rotação), e ` +
+      (grounding
+        ? 'cite o que o Agrofit registra (sem dose) e '
+        : '') +
+      `encaminhe a decisão de produto e dose pro agrônomo com receituário. Se a confiança for baixa, seja explícito e peça foto melhor ou indique procurar um agrônomo. Curto, tamanho WhatsApp.`,
   });
 }
 

@@ -27,6 +27,7 @@ export interface UserRow {
   name: string | null;
   state: string | null;
   consent_lgpd_at: string | null;
+  awaiting: string | null;
 }
 
 /** Upsert a user by WhatsApp id, returning the row. */
@@ -71,6 +72,22 @@ export async function setUserState(userId: string, uf: string): Promise<void> {
   const db = getDb();
   const { error } = await db.from('users').update({ state: uf }).eq('id', userId);
   if (error) log.error('setUserState failed:', error.message);
+}
+
+/** Set/clear what Stevi is waiting for from this user (e.g. 'crop'). */
+export async function setAwaiting(userId: string, awaiting: string | null): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('users').update({ awaiting }).eq('id', userId);
+  if (error) log.error('setAwaiting failed:', error.message);
+}
+
+/** Persist the crops a farmer grows (upsert the farm row if needed). */
+export async function setFarmCrops(userId: string, crops: string[]): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('farms')
+    .upsert({ user_id: userId, crop: crops }, { onConflict: 'user_id' });
+  if (error) log.error('setFarmCrops failed:', error.message);
 }
 
 /** Read the user's stored UF, if known. */
@@ -168,6 +185,27 @@ export async function markConsentNotified(userId: string): Promise<void> {
     .update({ consent_lgpd_at: new Date().toISOString() })
     .eq('id', userId);
   if (error) log.error('markConsentNotified failed:', error.message);
+}
+
+/**
+ * Count a user's inbound messages since a timestamp — the rate-limit signal.
+ * Serverless is stateless, so we count in the (indexed) messages table rather
+ * than hold an in-memory window. Returns 0 on error (fail-open: a DB hiccup
+ * shouldn't lock a farmer out).
+ */
+export async function countRecentInbound(userId: string, sinceIso: string): Promise<number> {
+  const db = getDb();
+  const { count, error } = await db
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('direction', 'in')
+    .gte('created_at', sinceIso);
+  if (error) {
+    log.error('countRecentInbound failed:', error.message);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 /** LGPD deletion: wipe a user's data on request. */

@@ -16,10 +16,19 @@ import {
   logMessage,
   deleteUserData,
   markConsentNotified,
+  setAwaiting,
+  setFarmCrops,
+  countRecentInbound,
 } from './db';
+import { parseCrops, joinCrops } from './tools/crops';
 import { createLogger } from './logger';
 
 const log = createLogger('pipeline');
+
+// Rate limit: protects the LLM-calling endpoint from abuse and echo loops.
+// Generous for real use (a human won't send 15 messages in a minute).
+const RATE_MAX_PER_WINDOW = 15;
+const RATE_WINDOW_MS = 60_000;
 
 const LGPD_DELETE = /\b(apaga|apagar|exclui|excluir|delet)\w*\s+(meus?\s+)?dados\b/i;
 const CONSENT_NOTE =
@@ -49,6 +58,29 @@ export async function handleInbound(
   const user = await upsertUser(msg.from, msg.profileName);
   const userId = user?.id ?? null;
   const firstContact = isFirstContact(user);
+
+  // Rate limit before any expensive work (media fetch, LLM). Count prior inbound
+  // in the window; notify once at the threshold, then drop silently so a flood
+  // (or an echo loop) can't turn into a reply storm.
+  if (userId) {
+    const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+    const prior = await countRecentInbound(userId, since);
+    if (prior >= RATE_MAX_PER_WINDOW) {
+      if (prior === RATE_MAX_PER_WINDOW) {
+        await adapter.send({
+          to: msg.from,
+          text: 'Opa, chegou bastante coisa junta! 😅 Me dá uns segundinhos e manda de novo, que eu te respondo com calma.',
+        });
+      }
+      await logMessage(userId, 'in', {
+        kind: msg.kind,
+        text: msg.text,
+        messageId: msg.messageId,
+        intent: 'rate_limited',
+      });
+      return;
+    }
+  }
 
   // Media fetch (image or voice) — provider-agnostic, lazy, fail-soft.
   let media: ChatImage | null = null;
@@ -80,7 +112,22 @@ export async function handleInbound(
   let intent: Intent;
   let replyText: string;
 
-  if (msg.kind === 'voice' && !transcript) {
+  // If we asked what they grow (right after the farm card) and they replied with
+  // recognizable crops, capture them. A non-crop reply clears the wait and falls
+  // through to normal handling, so the message is never swallowed.
+  const cropAnswer =
+    user?.awaiting === 'crop' && effective.kind === 'text' && effective.text
+      ? parseCrops(effective.text)
+      : null;
+
+  if (cropAnswer && cropAnswer.length > 0) {
+    if (userId) {
+      await setFarmCrops(userId, cropAnswer);
+      await setAwaiting(userId, null);
+    }
+    intent = 'onboarding';
+    replyText = `Anotado: você trabalha com ${joinCrops(cropAnswer)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`;
+  } else if (msg.kind === 'voice' && !transcript) {
     intent = 'general';
     replyText =
       'Recebi seu áudio mas não consegui entender direito. 🙉 Pode escrever em texto, ou mandar o áudio de novo mais pertinho do celular?';
@@ -88,7 +135,10 @@ export async function handleInbound(
     // Pin drop → the payback moment. Deterministic, no LLM needed.
     intent = 'onboarding';
     replyText = await buildFarmCard(userId, effective.location.lat, effective.location.lon);
+    if (userId) await setAwaiting(userId, 'crop');
   } else {
+    // A pending crop question that got a non-crop reply: stop waiting, answer normally.
+    if (user?.awaiting === 'crop' && userId) await setAwaiting(userId, null);
     intent = await routeIntent(effective);
     try {
       replyText = await reason(effective, intent, { userId, media });
