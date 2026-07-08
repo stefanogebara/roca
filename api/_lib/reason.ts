@@ -9,7 +9,8 @@
 
 import type { InboundMessage } from './transport/types';
 import type { Intent } from './router';
-import { SYSTEM_PROMPT, PEST_HANDOFF_REMINDER } from './prompts/system';
+import { PEST_HANDOFF_REMINDER } from './prompts/system';
+import { steviSystemPrompt } from './stylepack';
 import { fetchHourlyWeather } from './tools/weather';
 import { sprayWindow, type SprayWindow } from './tools/deltaT';
 import { getFarmLocation, getFarm, getCachedNdvi, setCachedNdvi } from './db';
@@ -190,7 +191,7 @@ async function handleVision(msg: InboundMessage, media: ChatImage): Promise<stri
     // Fallback: direct vision answer (still carries the handoff via the prompt).
     return chat({
       model: MODELS.reasoning(),
-      system: SYSTEM_PROMPT + '\n\n' + PEST_HANDOFF_REMINDER,
+      system: (await steviSystemPrompt()) + '\n\n' + PEST_HANDOFF_REMINDER,
       maxTokens: 700,
       image: media,
       user:
@@ -214,7 +215,7 @@ async function handleVision(msg: InboundMessage, media: ChatImage): Promise<stri
 
   return chat({
     model: MODELS.reasoning(),
-    system: SYSTEM_PROMPT + '\n\n' + PEST_HANDOFF_REMINDER,
+    system: (await steviSystemPrompt()) + '\n\n' + PEST_HANDOFF_REMINDER,
     maxTokens: 900,
     user:
       `${parts.join('\n')}\n\n` +
@@ -246,7 +247,7 @@ async function handleText(
 
   return chat({
     model: MODELS.reasoning(),
-    system: SYSTEM_PROMPT + extra,
+    system: (await steviSystemPrompt()) + extra,
     maxTokens: 900,
     user: (msg.text ?? '') + ctx,
   });
