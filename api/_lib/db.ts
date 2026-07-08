@@ -229,7 +229,12 @@ export async function getFarmProfile(userId: string): Promise<FarmProfile> {
 /** Record an explicit, consented agrônomo-referral request (business seed). */
 export async function createReferralRequest(
   userId: string,
-  fields: { uf: string | null; crop: string[] | null; topic: string | null }
+  fields: {
+    uf: string | null;
+    crop: string[] | null;
+    topic: string | null;
+    consentVersion: string;
+  }
 ): Promise<void> {
   const db = getDb();
   const { error } = await db.from('referral_requests').insert({
@@ -237,6 +242,7 @@ export async function createReferralRequest(
     uf: fields.uf,
     crop: fields.crop,
     topic: fields.topic,
+    consent_version: fields.consentVersion,
   });
   if (error) log.error('createReferralRequest failed:', error.message);
 }

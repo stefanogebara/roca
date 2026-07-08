@@ -6,7 +6,7 @@ create table if not exists public.referral_requests (
   user_id     uuid not null references public.users(id) on delete cascade,
   uf          text,                 -- state, for regional matching
   crop        text[],               -- what they grow
-  topic       text,                 -- what the triage was about (context to hand off)
+  topic       text,                 -- assunto/indício the farmer raised (never a "diagnosis")
   consent_at  timestamptz not null default now(),
   status      text not null default 'new',  -- new | contacted | closed
   created_at  timestamptz not null default now()

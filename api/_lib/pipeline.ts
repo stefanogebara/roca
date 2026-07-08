@@ -50,6 +50,10 @@ export function isReferralRequest(text: string): boolean {
   return REFERRAL_INTENT.test(text);
 }
 
+// Bump this string whenever REFERRAL_REPLY's wording changes — it's stored with
+// each opt-in so the consent is provable (LGPD accountability).
+const REFERRAL_CONSENT_VERSION = 'referral-v1-2026-07';
+
 const REFERRAL_REPLY =
   'Boa! 🙌 Anotei seu interesse em falar com um agrônomo — e não passo seus dados pra ninguém sem te perguntar antes.\n\n' +
   'Pra adiantar, leve pro agrônomo: fotos da lavoura, a cultura e a fase, e o que você observou (onde começou, como espalhou). Ele faz o diagnóstico e, se precisar, o receituário — o documento técnico que define o produto e a dose certos.\n\n' +
@@ -155,6 +159,7 @@ export async function handleInbound(
         uf: profile.uf,
         crop: profile.crop,
         topic: effective.text.slice(0, 280),
+        consentVersion: REFERRAL_CONSENT_VERSION,
       });
     }
     replyText = REFERRAL_REPLY;
