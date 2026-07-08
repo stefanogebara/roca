@@ -5,7 +5,7 @@
   <!-- Source template for og-image.png (1200x630). Rendered headless; not linked from the site. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
   <style>
     :root{
       --bone:#FBF7EF; --ink:#211C14; --ink2:#574E3F;
@@ -16,7 +16,7 @@
     *{margin:0;box-sizing:border-box;}
     html,body{width:1200px;height:630px;}
     body{
-      font-family:'IBM Plex Sans',sans-serif; color:var(--ink); position:relative; overflow:hidden;
+      font-family:'DM Sans',sans-serif; color:var(--ink); position:relative; overflow:hidden;
       background:
         radial-gradient(700px 500px at 92% -10%, var(--terra-050), transparent 60%),
         radial-gradient(700px 520px at 2% 8%, var(--green-050), transparent 60%),
@@ -29,13 +29,13 @@
     .left{flex:1; position:relative; z-index:2; display:flex; flex-direction:column; height:100%;}
     .brand{display:flex; align-items:center; gap:14px; margin-bottom:34px;}
     .brand svg{filter:drop-shadow(0 6px 12px rgba(16,62,40,.3));}
-    .brand span{font-family:'Fraunces',serif; font-weight:600; font-size:44px; color:var(--green-deep); letter-spacing:-.02em;}
+    .brand span{font-family:'Instrument Serif',serif; font-weight:400; font-synthesis:none; font-size:46px; color:var(--green-deep); letter-spacing:-.01em;}
     .eyebrow{display:inline-flex; align-items:center; gap:10px; font-size:18px; font-weight:600; letter-spacing:.09em; text-transform:uppercase; color:var(--terra); margin-bottom:22px;}
     .eyebrow b{width:10px;height:10px;border-radius:50%;background:var(--terra);box-shadow:0 0 0 5px var(--terra-050);}
-    h1{font-family:'Fraunces',serif; font-weight:600; font-size:66px; line-height:1.03; letter-spacing:-.02em; max-width:15ch;}
-    h1 em{font-style:italic; color:var(--green); font-weight:500;}
-    .chip{display:inline-block; margin-top:30px; font-family:'Fraunces',serif; font-style:italic; font-size:26px; color:var(--green-deep); background:#fff; border:1px solid var(--line); padding:10px 20px; border-radius:999px; box-shadow:0 10px 26px -16px rgba(16,62,40,.5);}
-    .grounding{margin-top:auto; padding-top:26px; font-family:'IBM Plex Mono',monospace; font-size:17px; color:var(--ink2);}
+    h1{font-family:'Instrument Serif',serif; font-weight:400; font-synthesis:none; font-size:74px; line-height:1.0; letter-spacing:-.01em; max-width:15ch;}
+    h1 em{font-style:italic; color:var(--green);}
+    .chip{display:inline-block; margin-top:30px; font-family:'Instrument Serif',serif; font-synthesis:none; font-style:italic; font-size:28px; color:var(--green-deep); background:#fff; border:1px solid var(--line); padding:10px 20px; border-radius:999px; box-shadow:0 10px 26px -16px rgba(16,62,40,.5);}
+    .grounding{margin-top:auto; padding-top:26px; font-family:'JetBrains Mono',monospace; font-size:17px; color:var(--ink2);}
     .grounding b{color:var(--green);}
 
     .card{width:430px; flex:none; position:relative; z-index:2; background:#ECE4D3; border-radius:28px; padding:20px; box-shadow:0 40px 80px -30px rgba(10,40,26,.5); border:8px solid #1b2024;}
@@ -47,7 +47,7 @@
     .out{background:#D9EAD0; border-top-right-radius:5px; margin-left:auto;}
     .verdict{display:block; font-weight:700; font-size:20px; color:var(--nogo-ink); margin-bottom:6px;}
     .reason{font-size:15px; color:var(--ink);}
-    .data{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px; background:var(--green-050); color:var(--green-deep); padding:2px 7px; border-radius:6px;}
+    .data{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; background:var(--green-050); color:var(--green-deep); padding:2px 7px; border-radius:6px;}
     .win{font-size:15px; color:var(--ink2); margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);}
     .meta{display:block; text-align:right; font-size:12px; color:#8A9384; margin-top:4px;}
   </style>

@@ -2,7 +2,7 @@
    Stevi — landing page styles
    Design system: "Terra e Folha" — earthy, rooted, modern, honest.
    Palette: deep leaf green + Latossolo terracotta on warm bone.
-   Type: Fraunces (display) + IBM Plex Sans (UI) + IBM Plex Mono (data).
+   Type: Instrument Serif (display) + DM Sans (UI) + JetBrains Mono (data) — matches seatable.one.
    ========================================================================= */
 
 /* ---- Tokens ---------------------------------------------------------- */
@@ -44,9 +44,9 @@
   --bubble-meta: #8A9384;
 
   /* Fonts */
-  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Spacing (8px grid) */
   --s1: .25rem; --s2: .5rem; --s3: .75rem; --s4: 1rem;
@@ -110,12 +110,15 @@ button { font: inherit; }
 .skip-link:focus { top: 0; }
 
 /* ---- Typography ------------------------------------------------------ */
-h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.08; letter-spacing: -0.015em; color: var(--ink); }
-h1 { font-size: clamp(2.35rem, 6vw, 4.25rem); font-weight: 600; }
-h1 em { font-style: italic; color: var(--green); font-weight: 500; }
-h2 { font-size: clamp(1.8rem, 4vw, 2.85rem); }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; line-height: 1.06; letter-spacing: -0.01em; color: var(--ink); }
+h1 { font-size: clamp(2.5rem, 6.4vw, 4.6rem); }
+h1 em { font-style: italic; color: var(--green); }
+h2 { font-size: clamp(1.9rem, 4vw, 3rem); }
 h2 em { font-style: italic; color: var(--terra); }
 h3 { font-size: 1.2rem; font-family: var(--font-sans); font-weight: 700; letter-spacing: -0.01em; }
+/* Instrument Serif ships weight 400 only — never let the browser faux-bold it
+   (the light serif at display sizes IS the look, per seatable.one). */
+h1, h2, .brand__word, .step__num, .quote-bubble p, .site-footer__tagline { font-synthesis: none; }
 p { text-wrap: pretty; }
 strong { font-weight: 600; }
 
