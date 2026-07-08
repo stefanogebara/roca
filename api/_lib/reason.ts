@@ -13,7 +13,12 @@ import { SYSTEM_PROMPT, PEST_HANDOFF_REMINDER } from './prompts/system';
 import { fetchHourlyWeather } from './tools/weather';
 import { sprayWindow, type SprayWindow } from './tools/deltaT';
 import { getFarmLocation, getFarm, getCachedNdvi, setCachedNdvi } from './db';
-import { fetchNdvi, classifyVigor } from './tools/ndvi';
+import {
+  fetchFieldNdvi,
+  classifyVigor,
+  classifyUniformity,
+  UNIFORMITY_MIN_SAMPLES,
+} from './tools/ndvi';
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
 import { lookupPest, normalizeCrop, groundingBlock } from './tools/agrofit';
@@ -83,10 +88,10 @@ async function handleFieldHealth(userId: string | null): Promise<string> {
 
   let reading = await getCachedNdvi(farm.id);
   if (!reading) {
-    const fresh = await fetchNdvi(farm.lat, farm.lon);
+    const fresh = await fetchFieldNdvi(farm.lat, farm.lon);
     if (fresh) {
-      reading = { ndvi: fresh.ndvi, date: fresh.date };
-      await setCachedNdvi(farm.id, { ndvi: fresh.ndvi, date: fresh.date });
+      reading = { ndvi: fresh.ndvi, date: fresh.date, std: fresh.std, samples: fresh.samples };
+      await setCachedNdvi(farm.id, reading);
     }
   }
   if (!reading) {
@@ -95,11 +100,30 @@ async function handleFieldHealth(userId: string | null): Promise<string> {
 
   const v = classifyVigor(reading.ndvi);
   const [y, m, d] = reading.date.split('-');
-  return (
-    `🛰️ Última imagem de satélite (Sentinel-2, ${d}/${m}/${y}) do ponto que você marcou:\n\n` +
-    `${v.emoji} NDVI ~${reading.ndvi.toFixed(2)} — ${v.label}.\n${v.note}\n\n` +
-    `_É uma leitura aproximada de um ponto (10 m), não da lavoura toda. Combine com o que você vê no campo e com seu agrônomo. Quer que eu veja se dá pra pulverizar hoje também?_`
+  const samples = reading.samples ?? 1;
+  const scope =
+    samples > 1
+      ? `média de ${samples} pontos num raio de ~40 m ao redor do pin`
+      : 'um ponto (10 m) no pin';
+
+  const lines = [
+    `🛰️ Última imagem de satélite (Sentinel-2, ${d}/${m}/${y}) da sua lavoura:`,
+    '',
+    `${v.emoji} NDVI ~${reading.ndvi.toFixed(2)} — ${v.label}.`,
+    `${v.note}`,
+    `_(${scope})_`,
+  ];
+
+  if (reading.std != null && samples >= UNIFORMITY_MIN_SAMPLES) {
+    const u = classifyUniformity(reading.std);
+    lines.push('', `📊 Uniformidade: ${u.label}. ${u.note}`);
+  }
+
+  lines.push(
+    '',
+    '_Leitura aproximada por satélite — combine com o que você vê no campo e com seu agrônomo. Quer que eu veja se dá pra pulverizar hoje também?_'
   );
+  return lines.join('\n');
 }
 
 async function handleSpray(

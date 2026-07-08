@@ -138,18 +138,24 @@ export async function getCachedSoil<T>(farmId: string): Promise<T | null> {
 export interface CachedNdvi {
   ndvi: number;
   date: string;
+  /** NDVI spread across the sampled grid (uniformity). Absent on legacy rows. */
+  std?: number;
+  /** How many grid pixels the reading averaged. Absent (→ 1) on legacy rows. */
+  samples?: number;
 }
 
 /** Cache the latest NDVI reading per farm. */
 export async function setCachedNdvi(
   farmId: string,
-  reading: { ndvi: number; date: string }
+  reading: { ndvi: number; date: string; std?: number; samples?: number }
 ): Promise<void> {
   const db = getDb();
   const { error } = await db.from('farm_derived').upsert({
     farm_id: farmId,
     latest_ndvi: reading.ndvi,
     ndvi_date: reading.date,
+    ndvi_std: reading.std ?? null,
+    ndvi_samples: reading.samples ?? null,
     ndvi_fetched_at: new Date().toISOString(),
   });
   if (error) log.error('setCachedNdvi failed:', error.message);
@@ -163,7 +169,7 @@ export async function getCachedNdvi(
   const db = getDb();
   const { data, error } = await db
     .from('farm_derived')
-    .select('latest_ndvi, ndvi_date, ndvi_fetched_at')
+    .select('latest_ndvi, ndvi_date, ndvi_std, ndvi_samples, ndvi_fetched_at')
     .eq('farm_id', farmId)
     .maybeSingle();
   if (error) {
@@ -171,12 +177,23 @@ export async function getCachedNdvi(
     return null;
   }
   const row = data as
-    | { latest_ndvi: number | null; ndvi_date: string | null; ndvi_fetched_at: string | null }
+    | {
+        latest_ndvi: number | null;
+        ndvi_date: string | null;
+        ndvi_std: number | null;
+        ndvi_samples: number | null;
+        ndvi_fetched_at: string | null;
+      }
     | null;
   if (!row || row.latest_ndvi == null || !row.ndvi_fetched_at || !row.ndvi_date) return null;
   const ageDays = (Date.now() - Date.parse(row.ndvi_fetched_at)) / 86_400_000;
   if (ageDays > maxAgeDays) return null;
-  return { ndvi: row.latest_ndvi, date: row.ndvi_date };
+  return {
+    ndvi: row.latest_ndvi,
+    date: row.ndvi_date,
+    std: row.ndvi_std ?? undefined,
+    samples: row.ndvi_samples ?? undefined,
+  };
 }
 
 /** Fetch a user's most recent farm location, if any. */
