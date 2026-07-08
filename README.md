@@ -20,6 +20,7 @@ Essa honestidade é o produto, não uma limitação.
 | **Triagem por foto** | foto de uma folha/praga | ID provável + confiança honesta, fundamentado no Agrofit, com o handoff do receituário |
 | **Janela de pulverização** | "posso pulverizar hoje?" + localização | veredito Delta T (✅/⚠️/🚫) de temperatura, umidade, vento e chuva, + melhor janela hoje |
 | **Farm card no pin** | a localização | solo (SoilGrids), clima agora, e o **vazio sanitário** do estado — "ele conhece minha terra" |
+| **Saúde da lavoura (satélite)** | "como está minha lavoura?" | leitura de **NDVI** (Sentinel-2) do vigor da vegetação no seu ponto, com leitura honesta |
 | **Captura de cultura** | "planto soja e milho" | anota as culturas no perfil da fazenda |
 | **Áudio** | um áudio (voice note) | transcreve em PT-BR e responde normalmente |
 | **Q&A geral** | dúvida de manejo | resposta fundamentada (MIP) ou "procure um agrônomo" honesto |
@@ -47,11 +48,11 @@ WhatsApp  ──(Twilio sandbox  |  Meta Cloud API)──►  api/webhook.ts
 _lib/pipeline.ts   normaliza (ASR) → rate-limit → roteia → deriva → raciocina → gate → persiste
    ├─ transport/     TwilioAdapter + CloudApiAdapter (mesma URL, drop-in)
    ├─ router.ts      classificação de intenção (tier barato)
-   ├─ reason.ts      visão 2-passos (ID→Agrofit→resposta) / Delta T / Q&A
+   ├─ reason.ts      visão 2-passos (ID→Agrofit→resposta) / Delta T / NDVI / Q&A
    ├─ farmcard.ts    solo + clima + vazio sanitário no pin
    ├─ transcribe.ts  áudio PT-BR
    ├─ compliance.ts  portão de saída anti-prescrição
-   ├─ tools/         deltaT · weather · soil · geo · calendar · agrofit · crops
+   ├─ tools/         deltaT · weather · soil · geo · calendar · agrofit · crops · ndvi
    └─ db.ts          Supabase: users · farms · farm_derived · messages · monitor_runs · referral_requests
 
 api/cron/monitor.ts  1×/dia — transições de vazio sanitário + validade do calendário
