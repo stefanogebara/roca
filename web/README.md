@@ -10,7 +10,7 @@ enhancement. Português (pt-BR). Publicar a pasta `web/` como estático (root =
 
 ## Conceito: "Terra e Folha"
 
-Stevi é um assistente agronômico que vive no WhatsApp e cuja marca é a
+Stevi é uma assistente agronômica que vive no WhatsApp e cuja marca é a
 **honestidade** ("triagem, não prescrição"). O visual precisava ser **enraizado,
 caloroso e confiável — mas moderno e limpo**, longe tanto do SaaS corporativo
 frio quanto do clichê de agro (trator de desenho, verde-limão).
@@ -21,7 +21,7 @@ recorrente é uma **curva de nível topográfica** (contorno de relevo) em marca
 d'água — sugere "conhecer o terreno" sem nenhuma ilustração literal.
 
 A prova viva do produto são **mockups reais de conversa no WhatsApp**: todo o
-texto do Stevi nos balões é o texto que o produto realmente envia (extraído de
+texto da Stevi nos balões é o texto que o produto realmente envia (extraído de
 `api/_lib/*`: `phraseSpray`, `buildFarmCard`, o portão de conformidade, a
 janela Delta T e o vazio sanitário da Portaria SDA/MAPA nº 1.579/2026). Nada de
 copy de vitrine.
@@ -70,7 +70,7 @@ seção de honestidade). Não usar como texto sobre claro.
 | Não | `--nogo #B3261E` | `--nogo-bg #FBE7E5` | `--nogo-ink #8C1E17` |
 
 ### Chat
-`--chat-bg #ECE4D3` (com micro-pontilhado), balão do Stevi `#FFFFFF`, balão do
+`--chat-bg #ECE4D3` (com micro-pontilhado), balão da Stevi `#FFFFFF`, balão do
 produtor `#D9EAD0` (verde suave, "WhatsApp-ish" mas da nossa marca), timestamp
 `#8A9384`.
 
