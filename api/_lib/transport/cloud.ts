@@ -166,19 +166,46 @@ export class CloudApiAdapter implements TransportAdapter {
     if (!token || !phoneId) {
       throw new Error('WHATSAPP_CLOUD_TOKEN / WHATSAPP_CLOUD_PHONE_NUMBER_ID not configured');
     }
+    // Interactive reply buttons (≤3, titles ≤20 chars, body ≤1024) when
+    // requested; plain text otherwise. A rejected interactive send retries as
+    // plain text — every rich message carries its plain-text twin.
+    const interactive = !!msg.buttons?.length && msg.text.length <= 1024;
+    const payload = interactive
+      ? {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: msg.to,
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            body: { text: msg.text },
+            action: {
+              buttons: msg.buttons!.slice(0, 3).map((title, i) => ({
+                type: 'reply',
+                reply: { id: `qr_${i}`, title: title.slice(0, 20) },
+              })),
+            },
+          },
+        }
+      : {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: msg.to,
+          type: 'text',
+          text: { preview_url: false, body: msg.text },
+        };
+
     const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: msg.to,
-        type: 'text',
-        text: { preview_url: false, body: msg.text },
-      }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const body = await res.text();
+      if (interactive) {
+        await this.send({ to: msg.to, text: msg.text });
+        return;
+      }
       throw new Error(`Cloud API send failed ${res.status}: ${body.slice(0, 200)}`);
     }
   }

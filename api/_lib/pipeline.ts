@@ -76,6 +76,28 @@ function isFirstContact(user: { consent_lgpd_at: string | null } | null): boolea
   return !!user && user.consent_lgpd_at == null;
 }
 
+/**
+ * Quick-reply buttons per intent. Titles ARE real queries: a tap arrives as a
+ * normal text message and routes through the existing pipeline ("Ver satélite"
+ * → field_health regex, "Quero um agrônomo" → referral regex, "Posso
+ * pulverizar?" → router). ≤3 buttons, ≤20 chars, only next steps that already
+ * work. Adapters degrade to plain text when buttons can't render.
+ */
+export function buttonsForIntent(intent: Intent): string[] | undefined {
+  switch (intent) {
+    case 'smalltalk':
+      return ['Posso pulverizar?', 'Ver satélite', 'Quero um agrônomo'];
+    case 'spray_window':
+      return ['Ver satélite', 'Quero um agrônomo'];
+    case 'field_health':
+      return ['Posso pulverizar?', 'Quero um agrônomo'];
+    case 'pest_triage':
+      return ['Quero um agrônomo'];
+    default:
+      return undefined;
+  }
+}
+
 export async function handleInbound(
   adapter: TransportAdapter,
   msg: InboundMessage
@@ -210,7 +232,7 @@ export async function handleInbound(
 
   if (firstContact) finalText += CONSENT_NOTE;
 
-  await adapter.send({ to: msg.from, text: finalText });
+  await adapter.send({ to: msg.from, text: finalText, buttons: buttonsForIntent(intent) });
   if (firstContact && userId) await markConsentNotified(userId);
   await logMessage(userId, 'out', {
     kind: 'text',

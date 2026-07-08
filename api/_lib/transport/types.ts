@@ -27,6 +27,14 @@ export interface InboundMessage {
 export interface OutboundMessage {
   to: string;
   text: string;
+  /**
+   * Optional quick-reply buttons (≤3, each ≤20 chars). Titles are phrased as
+   * real user queries ("Posso pulverizar?") so a tap round-trips through the
+   * normal text pipeline — no special inbound handling. Adapters that can't
+   * render buttons (or fail creating them) MUST fall back to plain text: every
+   * rich message carries its plain-text twin.
+   */
+  buttons?: string[];
 }
 
 /**

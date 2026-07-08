@@ -10,7 +10,7 @@
  * (empty TwiML ack in the webhook) to keep the pipeline uniform with Cloud API.
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual, createHash } from 'node:crypto';
 import type {
   TransportAdapter,
   TransportRequest,
@@ -18,8 +18,26 @@ import type {
   OutboundMessage,
   InboundKind,
 } from './types';
+import { getTwilioContentSid, setTwilioContentSid } from '../db';
+import { createLogger } from '../logger';
+
+const log = createLogger('twilio');
 
 const TWILIO_API = 'https://api.twilio.com/2010-04-01';
+const CONTENT_API = 'https://content.twilio.com/v1/Content';
+
+/**
+ * Quick-reply buttons ride on a Twilio Content template (in-session templates
+ * need no approval inside the 24h window). The body travels as variable {{1}},
+ * so one template per distinct BUTTON-SET serves every message — created once,
+ * SID cached in the DB. WhatsApp interactive bodies cap at 1024 chars; above
+ * this we quietly send plain text instead.
+ */
+const INTERACTIVE_BODY_MAX = 950;
+
+function buttonsHash(buttons: string[]): string {
+  return createHash('sha256').update(JSON.stringify(buttons)).digest('hex').slice(0, 32);
+}
 
 function formToObject(rawBody: Buffer): Record<string, string> {
   const params = new URLSearchParams(rawBody.toString('utf8'));
@@ -115,23 +133,78 @@ export class TwilioAdapter implements TransportAdapter {
       throw new Error('Twilio credentials / TWILIO_WHATSAPP_FROM not configured');
     }
     const auth = Buffer.from(`${sid}:${token}`).toString('base64');
-    const body = new URLSearchParams({
+
+    const params: Record<string, string> = {
       From: from,
       To: `whatsapp:${msg.to}`,
-      Body: msg.text,
-    });
+    };
+
+    // Buttons path: resolve (or create) the content template for this button-set.
+    // Any failure degrades to plain text — the farmer always gets the message.
+    let interactive = false;
+    if (msg.buttons?.length && msg.text.length <= INTERACTIVE_BODY_MAX) {
+      try {
+        const contentSid = await this.resolveContentSid(auth, msg.buttons.slice(0, 3));
+        params.ContentSid = contentSid;
+        params.ContentVariables = JSON.stringify({ '1': msg.text });
+        interactive = true;
+      } catch (e) {
+        log.error('buttons degraded to plain text:', (e as Error).message);
+      }
+    }
+    if (!interactive) params.Body = msg.text;
+
     const res = await fetch(`${TWILIO_API}/Accounts/${sid}/Messages.json`, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${auth}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: body.toString(),
+      body: new URLSearchParams(params).toString(),
     });
     if (!res.ok) {
       const text = await res.text();
+      // Interactive send rejected (e.g. outside the 24h session)? Plain-text twin.
+      if (interactive) {
+        log.error(`interactive send failed ${res.status}, retrying plain:`, text.slice(0, 120));
+        await this.send({ to: msg.to, text: msg.text });
+        return;
+      }
       throw new Error(`Twilio send failed ${res.status}: ${text.slice(0, 200)}`);
     }
+  }
+
+  /** Content SID for a button-set: DB cache first, else create once and cache. */
+  private async resolveContentSid(auth: string, buttons: string[]): Promise<string> {
+    const hash = buttonsHash(buttons);
+    const cached = await getTwilioContentSid(hash);
+    if (cached) return cached;
+
+    const res = await fetch(CONTENT_API, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        friendly_name: `stevi_qr_${hash.slice(0, 12)}`,
+        language: 'pt_BR',
+        variables: { '1': 'texto' },
+        types: {
+          'twilio/quick-reply': {
+            body: '{{1}}',
+            actions: buttons.map((title, i) => ({ title, id: `qr_${i}` })),
+          },
+          'twilio/text': { body: '{{1}}' },
+        },
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`content create failed ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+    const created = (await res.json()) as { sid: string };
+    await setTwilioContentSid(hash, created.sid, buttons);
+    return created.sid;
   }
 
   /**

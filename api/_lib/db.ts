@@ -355,6 +355,34 @@ export async function createReferralRequest(
   if (error) log.error('createReferralRequest failed:', error.message);
 }
 
+/** Cached Twilio Content SID for a button-set hash, or null. */
+export async function getTwilioContentSid(hash: string): Promise<string | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('twilio_content')
+    .select('content_sid')
+    .eq('hash', hash)
+    .maybeSingle();
+  if (error) {
+    log.error('getTwilioContentSid failed:', error.message);
+    return null;
+  }
+  return (data as { content_sid: string } | null)?.content_sid ?? null;
+}
+
+/** Persist a newly created Twilio Content SID for reuse. */
+export async function setTwilioContentSid(
+  hash: string,
+  contentSid: string,
+  buttons: string[]
+): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('twilio_content')
+    .upsert({ hash, content_sid: contentSid, buttons });
+  if (error) log.error('setTwilioContentSid failed:', error.message);
+}
+
 /** LGPD deletion: wipe a user's data on request. */
 export async function deleteUserData(waId: string): Promise<boolean> {
   const db = getDb();
