@@ -8,11 +8,14 @@
  *
  * Output: knowledge/agrofit/registry-slice.json (compact, shippable).
  */
-import { createReadStream, writeFileSync } from 'node:fs';
+import { createReadStream, writeFileSync, copyFileSync } from 'node:fs';
 import { parse } from 'csv-parse';
 
 const FILE = 'knowledge/agrofit/produtos_formulados.csv';
 const OUT = 'knowledge/agrofit/registry-slice.json';
+// The runtime reads the bundled copy; keep it in sync automatically so a rebuild
+// can never leave stale grounding shipped in the function.
+const RUNTIME_OUT = 'api/_lib/data/agrofit.json';
 
 // Focus crops → canonical key. "Todas as culturas" is kept separate and
 // unioned into every crop at query time.
@@ -113,7 +116,9 @@ const meta = {
 };
 
 writeFileSync(OUT, JSON.stringify({ meta, data: out }));
+copyFileSync(OUT, RUNTIME_OUT);
 console.log(`seen=${seen} kept=${kept}`);
 console.log('pests per crop:', JSON.stringify(meta.crops));
 const bytes = JSON.stringify({ meta, data: out }).length;
 console.log(`output: ${(bytes / 1024).toFixed(0)} KB -> ${OUT}`);
+console.log(`runtime copy -> ${RUNTIME_OUT}`);

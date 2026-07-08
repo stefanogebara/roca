@@ -90,21 +90,6 @@ export async function setFarmCrops(userId: string, crops: string[]): Promise<voi
   if (error) log.error('setFarmCrops failed:', error.message);
 }
 
-/** Read the user's stored UF, if known. */
-export async function getUserState(userId: string): Promise<string | null> {
-  const db = getDb();
-  const { data, error } = await db
-    .from('users')
-    .select('state')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) {
-    log.error('getUserState failed:', error.message);
-    return null;
-  }
-  return (data as { state: string | null } | null)?.state ?? null;
-}
-
 /** Cache derived soil data per farm (soil is effectively static). */
 export async function setCachedSoil(farmId: string, soil: unknown): Promise<void> {
   const db = getDb();
@@ -147,6 +132,46 @@ export async function getFarmLocation(
   }
   if (!data || data.lat == null || data.lon == null) return null;
   return { lat: data.lat as number, lon: data.lon as number };
+}
+
+/**
+ * Idempotently claim an inbound message by its provider id. Returns false if the
+ * message was already recorded (a provider retry — Twilio/Meta redeliver on
+ * timeout, and slow paths like photo triage can exceed the webhook window). A
+ * partial unique index on (provider_message_id) where direction='in' makes the
+ * duplicate insert fail with 23505; any other error fails open (we'd rather risk
+ * a rare double than silently drop a real message).
+ */
+export async function claimInbound(
+  userId: string | null,
+  msg: { kind: string; text: string | null; messageId: string }
+): Promise<boolean> {
+  const db = getDb();
+  const { error } = await db.from('messages').insert({
+    user_id: userId,
+    direction: 'in',
+    kind: msg.kind,
+    raw: msg.text,
+    provider_message_id: msg.messageId,
+  });
+  if (!error) return true;
+  if (error.code === '23505') return false; // duplicate provider_message_id → retry
+  log.error('claimInbound failed (fail-open):', error.message);
+  return true;
+}
+
+/** Attach a transcript to a claimed inbound row (voice notes). */
+export async function updateInboundTranscript(
+  messageId: string,
+  transcript: string
+): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('messages')
+    .update({ transcript })
+    .eq('provider_message_id', messageId)
+    .eq('direction', 'in');
+  if (error) log.error('updateInboundTranscript failed:', error.message);
 }
 
 export async function logMessage(

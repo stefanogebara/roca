@@ -27,7 +27,7 @@ const params = {
   From: `whatsapp:${from}`,
   To: 'whatsapp:+14155238886',
   Body: locArg ? '' : text,
-  MessageSid: `SMsim${Date.now()}`,
+  MessageSid: (process.argv.find((a) => a.startsWith('--sid=')) || `--sid=SMsim${Date.now()}`).split('=')[1],
   NumMedia: '0',
   ProfileName: 'Simulador Roca',
 };

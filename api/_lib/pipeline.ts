@@ -14,6 +14,8 @@ import type { ChatImage } from './llm';
 import {
   upsertUser,
   logMessage,
+  claimInbound,
+  updateInboundTranscript,
   deleteUserData,
   markConsentNotified,
   setAwaiting,
@@ -81,25 +83,31 @@ export async function handleInbound(
   const userId = user?.id ?? null;
   const firstContact = isFirstContact(user);
 
-  // Rate limit before any expensive work (media fetch, LLM). Count prior inbound
-  // in the window; notify once at the threshold, then drop silently so a flood
-  // (or an echo loop) can't turn into a reply storm.
+  // Idempotency gate: claim the message by provider id before any work. A
+  // provider retry (timeout redelivery) is a duplicate → ack without reprocessing.
+  const claimed = await claimInbound(userId, {
+    kind: msg.kind,
+    text: msg.text,
+    messageId: msg.messageId,
+  });
+  if (!claimed) {
+    log.info('duplicate inbound ignored:', msg.messageId);
+    return;
+  }
+
+  // Rate limit before any expensive work (media fetch, LLM). The current message
+  // is already claimed (counted), so throttle strictly above the cap; notify once
+  // at the threshold, then drop silently so a flood / echo loop can't storm.
   if (userId) {
     const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
-    const prior = await countRecentInbound(userId, since);
-    if (prior >= RATE_MAX_PER_WINDOW) {
-      if (prior === RATE_MAX_PER_WINDOW) {
+    const count = await countRecentInbound(userId, since);
+    if (count > RATE_MAX_PER_WINDOW) {
+      if (count === RATE_MAX_PER_WINDOW + 1) {
         const notice =
           'Opa, chegou bastante coisa junta! 😅 Me dá uns segundinhos e manda de novo, que eu te respondo com calma.';
         await adapter.send({ to: msg.from, text: notice });
         await logMessage(userId, 'out', { kind: 'text', text: notice, intent: 'rate_limited' });
       }
-      await logMessage(userId, 'in', {
-        kind: msg.kind,
-        text: msg.text,
-        messageId: msg.messageId,
-        intent: 'rate_limited',
-      });
       return;
     }
   }
@@ -124,12 +132,8 @@ export async function handleInbound(
   const effective: InboundMessage =
     msg.kind === 'voice' && transcript ? { ...msg, kind: 'text', text: transcript } : msg;
 
-  await logMessage(userId, 'in', {
-    kind: msg.kind,
-    text: effective.text,
-    transcript,
-    messageId: msg.messageId,
-  });
+  // Attach the transcript to the already-claimed inbound row (observability).
+  if (transcript) await updateInboundTranscript(msg.messageId, transcript);
 
   let intent: Intent;
   let replyText: string;
