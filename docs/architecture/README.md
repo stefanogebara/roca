@@ -231,26 +231,44 @@ code change — just point Meta's webhook here and provision the Meta env vars. 
    user's data and ack. Nothing else runs. This is checked before user upsert so a
    brand-new sender can still request deletion.
 2. **User upsert.** `upsertUser(from, profileName)` by `wa_id`. `firstContact` is
-   true when `consent_lgpd_at` is null.
-3. **Media normalization.** If `mediaUrl` is present and the adapter exposes
+   true when `consent_lgpd_at` is null; the row also carries the `awaiting`
+   conversation-state flag.
+3. **Rate limit.** Before any expensive work (media fetch, LLM),
+   `countRecentInbound(userId, …)` counts the user's inbound messages in the last
+   60 s. At/above **15** per minute, Stevi sends one heads-up (only exactly at the
+   threshold), logs the message with `intent: 'rate_limited'`, and returns — so a
+   flood or an echo loop can't become a reply storm. Fail-open: a DB error counts as
+   0, so a hiccup never locks a farmer out. (Skipped when the user upsert failed.)
+4. **Media normalization.** If `mediaUrl` is present and the adapter exposes
    `fetchMedia`, fetch the bytes. An image becomes a `ChatImage` (base64 + mime); a
    voice note is transcribed to text via `transcribeVoice`. Media fetch is
    fail-soft: any error is logged and the loop continues without it.
-4. **Effective message.** A voice note that transcribed successfully is rewritten as
+5. **Effective message.** A voice note that transcribed successfully is rewritten as
    a normal text message (`kind: 'text'`) for everything downstream.
-5. **Inbound log.** `logMessage('in', …)` records kind, text, transcript, and the
+6. **Inbound log.** `logMessage('in', …)` records kind, text, transcript, and the
    provider message id.
-6. **Branch:**
+7. **Branch:**
+   - **Crop-capture answer** — if the user was `awaiting === 'crop'` (set right after
+     the farm card) and the text parses to recognizable crops (`parseCrops`,
+     `api/_lib/tools/crops.ts`), persist them (`setFarmCrops`), clear the wait, and
+     confirm. A non-crop reply clears the wait and falls through, so a message is
+     never swallowed.
    - Voice with no transcript → a canned "didn't catch that, resend/type" reply.
-   - Location pin → `buildFarmCard(...)` — deterministic, **no LLM** (see below).
+   - Location pin → `buildFarmCard(...)` — deterministic, **no LLM** (see below) —
+     then mark the user `awaiting = 'crop'`.
    - Otherwise → `routeIntent(...)` then `reason(...)`, with a fallback reply if
      reasoning throws.
-7. **Compliance gate.** `checkOutbound(replyText)` inspects the reply; an unsafe
+8. **Compliance gate.** `checkOutbound(replyText)` inspects the reply; an unsafe
    (prescription-shaped) reply is swapped for a safe handoff and the flags are
    logged.
-8. **First-contact consent.** On first contact the LGPD consent note is appended
+9. **First-contact consent.** On first contact the LGPD consent note is appended
    once, and `markConsentNotified` stamps `consent_lgpd_at` so it never repeats.
-9. **Send + outbound log.** `adapter.send({to, text})`, then `logMessage('out', …)`.
+10. **Send + outbound log.** `adapter.send({to, text})`, then `logMessage('out', …)`.
+
+**Conversation state.** State between messages is a single `users.awaiting` flag
+(nullable text; `null` = idle), not a session object — consistent with the stateless
+compute model. The only value today is `'crop'`, set by the farm card and consumed by
+the crop-capture branch above.
 
 ### The farm card (onboarding payback)
 
@@ -265,7 +283,8 @@ reflects it back in one WhatsApp-sized message:
 - The state's vazio-sanitário status (reverse-geocode → UF → `vazioStatus`).
 
 Every layer degrades independently: the card ships with whatever resolved in time
-and never throws.
+and never throws. The card closes by asking what the farmer grows; the pipeline then
+sets `awaiting = 'crop'` so the next reply can be captured as crops.
 
 ---
 
@@ -292,9 +311,15 @@ generation entirely:
 
 The LLM-backed paths:
 
-- **Vision** (image + fetched media) → `handleVision`. Sends the photo to the
-  reasoning tier under the system prompt + handoff reminder, asking for an honest
-  confidence, one-line rationale, MIP-based management, and a receituário handoff.
+- **Vision** (image + fetched media) → `handleVision`, a **grounded two-step**.
+  First `identifyFromPhoto` asks the reasoning tier for a *structured* JSON
+  identification (`pest`, `crop`, `confidence` ∈ alta/media/baixa, one-line
+  `evidence`). When a pest is named with non-low confidence, it is looked up in
+  Agrofit and the registry becomes the base for a second compose pass that writes the
+  WhatsApp reply (honest confidence, one-line why, MIP management, what's registered
+  without doses, receituário handoff). If identification fails — or is low-confidence
+  with no pest — it falls back to a single direct vision answer, so a photo always
+  gets a useful, safe reply.
 - **Text** → `handleText`. For `pest_triage`, it first extracts `{crop, pest}` with
   the cheap tier and looks them up in Agrofit; a hit becomes a grounding block
   injected into the prompt ("use this as base, don't invent"). Any derived farm
@@ -354,17 +379,17 @@ key cannot read farmer data.
 
 | Table | Key columns | Notes |
 |-------|-------------|-------|
-| `users` | `id`, `wa_id` (unique), `name`, `state` (UF), `consent_lgpd_at`, `created_at` | keyed by WhatsApp id; `state` set from the farm-card reverse-geocode |
-| `farms` | `id`, `user_id` (FK, unique), `lat`, `lon`, `crop text[]`, `irrigated`, `planting_date`, timestamps | one farm per user (v1); `updated_at` kept fresh by a trigger |
+| `users` | `id`, `wa_id` (unique), `name`, `state` (UF), `consent_lgpd_at`, `awaiting`, `created_at` | keyed by WhatsApp id; `state` set from the farm-card reverse-geocode; `awaiting` is the conversation-state flag (migration `…_conversation_state`) |
+| `farms` | `id`, `user_id` (FK, unique), `lat`, `lon`, `crop text[]`, `irrigated`, `planting_date`, timestamps | one farm per user (v1); `crop` written by crop capture; `updated_at` kept fresh by a trigger |
 | `farm_derived` | `farm_id` (PK/FK), `soil_json`, `climate_normals_json`, `latest_ndvi`, `fetched_at` | slow-changing derived cache; only `soil_json` is populated today |
 | `messages` | `id`, `user_id` (FK), `direction` (`in`/`out`), `kind`, `raw`, `transcript`, `intent`, `provider_message_id`, `created_at` | full conversation log; indexed by `(user_id, created_at desc)` |
 | `monitor_runs` | `id`, `ran_at`, `transitions_count`, `stale`, `findings` (jsonb), `created_at` | daily-monitor audit trail |
 
-**Columns ahead of the code (reserved):** `farms.crop`, `farms.irrigated`,
-`farms.planting_date`, and `farm_derived.climate_normals_json` / `latest_ndvi` exist
-in the schema but are not written by any current code path — they are staged for crop
-capture and later derived layers. Similarly, `db.getUserState` is defined but not yet
-called (only `setUserState` is, from the farm card). These are noted so a reader
+**Columns ahead of the code (reserved):** `farms.irrigated`, `farms.planting_date`,
+and `farm_derived.climate_normals_json` / `latest_ndvi` exist in the schema but are
+not written by any current code path — staged for later derived layers. (`farms.crop`
+and `users.awaiting` *are* written now, by crop capture.) `db.getUserState` is defined
+but not yet called (only `setUserState` is, from the farm card). Noted so a reader
 isn't surprised to find empty columns.
 
 ## Stateless compute, stateful DB
@@ -413,6 +438,7 @@ api/
     logger.ts             phone-masking structured logger
     farmcard.ts           onboarding payback card (parallel derive)
     transcribe.ts         PT-BR voice-note ASR
+    tools/                deltaT · weather · soil · geo · calendar · agrofit · crops
     prompts/system.ts     PT-BR system prompt + handoff reminder
     transport/
       types.ts            TransportAdapter + neutral message shapes
