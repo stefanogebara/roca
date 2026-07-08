@@ -2,111 +2,115 @@
 
 Assistente agronômico brasileiro que vive no WhatsApp. **Triagem, não prescrição.**
 
-> Nome do produto: **Stevi**. Identificadores de infra (pasta do repo, projeto
-> Vercel `roca`, projeto Supabase `roca`, domínio `roca-black.vercel.app`)
-> seguem como `roca` por enquanto — invisíveis pro produtor, e renomear o
-> domínio exigiria reconfigurar o webhook do Twilio. Trocar depois é barato.
+Stevi ajuda o produtor a entender a lavoura e saber o que perguntar — ele **nunca
+prescreve defensivos** (isso é ato do engenheiro agrônomo, via receituário). Tudo
+que ele afirma sobre agronomia é fundamentado (EMBRAPA / Agrofit-MAPA / FRAC-BR /
+Fundecitrus) ou ele diz honestamente que não sabe e encaminha para um agrônomo.
+Essa honestidade é o produto, não uma limitação.
 
-Stevi ajuda o produtor a entender a lavoura e saber o que perguntar — ele nunca
-prescreve defensivos (isso é ato do engenheiro agrônomo, via receituário). Tudo
-que ele afirma sobre agronomia é fundamentado (EMBRAPA/Agrofit/FRAC-BR) ou ele
-diz honestamente que não sabe e encaminha para um agrônomo.
+> **Nome:** o produto é **Stevi** para o produtor. Os identificadores de infra
+> (pasta do repo, projeto Vercel/Supabase `roca`, domínio `roca-black.vercel.app`)
+> seguem como `roca` — invisíveis pro produtor; renomear o domínio exigiria
+> reconfigurar o webhook. Trocar depois é barato.
 
-Este é o **Stage 0** do dossiê: o loop do WhatsApp ponta a ponta, com dois
-caminhos que já entregam valor real.
+## O que funciona (verificado em produção)
 
-## O que já funciona (Stage 0 + Stage 1)
+| Caminho | O produtor manda… | Stevi responde |
+|---|---|---|
+| **Triagem por foto** | foto de uma folha/praga | ID provável + confiança honesta, fundamentado no Agrofit, com o handoff do receituário |
+| **Janela de pulverização** | "posso pulverizar hoje?" + localização | veredito Delta T (✅/⚠️/🚫) de temperatura, umidade, vento e chuva, + melhor janela hoje |
+| **Farm card no pin** | a localização | solo (SoilGrids), clima agora, e o **vazio sanitário** do estado — "ele conhece minha terra" |
+| **Captura de cultura** | "planto soja e milho" | anota as culturas no perfil da fazenda |
+| **Áudio** | um áudio (voice note) | transcreve em PT-BR e responde normalmente |
+| **Q&A geral** | dúvida de manejo | resposta fundamentada (MIP) ou "procure um agrônomo" honesto |
+| **Encaminhamento** | "me indica um agrônomo" | registra o interesse (consentido) e orienta o que levar ao agrônomo |
+| **LGPD** | "apaga meus dados" | apaga tudo, na hora |
 
-- **Triagem de praga/doença por foto** (visão multimodal) com o handoff do
-  receituário embutido.
-- **Janela de pulverização** ("posso pulverizar hoje?") → veredito Delta T
-  (go / atenção / não) com temperatura, umidade, vento e chuva (Open-Meteo).
-- **Farm card no pin** — manda a localização e volta: solo (SoilGrids, com
-  cache e fallback pra instabilidade do ISRIC), janela de pulverização agora,
-  e situação do **vazio sanitário** do estado.
-- **Vazio sanitário 2026/27 fundamentado** — janelas por UF da Portaria
-  SDA/MAPA nº 1.579/2026 (fonte crua em `knowledge/`); estados com subdivisão
-  regional recebem resposta com ressalva; UF desconhecida = silêncio (nunca
-  inventar).
-- **Áudio (voice note) PT-BR** — transcrição via modelo multimodal e o
-  transcript segue o fluxo normal.
-- **Consentimento LGPD** na primeira interação (uma vez só) + `"apaga meus
-  dados"` funcional.
-- **Portão de conformidade** que bloqueia qualquer resposta com cara de
-  prescrição (produto + dose) e a substitui por um encaminhamento seguro.
+**Culturas fundamentadas no Agrofit:** soja, milho, pastagem, **café** e **citros**
+(ferrugem, ferrugem asiática, lagarta-do-cartucho, greening/HLB, cancro cítrico, …).
 
-**LLM**: tudo via **OpenRouter** (uma chave, tiers por env):
-`anthropic/claude-haiku-4.5` (roteador de intenção), `anthropic/claude-sonnet-5`
-(raciocínio/visão), `google/gemini-2.5-flash` (transcrição de áudio).
-
-### Stage 2 — grounding + monitor
-
-- **Grounding Agrofit** (diretriz principal: citar o registro, não inventar).
-  Uma fatia do dataset aberto do Agrofit/MAPA (só `SITUACAO=TRUE`) fica em
-  `api/_lib/data/agrofit.json`. Numa pergunta de praga, o tier barato extrai
-  `{cultura, praga}`, buscamos no Agrofit (match sem acento/hífen, bucket da
-  cultura pesa mais que "todas as culturas", com piso de confiança pra nunca
-  errar o alvo) e injetamos os **ingredientes ativos registrados** (sem dose) +
-  contagem de produtos. O modelo então explica grupos FRAC/rotação e reforça o
-  receituário. Reconstruir: `node scripts/agrofit-extract.mjs`.
-- **Monitor diário** (`api/cron/monitor.ts`, Part 9.3): 1 invocação/dia,
-  protegido por `CRON_SECRET`. Sinaliza transições de vazio sanitário nos
-  próximos 7 dias e se o calendário 2026/27 venceu (hora de buscar a portaria
-  nova). Cada rodada fica em `monitor_runs`.
-- **Sem dependência do SDK Twilio**: assinatura via `node:crypto` (conferida
-  byte a byte contra o SDK oficial) + `fetch`. Typecheck caiu de ~150s → ~5s.
+**Guarda-corpos:**
+- **Prime directive** — nunca inventar agronomia. Sem base → "procure um agrônomo".
+- **Portão de conformidade** — bloqueia qualquer resposta com cara de prescrição
+  (produto + dose) e a substitui por encaminhamento seguro.
+- **Grounding Agrofit** — respostas de praga citam o registro oficial (ingredientes
+  ativos registrados, sem dose), não a memória do modelo.
+- **LGPD** — consentimento na 1ª interação (uma vez), dados mínimos, exclusão funcional.
+- **Rate limiting** — 15 msgs/60s por número, com aviso único e sem loop de resposta.
 
 ## Arquitetura
 
 ```
-WhatsApp (Twilio sandbox)
-  → api/webhook.ts          (verifica assinatura, ack em TwiML vazio)
-    → _lib/pipeline.ts      (normaliza → roteia → deriva → raciocina → gate → persiste)
-      ├─ _lib/router.ts     (classificação de intenção, modelo barato)
-      ├─ _lib/reason.ts     (Claude: visão / spray Delta T / Q&A geral)
-      ├─ _lib/tools/        (deltaT.ts puro + weather.ts Open-Meteo)
-      ├─ _lib/compliance.ts (portão de saída — anti-prescrição)
-      └─ _lib/db.ts         (Supabase: users, farms, messages)
+WhatsApp  ──(Twilio sandbox  |  Meta Cloud API)──►  api/webhook.ts
+   │  corpo lido cru (bodyParser off) → assinatura verificada → adapter por formato
+   ▼
+_lib/pipeline.ts   normaliza (ASR) → rate-limit → roteia → deriva → raciocina → gate → persiste
+   ├─ transport/     TwilioAdapter + CloudApiAdapter (mesma URL, drop-in)
+   ├─ router.ts      classificação de intenção (tier barato)
+   ├─ reason.ts      visão 2-passos (ID→Agrofit→resposta) / Delta T / Q&A
+   ├─ farmcard.ts    solo + clima + vazio sanitário no pin
+   ├─ transcribe.ts  áudio PT-BR
+   ├─ compliance.ts  portão de saída anti-prescrição
+   ├─ tools/         deltaT · weather · soil · geo · calendar · agrofit · crops
+   └─ db.ts          Supabase: users · farms · farm_derived · messages · monitor_runs · referral_requests
+
+api/cron/monitor.ts  1×/dia — transições de vazio sanitário + validade do calendário
 ```
 
-O transporte é abstraído em `_lib/transport/` (`TransportAdapter`). Hoje:
-`TwilioAdapter`. Amanhã: um `CloudApiAdapter` (Meta) é um drop-in — o pipeline
-não sabe qual provider está falando.
+O transporte é abstraído em `_lib/transport/`. **Twilio e Meta Cloud API coexistem
+na mesma URL** — o webhook escolhe o adapter pelo formato da requisição, então virar
+pro Cloud API é só apontar o webhook da Meta pra cá (sem redeploy). O compute é
+stateless por mensagem; o estado vive no Supabase.
 
-## Rodar os testes
+**LLM via OpenRouter** (uma chave, tiers por env): `anthropic/claude-haiku-4.5`
+(roteador), `anthropic/claude-sonnet-5` (raciocínio/visão), `google/gemini-2.5-flash`
+(transcrição).
+
+## Site
+
+Landing page em `web/` (estática, pt-BR, sem build) — copiada pra `public/` por
+`node scripts/build-web.mjs` e servida na raiz do domínio, ao lado das funções `/api`.
+
+## Testes & verificação
 
 ```bash
 npm install
-npm run typecheck   # tsc --noEmit
-npm test            # vitest — lógica Delta T + portão de conformidade
+npm run typecheck        # tsc --noEmit  (~5s)
+npm test                 # vitest: deltaT, compliance, calendar, agrofit,
+                         #         twilio-signature, cloud, crops, referral
+node scripts/simulate-inbound.mjs "posso pulverizar hoje?"   # inbound Twilio assinado
+node scripts/simulate-inbound.mjs --location=-12.5,-55.7     # pin → farm card
+node scripts/simulate-inbound.mjs --media-url=<img> --media-type=image/jpeg
 ```
 
-## Setup (Stage 0)
+Filosofia: lógica pura é testada em unidade; o comportamento é verificado **ao vivo**
+contra o webhook em produção + as linhas no Supabase (o simulador assina requisições
+Twilio reais). Documentação completa em [`docs/`](./docs/).
 
-1. **Supabase**: crie um projeto, rode `supabase/migrations/0001_init.sql` no SQL
-   editor. Copie a URL e a `service_role` key.
-2. **Twilio WhatsApp Sandbox**: ative o sandbox no console Twilio, pegue o
-   `Account SID`, `Auth Token` e o número `whatsapp:+1415...`. Aponte o webhook
-   ("When a message comes in") para `https://<seu-deploy>/api/webhook`.
-3. **Anthropic**: gere uma `ANTHROPIC_API_KEY`.
-4. Preencha `.env` a partir de `.env.example` e faça deploy na Vercel
-   (`vercel --prod`). Configure as env vars no projeto Vercel.
-5. Do seu próprio celular, entre no sandbox (mande o código de join) e teste:
-   - Foto de uma folha → triagem.
-   - "posso pulverizar hoje?" → ele pede sua localização → veredito Delta T.
+## Setup
+
+1. **Supabase** — crie o projeto e rode as migrações (`supabase db push`).
+2. **Twilio WhatsApp Sandbox** — ative, pegue `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN`,
+   e aponte "When a message comes in" para `https://<deploy>/api/webhook`.
+3. **OpenRouter** — gere `OPENROUTER_API_KEY`.
+4. Preencha `.env` a partir de `.env.example`, configure as env vars na Vercel, deploy.
+5. Do seu celular: entre no sandbox (`join <código>`) e teste foto, "posso pulverizar
+   hoje?", um pin e um áudio.
+
+Runbook detalhado (env vars, migrações, cron, transição pro Cloud API):
+[`docs/deployment/`](./docs/deployment/).
 
 ## Escopo (disciplina)
 
-Isto **não** é: ERP de fazenda, marketplace de insumos, plataforma de sensores,
-emissor de receituário. É triagem agronômica conversacional. Foco v1: **soja,
-milho e pastagem**. Próximos estágios (onboarding "conhece minha terra" com solo
-+ farm card, grounding Agrofit/EMBRAPA, café/citros, NDVI) no dossiê, Parte 10.
+**Não** é: ERP de fazenda, marketplace de insumos, plataforma de sensores, emissor
+de receituário. **É** triagem agronômica conversacional, honesta sobre a linha da
+prescrição. Próximo horizonte (dossiê Parte 10): NDVI/Sentinel-2, o warm-handoff real
+pro agrônomo (com consentimento específico + DPA), e mais culturas.
 
 ## Decisões travadas (dossiê Parte 11)
 
-- **Culturas v1**: soja + milho + pastagem.
-- **Transporte pós-sandbox**: direto para o WhatsApp Cloud API (sem camada não
-  oficial). O adapter deixa isso plugável.
-- **Voz**: entrada por áudio (ASR) no Stage 1; respostas em texto por enquanto.
-- **Modelo de negócio**: ferramenta gratuita → referência para agrônomo. Por
-  isso o consentimento já permite conectar o produtor a um agrônomo depois.
+- **Culturas**: soja, milho, pastagem, café, citros.
+- **Transporte**: Twilio sandbox agora; Cloud API já implementado e plugável (mesma URL).
+- **Voz**: entrada por áudio (ASR); respostas em texto.
+- **Modelo de negócio**: ferramenta gratuita → encaminhamento pro agrônomo (lead-gen),
+  nunca comissão por produto prescrito. O `referral_requests` já registra o opt-in.
