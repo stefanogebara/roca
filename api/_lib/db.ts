@@ -208,6 +208,39 @@ export async function countRecentInbound(userId: string, sinceIso: string): Prom
   return count ?? 0;
 }
 
+export interface FarmProfile {
+  uf: string | null;
+  crop: string[] | null;
+}
+
+/** Read a user's state + crops to hand off with a referral. */
+export async function getFarmProfile(userId: string): Promise<FarmProfile> {
+  const db = getDb();
+  const [{ data: u }, { data: f }] = await Promise.all([
+    db.from('users').select('state').eq('id', userId).maybeSingle(),
+    db.from('farms').select('crop').eq('user_id', userId).maybeSingle(),
+  ]);
+  return {
+    uf: (u as { state: string | null } | null)?.state ?? null,
+    crop: (f as { crop: string[] | null } | null)?.crop ?? null,
+  };
+}
+
+/** Record an explicit, consented agrônomo-referral request (business seed). */
+export async function createReferralRequest(
+  userId: string,
+  fields: { uf: string | null; crop: string[] | null; topic: string | null }
+): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('referral_requests').insert({
+    user_id: userId,
+    uf: fields.uf,
+    crop: fields.crop,
+    topic: fields.topic,
+  });
+  if (error) log.error('createReferralRequest failed:', error.message);
+}
+
 /** LGPD deletion: wipe a user's data on request. */
 export async function deleteUserData(waId: string): Promise<boolean> {
   const db = getDb();
@@ -219,6 +252,7 @@ export async function deleteUserData(waId: string): Promise<boolean> {
   if (!user) return true;
   const userId = (user as { id: string }).id;
   await db.from('messages').delete().eq('user_id', userId);
+  await db.from('referral_requests').delete().eq('user_id', userId);
   await db.from('farms').delete().eq('user_id', userId);
   const { error } = await db.from('users').delete().eq('id', userId);
   if (error) {

@@ -20,6 +20,8 @@ const CROP_MATCHERS = [
   { key: 'soja', re: /\bsoja\b/i },
   { key: 'milho', re: /\bmilho\b/i },
   { key: 'pastagem', re: /pastagem|pasto|capim|forrage|braqui/i },
+  { key: 'cafe', re: /caf[eé]/i },
+  { key: 'citros', re: /citros|lim[aã]o|laranja|tangerin/i },
 ];
 const TODAS_RE = /todas as culturas/i;
 

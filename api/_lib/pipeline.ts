@@ -19,6 +19,8 @@ import {
   setAwaiting,
   setFarmCrops,
   countRecentInbound,
+  getFarmProfile,
+  createReferralRequest,
 } from './db';
 import { parseCrops, joinCrops } from './tools/crops';
 import { createLogger } from './logger';
@@ -36,6 +38,22 @@ const CONSENT_NOTE =
 
 const FALLBACK_REPLY =
   'Tive um problema pra processar isso agora. Tenta de novo daqui a pouco, ou manda de outro jeito.';
+
+// Explicit request to be connected to an agrônomo (the referral opt-in). Kept
+// conservative so we only capture on a clear ask — storing is within the
+// onboarding consent; sharing with a third party would ask again (future).
+const REFERRAL_INTENT =
+  /\b(me\s+(indic\w*|arrum\w*|ach\w*|conect\w*|pass\w*)\s+(um\s+)?agr[oôó]nomo|quero\s+(um\s+|falar\s+com\s+(um\s+)?)?agr[oôó]nomo|preciso\s+de\s+(um\s+)?agr[oôó]nomo|(conect\w*|indic\w*)\s+[^.?!]{0,30}\bagr[oôó]nomo)/i;
+
+/** Whether a message is an explicit request to be connected to an agrônomo. */
+export function isReferralRequest(text: string): boolean {
+  return REFERRAL_INTENT.test(text);
+}
+
+const REFERRAL_REPLY =
+  'Boa! 🙌 Anotei seu interesse em falar com um agrônomo — e não passo seus dados pra ninguém sem te perguntar antes.\n\n' +
+  'Pra adiantar, leve pro agrônomo: fotos da lavoura, a cultura e a fase, e o que você observou (onde começou, como espalhou). Ele faz o diagnóstico e, se precisar, o receituário — o documento técnico que define o produto e a dose certos.\n\n' +
+  'Dica: agrônomo tem registro no CREA do seu estado, e cooperativa/revenda geralmente tem um técnico responsável. Assim que a nossa rede de agrônomos parceiros estiver pronta, eu te conecto direto por aqui. 👊';
 
 function isFirstContact(user: { consent_lgpd_at: string | null } | null): boolean {
   return !!user && user.consent_lgpd_at == null;
@@ -127,6 +145,19 @@ export async function handleInbound(
     }
     intent = 'onboarding';
     replyText = `Anotado: você trabalha com ${joinCrops(cropAnswer)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`;
+  } else if (effective.kind === 'text' && effective.text && isReferralRequest(effective.text)) {
+    // Explicit agrônomo referral request — the business-model seed.
+    intent = 'referral';
+    if (userId) {
+      if (user?.awaiting) await setAwaiting(userId, null);
+      const profile = await getFarmProfile(userId);
+      await createReferralRequest(userId, {
+        uf: profile.uf,
+        crop: profile.crop,
+        topic: effective.text.slice(0, 280),
+      });
+    }
+    replyText = REFERRAL_REPLY;
   } else if (msg.kind === 'voice' && !transcript) {
     intent = 'general';
     replyText =

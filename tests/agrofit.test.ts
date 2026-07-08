@@ -12,8 +12,9 @@ describe('normalizeCrop', () => {
     expect(normalizeCrop('pasto')).toBe('pastagem');
     expect(normalizeCrop('braquiária')).toBe('pastagem');
   });
-  it('returns null for non-focus crops', () => {
-    expect(normalizeCrop('café')).toBeNull();
+  it('returns null for non-covered crops', () => {
+    expect(normalizeCrop('trigo')).toBeNull();
+    expect(normalizeCrop('arroz')).toBeNull();
     expect(normalizeCrop(null)).toBeNull();
   });
 });
@@ -42,6 +43,30 @@ describe('lookupPest', () => {
   it('searches all crops when crop is unknown', () => {
     const hit = lookupPest(null, 'ferrugem');
     expect(hit).not.toBeNull();
+  });
+
+  it('grounds café pests (ferrugem do cafeeiro, broca)', () => {
+    const rust = lookupPest('cafe', 'ferrugem do café');
+    expect(rust).not.toBeNull();
+    expect(rust!.crop).toBe('cafe');
+    expect(rust!.entry.products).toBeGreaterThan(0);
+    expect(lookupPest('cafe', 'broca do café')).not.toBeNull();
+  });
+
+  it('grounds citros pests (cancro cítrico)', () => {
+    const cancro = lookupPest('citros', 'cancro cítrico');
+    expect(cancro).not.toBeNull();
+    expect(cancro!.crop).toBe('citros');
+    expect(cancro!.entry.products).toBeGreaterThan(0);
+  });
+});
+
+describe('normalizeCrop — café + citros', () => {
+  it('maps coffee and citrus vocabulary', () => {
+    expect(normalizeCrop('cafezal')).toBe('cafe');
+    expect(normalizeCrop('meu café')).toBe('cafe');
+    expect(normalizeCrop('laranja')).toBe('citros');
+    expect(normalizeCrop('citros')).toBe('citros');
   });
 });
 

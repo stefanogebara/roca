@@ -47,15 +47,19 @@ function loadAgrofit(): AgrofitFile {
 const AGROFIT = loadAgrofit();
 export const AGROFIT_SOURCE = AGROFIT.meta.source;
 
-export type CropKey = 'soja' | 'milho' | 'pastagem';
+export type CropKey = 'soja' | 'milho' | 'pastagem' | 'cafe' | 'citros';
 
-/** Map free crop text → canonical key, or null if not a focus crop. */
+const ALL_CROPS: CropKey[] = ['soja', 'milho', 'pastagem', 'cafe', 'citros'];
+
+/** Map free crop text → canonical key, or null if not a covered crop. */
 export function normalizeCrop(crop: string | null | undefined): CropKey | null {
   if (!crop) return null;
   const c = strip(crop);
   if (/\bsoja\b/.test(c)) return 'soja';
   if (/\bmilho\b/.test(c)) return 'milho';
   if (/pastagem|pasto|capim|forrage|braqui|gado|pecuar/.test(c)) return 'pastagem';
+  if (/cafe|cafeeiro|cafezal/.test(c)) return 'cafe';
+  if (/citros|citrus|laranja|limao|tangerin|pomar/.test(c)) return 'citros';
   return null;
 }
 
@@ -136,7 +140,7 @@ export function lookupPest(
   const qTokens = tokens(pestQuery);
   if (qTokens.length === 0 && qMatch.length < 3) return null;
 
-  const cropsToSearch: CropKey[] = crop ? [crop] : ['soja', 'milho', 'pastagem'];
+  const cropsToSearch: CropKey[] = crop ? [crop] : ALL_CROPS;
   const candidates: Scored[] = [];
 
   for (const c of cropsToSearch) {
