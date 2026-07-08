@@ -89,10 +89,10 @@ export async function handleInbound(
     const prior = await countRecentInbound(userId, since);
     if (prior >= RATE_MAX_PER_WINDOW) {
       if (prior === RATE_MAX_PER_WINDOW) {
-        await adapter.send({
-          to: msg.from,
-          text: 'Opa, chegou bastante coisa junta! 😅 Me dá uns segundinhos e manda de novo, que eu te respondo com calma.',
-        });
+        const notice =
+          'Opa, chegou bastante coisa junta! 😅 Me dá uns segundinhos e manda de novo, que eu te respondo com calma.';
+        await adapter.send({ to: msg.from, text: notice });
+        await logMessage(userId, 'out', { kind: 'text', text: notice, intent: 'rate_limited' });
       }
       await logMessage(userId, 'in', {
         kind: msg.kind,

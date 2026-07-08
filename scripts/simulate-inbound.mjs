@@ -19,10 +19,12 @@ const env = Object.fromEntries(
 
 const badSig = process.argv.includes('--bad-signature');
 const locArg = process.argv.find((a) => a.startsWith('--location='));
+const fromArg = process.argv.find((a) => a.startsWith('--from='));
+const from = fromArg ? fromArg.split('=')[1] : '+5511999990000';
 const text = process.argv.find((a, i) => i >= 2 && !a.startsWith('--')) ?? 'posso pulverizar hoje?';
 
 const params = {
-  From: 'whatsapp:+5511999990000',
+  From: `whatsapp:${from}`,
   To: 'whatsapp:+14155238886',
   Body: locArg ? '' : text,
   MessageSid: `SMsim${Date.now()}`,
