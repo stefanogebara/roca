@@ -5,7 +5,6 @@
  */
 
 import type { TransportAdapter, InboundMessage } from './transport/types';
-import { TwilioAdapter } from './transport/twilio';
 import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
 import { buildFarmCard } from './farmcard';
@@ -51,10 +50,10 @@ export async function handleInbound(
   const userId = user?.id ?? null;
   const firstContact = isFirstContact(user);
 
-  // Media fetch (image or voice) — Twilio-specific, lazy, fail-soft.
+  // Media fetch (image or voice) — provider-agnostic, lazy, fail-soft.
   let media: ChatImage | null = null;
   let transcript: string | null = null;
-  if (msg.mediaUrl && adapter instanceof TwilioAdapter) {
+  if (msg.mediaUrl && adapter.fetchMedia) {
     try {
       const fetched = await adapter.fetchMedia(msg.mediaUrl);
       if (msg.kind === 'image') {

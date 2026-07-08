@@ -21,17 +21,11 @@ import type {
 
 const TWILIO_API = 'https://api.twilio.com/2010-04-01';
 
-function formToObject(body: unknown): Record<string, string> {
-  if (body && typeof body === 'object' && !Array.isArray(body)) {
-    return body as Record<string, string>;
-  }
-  if (typeof body === 'string') {
-    const params = new URLSearchParams(body);
-    const out: Record<string, string> = {};
-    for (const [k, v] of params) out[k] = v;
-    return out;
-  }
-  return {};
+function formToObject(rawBody: Buffer): Record<string, string> {
+  const params = new URLSearchParams(rawBody.toString('utf8'));
+  const out: Record<string, string> = {};
+  for (const [k, v] of params) out[k] = v;
+  return out;
 }
 
 function classifyMedia(mime: string | null): InboundKind {
@@ -68,7 +62,7 @@ export class TwilioAdapter implements TransportAdapter {
 
     const host = req.headers['host'];
     const url = `https://${host}${req.url ?? ''}`;
-    const expected = computeTwilioSignature(authToken, url, formToObject(req.body));
+    const expected = computeTwilioSignature(authToken, url, formToObject(req.rawBody));
 
     const a = Buffer.from(expected);
     const b = Buffer.from(signature);
@@ -76,7 +70,7 @@ export class TwilioAdapter implements TransportAdapter {
   }
 
   async parseInbound(req: TransportRequest): Promise<InboundMessage | null> {
-    const b = formToObject(req.body);
+    const b = formToObject(req.rawBody);
     const from = (b.From ?? '').replace('whatsapp:', '');
     if (!from) return null;
 

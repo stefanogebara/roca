@@ -40,13 +40,17 @@ export interface TransportAdapter {
   verifySignature(req: TransportRequest): Promise<boolean>;
   parseInbound(req: TransportRequest): Promise<InboundMessage | null>;
   send(msg: OutboundMessage): Promise<void>;
+  /** Resolve an inbound media reference (Twilio URL or Cloud media id) to bytes. */
+  fetchMedia?(ref: string): Promise<{ base64: string; mime: string }>;
 }
 
-/** Minimal request surface the adapters need (Vercel/Node req is compatible). */
+/** Minimal request surface the adapters need. The webhook reads the raw body
+ * once (body parsing is disabled) so providers can verify signatures over the
+ * exact bytes; each adapter parses `rawBody` itself. */
 export interface TransportRequest {
   method?: string;
   headers: Record<string, string | string[] | undefined>;
   url?: string;
-  /** Parsed body (object) or raw string. */
-  body: unknown;
+  /** Exact request bytes, for signature verification and per-provider parsing. */
+  rawBody: Buffer;
 }
