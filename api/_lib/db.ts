@@ -67,6 +67,28 @@ export async function setFarmLocation(
   return (data as { id: string }).id;
 }
 
+/** Fetch a user's farm id + coordinates (for NDVI caching + derivation). */
+export async function getFarm(
+  userId: string
+): Promise<{ id: string; lat: number; lon: number } | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('farms')
+    .select('id, lat, lon')
+    .eq('user_id', userId)
+    .not('lat', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    log.error('getFarm failed:', error.message);
+    return null;
+  }
+  const row = data as { id: string; lat: number | null; lon: number | null } | null;
+  if (!row || row.lat == null || row.lon == null) return null;
+  return { id: row.id, lat: row.lat, lon: row.lon };
+}
+
 /** Store the derived UF on the user (drives vazio sanitário awareness). */
 export async function setUserState(userId: string, uf: string): Promise<void> {
   const db = getDb();
@@ -111,6 +133,50 @@ export async function getCachedSoil<T>(farmId: string): Promise<T | null> {
     return null;
   }
   return ((data as { soil_json: T | null } | null)?.soil_json as T) ?? null;
+}
+
+export interface CachedNdvi {
+  ndvi: number;
+  date: string;
+}
+
+/** Cache the latest NDVI reading per farm. */
+export async function setCachedNdvi(
+  farmId: string,
+  reading: { ndvi: number; date: string }
+): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('farm_derived').upsert({
+    farm_id: farmId,
+    latest_ndvi: reading.ndvi,
+    ndvi_date: reading.date,
+    ndvi_fetched_at: new Date().toISOString(),
+  });
+  if (error) log.error('setCachedNdvi failed:', error.message);
+}
+
+/** Read cached NDVI if fresh (within maxAgeDays); else null to refetch. */
+export async function getCachedNdvi(
+  farmId: string,
+  maxAgeDays = 7
+): Promise<CachedNdvi | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('farm_derived')
+    .select('latest_ndvi, ndvi_date, ndvi_fetched_at')
+    .eq('farm_id', farmId)
+    .maybeSingle();
+  if (error) {
+    log.error('getCachedNdvi failed:', error.message);
+    return null;
+  }
+  const row = data as
+    | { latest_ndvi: number | null; ndvi_date: string | null; ndvi_fetched_at: string | null }
+    | null;
+  if (!row || row.latest_ndvi == null || !row.ndvi_fetched_at || !row.ndvi_date) return null;
+  const ageDays = (Date.now() - Date.parse(row.ndvi_fetched_at)) / 86_400_000;
+  if (ageDays > maxAgeDays) return null;
+  return { ndvi: row.latest_ndvi, date: row.ndvi_date };
 }
 
 /** Fetch a user's most recent farm location, if any. */

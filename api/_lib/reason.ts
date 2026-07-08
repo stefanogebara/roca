@@ -12,7 +12,8 @@ import type { Intent } from './router';
 import { SYSTEM_PROMPT, PEST_HANDOFF_REMINDER } from './prompts/system';
 import { fetchHourlyWeather } from './tools/weather';
 import { sprayWindow, type SprayWindow } from './tools/deltaT';
-import { getFarmLocation } from './db';
+import { getFarmLocation, getFarm, getCachedNdvi, setCachedNdvi } from './db';
+import { fetchNdvi, classifyVigor } from './tools/ndvi';
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
 import { lookupPest, normalizeCrop, groundingBlock } from './tools/agrofit';
@@ -68,6 +69,37 @@ export function phraseSpray(w: SprayWindow): string {
     lines.push(`\n🕐 Janela melhor hoje: por volta das ${hour} (Delta T ${w.bestUpcoming.deltaT} °C).`);
   }
   return lines.join('\n');
+}
+
+/** Satellite field-vigor read (NDVI) for the farmer's pin. Cached per farm. */
+async function handleFieldHealth(userId: string | null): Promise<string> {
+  if (!userId) {
+    return 'Pra ver a imagem de satélite da sua lavoura, primeiro me manda sua localização (clipe 📎 → Localização). Aí eu puxo o índice de vigor (NDVI) do seu ponto.';
+  }
+  const farm = await getFarm(userId);
+  if (!farm) {
+    return 'Ainda não tenho a localização da sua lavoura. Manda o pin aqui (clipe 📎 → Localização) que eu puxo a imagem de satélite mais recente e te digo como tá o vigor.';
+  }
+
+  let reading = await getCachedNdvi(farm.id);
+  if (!reading) {
+    const fresh = await fetchNdvi(farm.lat, farm.lon);
+    if (fresh) {
+      reading = { ndvi: fresh.ndvi, date: fresh.date };
+      await setCachedNdvi(farm.id, { ndvi: fresh.ndvi, date: fresh.date });
+    }
+  }
+  if (!reading) {
+    return 'Não consegui puxar a imagem de satélite agora — pode ser cobertura de nuvem nos últimos dias ou instabilidade do serviço. Tenta de novo mais tarde. 🛰️';
+  }
+
+  const v = classifyVigor(reading.ndvi);
+  const [y, m, d] = reading.date.split('-');
+  return (
+    `🛰️ Última imagem de satélite (Sentinel-2, ${d}/${m}/${y}) do ponto que você marcou:\n\n` +
+    `${v.emoji} NDVI ~${reading.ndvi.toFixed(2)} — ${v.label}.\n${v.note}\n\n` +
+    `_É uma leitura aproximada de um ponto (10 m), não da lavoura toda. Combine com o que você vê no campo e com seu agrônomo. Quer que eu veja se dá pra pulverizar hoje também?_`
+  );
 }
 
 async function handleSpray(
@@ -216,6 +248,10 @@ export async function reason(
 
   if (intent === 'spray_window') {
     return handleSpray(msg, deps.userId);
+  }
+
+  if (intent === 'field_health') {
+    return handleFieldHealth(deps.userId);
   }
 
   if (msg.kind === 'image' && deps.media) {

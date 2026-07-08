@@ -79,12 +79,16 @@ produtor `#D9EAD0` (verde suave, "WhatsApp-ish" mas da nossa marca), timestamp
 Via Google Fonts (`<link>`), com `display=swap`. Deliberadamente **sem
 Inter/Roboto** (genéricos de IA).
 
-- **Display — Fraunces** (serifada suave, ótica, "old-style"): H1/H2/H3 de
-  seção, wordmark, pull-quote. Traz calor editorial e um ar enraizado/humano.
-  Itálico usado como acento (a palavra "entender", "não", a tagline).
-- **Corpo/UI — IBM Plex Sans**: legível em tela barata de Android, com mais
-  caráter que a fonte padrão. Todo o texto corrido, botões, nav, cards.
-- **Dados — IBM Plex Mono**: leituras de instrumento — `Delta T 6.5 °C`,
+> Tipografia alinhada à do seatable.one (mesma família da hero): **Instrument
+> Serif + DM Sans + JetBrains Mono**.
+
+- **Display — Instrument Serif** (serifada leve, só peso 400 + itálico): H1/H2/H3
+  de seção, wordmark, pull-quote. `font-synthesis: none` para nunca "engrossar"
+  artificialmente — a serifada leve em tamanho grande É o visual. Itálico como
+  acento (a palavra "entender", "não", a tagline).
+- **Corpo/UI — DM Sans**: legível em tela barata de Android. Todo o texto
+  corrido, botões, nav, cards.
+- **Dados — JetBrains Mono**: leituras de instrumento — `Delta T 6.5 °C`,
   `pH ~5.2`, `Vento 16 km/h`, chips de fonte. Reforça a precisão técnica.
 
 **Escala** fluida com `clamp()` (mobile-first):

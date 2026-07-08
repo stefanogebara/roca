@@ -16,6 +16,7 @@ export type Intent =
   | 'pest_triage'
   | 'spray_window'
   | 'field_profile'
+  | 'field_health'
   | 'general'
   | 'onboarding'
   | 'smalltalk'

@@ -52,6 +52,17 @@ export function isReferralRequest(text: string): boolean {
   return REFERRAL_INTENT.test(text);
 }
 
+// Satellite field-vigor (NDVI) request — asks how the field looks from space, or
+// how the crop is doing overall. Kept a fast regex because it triggers a distinct
+// action (satellite fetch) that the generic router would likely miss.
+const FIELD_HEALTH_INTENT =
+  /\b(sat[ée]lite|ndvi|vigor\b|imagem\s+(da|de|por)\s+sat[ée]lite)|como\s+(est[áa]|t[áa]|vai)\s+(a\s+|minha\s+|a\s+minha\s+)?(lavoura|ro[çc]a|planta[çc][ãa]o|plantio)/i;
+
+/** Whether a message asks for a satellite/vigor read of the field. */
+export function isFieldHealthRequest(text: string): boolean {
+  return FIELD_HEALTH_INTENT.test(text);
+}
+
 // Bump this string whenever REFERRAL_REPLY's wording changes — it's stored with
 // each opt-in so the consent is provable (LGPD accountability).
 const REFERRAL_CONSENT_VERSION = 'referral-v1-2026-07';
@@ -179,7 +190,10 @@ export async function handleInbound(
   } else {
     // A pending crop question that got a non-crop reply: stop waiting, answer normally.
     if (user?.awaiting === 'crop' && userId) await setAwaiting(userId, null);
-    intent = await routeIntent(effective);
+    intent =
+      effective.text && isFieldHealthRequest(effective.text)
+        ? 'field_health'
+        : await routeIntent(effective);
     try {
       replyText = await reason(effective, intent, { userId, media });
     } catch (e) {
