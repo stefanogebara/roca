@@ -338,6 +338,29 @@ export async function getRecentInboundText(userId: string, limit = 12): Promise<
     .filter((t) => t.length > 0);
 }
 
+/** Outbound event log for the passive caderno ("meu histórico"). */
+export async function getActivityLog(
+  userId: string,
+  sinceDays = 180,
+  limit = 200
+): Promise<Array<{ intent: string | null; created_at: string }>> {
+  const db = getDb();
+  const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+  const { data, error } = await db
+    .from('messages')
+    .select('intent, created_at')
+    .eq('user_id', userId)
+    .eq('direction', 'out')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) {
+    log.error('getActivityLog failed:', error.message);
+    return [];
+  }
+  return (data ?? []) as Array<{ intent: string | null; created_at: string }>;
+}
+
 export interface FarmProfile {
   uf: string | null;
   crop: string[] | null;

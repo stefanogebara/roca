@@ -28,7 +28,9 @@ import {
   getFarmLocation,
   getCachedNdvi,
   hasRecentReferral,
+  getActivityLog,
 } from './db';
+import { buildHistoryReply } from './caderno';
 import { parseCrops, joinCrops } from './tools/crops';
 import type { PestCardData } from './cards/pest';
 import { withRetry } from './retry';
@@ -71,6 +73,16 @@ const FIELD_HEALTH_INTENT =
 /** Whether a message asks for a satellite/vigor read of the field. */
 export function isFieldHealthRequest(text: string): boolean {
   return FIELD_HEALTH_INTENT.test(text);
+}
+
+// "Meu histórico" / "meu caderno" — the passive caderno de campo read-out.
+// Anchored to possessives/conversation so "histórico de chuva" doesn't match.
+const HISTORY_INTENT =
+  /\b(meu|nosso)\s+(hist[óo]rico|caderno)\b|\bo\s+que\s+(a\s+gente\s+|n[óo]s\s+)?(j[áa]\s+)?(conversamos|falamos|falou)\b/i;
+
+/** Whether a message asks for the farmer's own history/caderno. */
+export function isHistoryRequest(text: string): boolean {
+  return HISTORY_INTENT.test(text);
 }
 
 // Request to assemble the "resumo pro agrônomo" — the briefing the farmer
@@ -181,6 +193,9 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
     case 'brief':
       // The resumo exists to hand to a professional — offer the connection.
       return ['Quero um agrônomo'];
+    case 'history':
+      // From the season record, the useful next steps are the pro handoffs.
+      return ['Montar resumo', 'Quero um agrônomo'];
     default:
       return undefined;
   }
@@ -317,6 +332,13 @@ export async function handleInbound(
     }
     intent = 'onboarding';
     replyText = `Anotado: você trabalha com ${joinCrops(cropAnswer)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`;
+  } else if (effective.kind === 'text' && effective.text && isHistoryRequest(effective.text)) {
+    // Passive caderno de campo — the season record Stevi keeps for free.
+    intent = 'history';
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    replyText = userId
+      ? buildHistoryReply(await getFarmProfile(userId), await getActivityLog(userId))
+      : buildHistoryReply({ uf: null, crop: null }, []);
   } else if (effective.kind === 'text' && effective.text && isBriefRequest(effective.text)) {
     // Assemble the agrônomo briefing from the farmer's profile + recent messages.
     intent = 'brief';

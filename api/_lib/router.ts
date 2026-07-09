@@ -21,7 +21,9 @@ export type Intent =
   | 'onboarding'
   | 'smalltalk'
   | 'referral'
-  | 'brief';
+  | 'brief'
+  // matched by fast regex in the pipeline, never returned by the LLM router
+  | 'history';
 
 const ROUTER_INSTRUCTION = `Classifique a mensagem do produtor rural em UMA categoria. Responda só com a palavra-chave.
 
