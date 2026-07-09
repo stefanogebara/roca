@@ -5,6 +5,7 @@
  */
 
 import { requireEnv } from './env';
+import { withRetry, isTransient } from './retry';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -35,8 +36,22 @@ type ContentPart =
   | { type: 'image_url'; image_url: { url: string } }
   | { type: 'input_audio'; input_audio: { data: string; format: string } };
 
-/** Send one chat turn and return the assistant text. Throws on API failure. */
+/**
+ * Send one chat turn and return the assistant text. Throws on API failure.
+ * One retry on transient failures (429/5xx/network) and on empty completions —
+ * OpenRouter occasionally returns those transiently (seen in gym runs). Kept to
+ * a single retry: these calls are the slow part of a webhook with a hard
+ * maxDuration budget.
+ */
 export async function chat(opts: ChatOptions): Promise<string> {
+  return withRetry(() => chatOnce(opts), {
+    attempts: 2,
+    shouldRetry: (e) =>
+      isTransient(e) || (e instanceof Error && e.message.includes('empty completion')),
+  });
+}
+
+async function chatOnce(opts: ChatOptions): Promise<string> {
   const apiKey = requireEnv('OPENROUTER_API_KEY');
 
   let content: string | ContentPart[] = opts.user;

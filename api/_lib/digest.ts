@@ -69,7 +69,11 @@ export async function computeDigestStats(since: string, until: string): Promise<
     byKind[k] = (byKind[k] ?? 0) + 1;
   }
 
-  const failures = outbound.filter((r) => r.raw && FAILURE_RE.test(r.raw)).length;
+  // Failure = a couldn't-help reply, or a reply the farmer never received
+  // (send exhausted its retries; pipeline records it as intent 'send_failed').
+  const failures = outbound.filter(
+    (r) => r.intent === 'send_failed' || (r.raw && FAILURE_RE.test(r.raw))
+  ).length;
 
   const sampleQuestions = inbound
     .filter((r) => r.raw && r.raw.trim().length > 0)

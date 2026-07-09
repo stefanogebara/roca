@@ -23,8 +23,13 @@ import {
   countRecentInbound,
   getFarmProfile,
   createReferralRequest,
+  getFarm,
+  getFarmLocation,
+  getCachedNdvi,
 } from './db';
 import { parseCrops, joinCrops } from './tools/crops';
+import { withRetry } from './retry';
+import { alertFounders } from './alert';
 import { createLogger } from './logger';
 
 const log = createLogger('pipeline');
@@ -76,6 +81,44 @@ function isFirstContact(user: { consent_lgpd_at: string | null } | null): boolea
   return !!user && user.consent_lgpd_at == null;
 }
 
+// Where the public card images are served from (WhatsApp fetches these).
+const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://roca-black.vercel.app';
+
+/**
+ * Optional visual card for a reply, as a public PNG URL WhatsApp can fetch.
+ * Reads the same data the reply used (fresh coords for spray; the just-cached
+ * NDVI reading for field health), so it stays a thin presentation layer on top
+ * of reason() — no change to reason()'s contract. Returns undefined when there's
+ * nothing visual to add (or the underlying data isn't available).
+ */
+async function cardUrlFor(
+  intent: Intent,
+  msg: InboundMessage,
+  userId: string | null
+): Promise<string | undefined> {
+  try {
+    if (intent === 'spray_window') {
+      let coords = msg.location;
+      if (!coords && userId) coords = await getFarmLocation(userId);
+      if (coords) return `${PUBLIC_BASE}/api/card?type=spray&lat=${coords.lat}&lon=${coords.lon}`;
+    } else if (intent === 'field_health' && userId) {
+      const farm = await getFarm(userId);
+      if (farm) {
+        const r = await getCachedNdvi(farm.id);
+        if (r) {
+          const q = new URLSearchParams({ type: 'ndvi', ndvi: String(r.ndvi), date: r.date });
+          if (r.std != null) q.set('std', String(r.std));
+          if (r.samples != null) q.set('samples', String(r.samples));
+          return `${PUBLIC_BASE}/api/card?${q.toString()}`;
+        }
+      }
+    }
+  } catch (e) {
+    log.error('cardUrlFor failed:', (e as Error).message);
+  }
+  return undefined;
+}
+
 /**
  * Quick-reply buttons per intent. Titles ARE real queries: a tap arrives as a
  * normal text message and routes through the existing pipeline ("Ver satélite"
@@ -98,17 +141,57 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
   }
 }
 
+/**
+ * Send with retries; a send that still fails is never silent — it's logged,
+ * recorded as a `send_failed` outbound row (so the digest and ops console
+ * surface it), and alerted to the founders. Returns whether the farmer
+ * actually got the message, so callers can skip "delivered" side effects.
+ */
+async function sendOrRecord(
+  adapter: TransportAdapter,
+  to: string,
+  out: { text: string; buttons?: string[]; mediaUrl?: string },
+  userId: string | null,
+  intent: string
+): Promise<boolean> {
+  try {
+    await withRetry(() =>
+      adapter.send({ to, text: out.text, buttons: out.buttons, mediaUrl: out.mediaUrl })
+    );
+    return true;
+  } catch (e) {
+    const reason = (e as Error).message;
+    log.error('send failed after retries:', reason);
+    if (userId) {
+      await logMessage(userId, 'out', { kind: 'text', text: out.text, intent: 'send_failed' });
+    }
+    // No phone number in the alert — masked-PII discipline applies here too.
+    await alertFounders(`⚠️ Stevi: envio ao produtor falhou (${intent}) — ${reason.slice(0, 200)}`);
+    return false;
+  }
+}
+
 export async function handleInbound(
   adapter: TransportAdapter,
   msg: InboundMessage
 ): Promise<void> {
-  // LGPD deletion short-circuit — honour it before anything else.
+  // LGPD deletion short-circuit — honour it before anything else. No DB write
+  // on a send failure here: the user's data was just deleted, keep it that way.
   if (msg.text && LGPD_DELETE.test(msg.text)) {
     await deleteUserData(msg.from);
-    await adapter.send({
-      to: msg.from,
-      text: 'Pronto, apaguei seus dados (localização e histórico). Se quiser voltar a usar é só mandar mensagem. 👍',
-    });
+    try {
+      await withRetry(() =>
+        adapter.send({
+          to: msg.from,
+          text: 'Pronto, apaguei seus dados (localização e histórico). Se quiser voltar a usar é só mandar mensagem. 👍',
+        })
+      );
+    } catch (e) {
+      log.error('LGPD confirmation send failed:', (e as Error).message);
+      await alertFounders(
+        `⚠️ Stevi: confirmação de exclusão LGPD não foi entregue — ${(e as Error).message.slice(0, 200)}`
+      );
+    }
     return;
   }
 
@@ -138,8 +221,10 @@ export async function handleInbound(
       if (count === RATE_MAX_PER_WINDOW + 1) {
         const notice =
           'Opa, chegou bastante coisa junta! 😅 Me dá uns segundinhos e manda de novo, que eu te respondo com calma.';
-        await adapter.send({ to: msg.from, text: notice });
-        await logMessage(userId, 'out', { kind: 'text', text: notice, intent: 'rate_limited' });
+        const sent = await sendOrRecord(adapter, msg.from, { text: notice }, userId, 'rate_limited');
+        if (sent) {
+          await logMessage(userId, 'out', { kind: 'text', text: notice, intent: 'rate_limited' });
+        }
       }
       return;
     }
@@ -232,7 +317,16 @@ export async function handleInbound(
 
   if (firstContact) finalText += CONSENT_NOTE;
 
-  await adapter.send({ to: msg.from, text: finalText, buttons: buttonsForIntent(intent) });
+  const mediaUrl = await cardUrlFor(intent, effective, userId);
+  const sent = await sendOrRecord(
+    adapter,
+    msg.from,
+    { text: finalText, buttons: buttonsForIntent(intent), mediaUrl },
+    userId,
+    intent
+  );
+  if (!sent) return;
+  // Consent counts as "notified" only if the notice was actually delivered.
   if (firstContact && userId) await markConsentNotified(userId);
   await logMessage(userId, 'out', {
     kind: 'text',
