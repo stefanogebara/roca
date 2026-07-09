@@ -364,6 +364,19 @@
         p.append(act);
 
         // List.
+        const srcBtn = el('button', 'btn small', '🔎 Buscar prospects na web (Google)');
+        srcBtn.addEventListener('click', async () => {
+          srcBtn.disabled = true; srcBtn.textContent = 'Buscando…';
+          try {
+            const rep = await api('prospects', { method:'POST', body: JSON.stringify({ action:'source' }) });
+            alert(rep.configured
+              ? `Busca: ${rep.found} encontrados, ${rep.imported} novos importados (${rep.withPhone} com telefone).` + (rep.error ? `\nAviso: ${rep.error}` : '')
+              : rep.error);
+            loadProspeccao();
+          } catch (e) { if (e.message!=='unauthorized') alert('Erro na busca: '+e.message); }
+          finally { srcBtn.disabled = false; srcBtn.textContent = '🔎 Buscar prospects na web (Google)'; }
+        });
+        imp.append(srcBtn);
         const listWrap = el('div'); listWrap.id = 'prospect-list';
         p.append(listWrap);
         renderProspects(listWrap, list);

@@ -16,6 +16,7 @@
 import { chat } from '../llm';
 import { MODELS } from '../env';
 import { withRetry } from '../retry';
+import { loadPlaybook, playbookBlock } from './learn';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-agent');
@@ -120,11 +121,15 @@ export async function buildAgentReply(
     `Nova mensagem do prospect: ${inboundText}\n\n` +
     `Responda como ${AGENT_NAME} (só o texto da mensagem, tamanho WhatsApp).`;
 
+  // Market learnings (weekly-mined) are appended as an informational block;
+  // a load failure only costs the learnings, never the reply.
+  const learned = playbookBlock(await loadPlaybook().catch(() => []));
+
   const raw = await withRetry(
     () =>
       chat({
         model: MODELS.reasoning(),
-        system: agentSystemPrompt(AGENT_NAME),
+        system: agentSystemPrompt(AGENT_NAME) + (learned ? `\n\n${learned}` : ''),
         maxTokens: 400,
         user,
       }),

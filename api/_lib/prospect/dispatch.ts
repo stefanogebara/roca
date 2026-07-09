@@ -22,16 +22,24 @@ import {
   recordSendFailed,
 } from './db';
 import { sendProspectTemplate } from './send';
+import { buildTemplateParams } from './personalize';
 import { alertFounders } from '../alert';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-dispatch');
 
-const TEMPLATE_NAME = 'stevi_parceria_v1';
+// Template selection is env-driven so approving the personalized v2 in
+// WhatsApp Manager upgrades the copy without a deploy (see personalize.ts).
+const TEMPLATE_NAME = process.env.PROSPECT_TEMPLATE_NAME || 'stevi_parceria_v1';
+const TEMPLATE_PARAMS = Number(process.env.PROSPECT_TEMPLATE_PARAMS || '1');
 const TEMPLATE_LANG = 'pt_BR';
 // Gentle spacing between individual sends in a batch (avoids a burst that spikes
 // the block/report rate). Skipped in dryRun.
 const PER_SEND_DELAY_MS = Math.round(BATCH_DELAY_MS / BATCH_SIZE);
+// Human-like pacing: uniform machine intervals look like a bot to Meta's
+// quality systems and to anyone watching a phone; jitter ±40%.
+const jitteredDelay = (): number =>
+  Math.round(PER_SEND_DELAY_MS * (0.6 + Math.random() * 0.8));
 
 export interface DispatchOptions {
   dryRun?: boolean;
@@ -97,14 +105,19 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     }
     let wamid: string;
     try {
-      ({ wamid } = await sendProspectTemplate(phone, TEMPLATE_NAME, TEMPLATE_LANG, [p.name.slice(0, 60)]));
+      ({ wamid } = await sendProspectTemplate(
+        phone,
+        TEMPLATE_NAME,
+        TEMPLATE_LANG,
+        buildTemplateParams(p, TEMPLATE_PARAMS)
+      ));
     } catch (e) {
       // Send itself failed → nothing went out; record + continue is safe.
       await recordSendFailed(p.id);
       recipients.push({ id: p.id, name: p.name, phone, result: 'failed' });
       failed++;
       log.error(`dispatch send failed for ${p.id}:`, (e as Error).message);
-      if (batch.indexOf(p) < batch.length - 1) await sleep(PER_SEND_DELAY_MS);
+      if (batch.indexOf(p) < batch.length - 1) await sleep(jitteredDelay());
       continue;
     }
 
@@ -124,7 +137,7 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
       );
       break;
     }
-    if (batch.indexOf(p) < batch.length - 1) await sleep(PER_SEND_DELAY_MS);
+    if (batch.indexOf(p) < batch.length - 1) await sleep(jitteredDelay());
   }
 
   if (failed > 0) {

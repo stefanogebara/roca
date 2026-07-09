@@ -95,6 +95,22 @@ export default async function handler(
     log.error('fire alerts run failed:', (e as Error).message);
   }
 
+  // Weekly (Mondays BRT): mine prospect conversations for market learnings —
+  // feeds Vitória's playbook block and the painel funnel stats.
+  let learning: { learnings: string[] } | null = null;
+  const brtDay = new Date(now.getTime() - 3 * 3_600_000).getUTCDay();
+  if (brtDay === 1) {
+    try {
+      const { runProspectLearning } = await import('../_lib/prospect/learn');
+      learning = await runProspectLearning();
+      if (learning.learnings.length > 0) {
+        findings.push(`Prospecção: ${learning.learnings.length} aprendizado(s) novos no playbook.`);
+      }
+    } catch (e) {
+      log.error('prospect learning run failed:', (e as Error).message);
+    }
+  }
+
   // LGPD retention: purge rows past their useful life (see purgeExpiredRows).
   let purged: Record<string, number> = {};
   try {

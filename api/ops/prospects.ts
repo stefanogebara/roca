@@ -47,6 +47,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
+    if (action === 'source') {
+      const { runSourcing } = await import('../_lib/prospect/source');
+      res.status(200).json({ success: true, data: await runSourcing() });
+      return;
+    }
+
     if (action === 'thread') {
       const id = String((body as { id?: unknown }).id ?? '');
       if (!id) {
