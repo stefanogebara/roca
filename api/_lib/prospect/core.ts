@@ -124,6 +124,45 @@ export function planBatch<T>(
   return eligible.slice(0, batch);
 }
 
+export interface ParsedProspect {
+  name: string;
+  phone: string | null;
+  wa_status: WaStatus;
+  kind: string;
+  city: string | null;
+  uf: string | null;
+}
+
+const VALID_KINDS = new Set(['coop', 'revenda', 'sindicato', 'agronomo']);
+
+/**
+ * Parse pasted import lines → prospects. One per line, comma-separated:
+ * `nome, telefone[, cidade, uf, tipo]`. Name + phone required. Phones run through
+ * normalizePhoneBR — an unparseable number keeps the row but marks it `invalid`
+ * (phone null) so ops sees it and it can NEVER be sent. Blank/`#` lines skipped.
+ */
+export function parseProspectLines(text: string): ParsedProspect[] {
+  const out: ParsedProspect[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith('#')) continue;
+    const parts = t.split(',').map((s) => s.trim());
+    const name = parts[0];
+    if (!name || parts.length < 2) continue;
+    const phone = normalizePhoneBR(parts[1]);
+    const kindRaw = (parts[4] ?? '').toLowerCase();
+    out.push({
+      name,
+      phone,
+      wa_status: phone ? 'valid' : 'invalid',
+      kind: VALID_KINDS.has(kindRaw) ? kindRaw : 'revenda',
+      city: parts[2] || null,
+      uf: (parts[3] || null)?.toUpperCase() ?? null,
+    });
+  }
+  return out;
+}
+
 // Inbound opt-out phrases from a prospect ("parar", "sair", "não quero", "remover").
 const OPTOUT_RE = /\b(parar|sair|descadastr\w*|remover?|n[ãa]o\s+quero|cancelar?|stop)\b/i;
 

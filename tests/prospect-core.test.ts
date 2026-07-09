@@ -6,6 +6,7 @@ import {
   planBatch,
   clampDailyCap,
   isOptOut,
+  parseProspectLines,
   brtDayStartIso,
   DAILY_CAP_CEILING,
   type ProspectLike,
@@ -80,6 +81,26 @@ describe('brtDayStartIso', () => {
     expect(brtDayStartIso(new Date('2026-07-08T15:00:00Z'))).toBe('2026-07-08T03:00:00.000Z');
     // 2026-07-08 02:00 UTC = 23:00 BRT on the 7th → start = 7th 03:00 UTC.
     expect(brtDayStartIso(new Date('2026-07-08T02:00:00Z'))).toBe('2026-07-07T03:00:00.000Z');
+  });
+});
+
+describe('parseProspectLines', () => {
+  it('parses fields, validates phones, defaults kind, skips blanks/comments', () => {
+    const rows = parseProspectLines(
+      [
+        '# header comment',
+        'Cooperativa Central, (19) 3822-1234, Campinas, sp, coop',
+        'Revenda Boa Safra, 11999002121',
+        'Sem Telefone',
+        '',
+        'Agro XPTO, 123, , , boguskind',
+      ].join('\n')
+    );
+    expect(rows).toHaveLength(3); // "Sem Telefone" (no phone) and blanks/comments dropped
+    expect(rows[0]).toMatchObject({ name: 'Cooperativa Central', phone: '+551938221234', wa_status: 'valid', kind: 'coop', city: 'Campinas', uf: 'SP' });
+    expect(rows[1]).toMatchObject({ name: 'Revenda Boa Safra', wa_status: 'valid', kind: 'revenda' });
+    // Bad phone kept but marked invalid (never fabricated) and unknown kind defaulted.
+    expect(rows[2]).toMatchObject({ name: 'Agro XPTO', phone: null, wa_status: 'invalid', kind: 'revenda' });
   });
 });
 

@@ -114,6 +114,63 @@ export async function recordSendFailed(id: string): Promise<void> {
   if (error) log.error('recordSendFailed failed:', error.message);
 }
 
+/** All prospects for the ops table, newest first. */
+export async function listProspects(limit = 500): Promise<ProspectRow[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('prospects')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    log.error('listProspects failed:', error.message);
+    return [];
+  }
+  return (data ?? []) as ProspectRow[];
+}
+
+export interface ProspectInput {
+  name: string;
+  phone: string | null;
+  wa_status: WaStatus;
+  kind: string;
+  city: string | null;
+  uf: string | null;
+  source: string;
+}
+
+/**
+ * Bulk-insert prospects, skipping duplicates (the partial unique index on phone
+ * makes a repeat phone a no-op). Returns how many rows were newly inserted.
+ */
+export async function importProspects(rows: ProspectInput[]): Promise<number> {
+  if (!rows.length) return 0;
+  const db = getDb();
+  const { data, error } = await db
+    .from('prospects')
+    .upsert(rows, { onConflict: 'phone', ignoreDuplicates: true })
+    .select('id');
+  if (error) {
+    log.error('importProspects failed:', error.message);
+    throw new Error(error.message);
+  }
+  return (data ?? []).length;
+}
+
+/** Set a prospect's pipeline status (e.g. ready / discarded) from the ops console. */
+export async function setProspectStatus(id: string, status: ProspectStatus): Promise<boolean> {
+  const db = getDb();
+  const { error } = await db
+    .from('prospects')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) {
+    log.error('setProspectStatus failed:', error.message);
+    return false;
+  }
+  return true;
+}
+
 /** Add a phone to the hard opt-out blocklist (idempotent on the unique index). */
 export async function addOptout(phone: string, reason: string): Promise<void> {
   const db = getDb();
