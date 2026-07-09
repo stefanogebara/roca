@@ -184,14 +184,18 @@ async function identifyFromPhoto(msg: InboundMessage, media: ChatImage): Promise
  * identification fails we fall back to a single direct vision answer, so a photo
  * always gets a useful, safe reply.
  */
-async function handleVision(msg: InboundMessage, media: ChatImage): Promise<string> {
+async function handleVision(
+  msg: InboundMessage,
+  media: ChatImage,
+  packOverride?: string | null
+): Promise<string> {
   const id = await identifyFromPhoto(msg, media);
 
   if (!id || (!id.pest && id.confidence === 'baixa')) {
     // Fallback: direct vision answer (still carries the handoff via the prompt).
     return chat({
       model: MODELS.reasoning(),
-      system: (await steviSystemPrompt()) + '\n\n' + PEST_HANDOFF_REMINDER,
+      system: (await steviSystemPrompt(packOverride)) + '\n\n' + PEST_HANDOFF_REMINDER,
       maxTokens: 700,
       image: media,
       user:
@@ -215,7 +219,7 @@ async function handleVision(msg: InboundMessage, media: ChatImage): Promise<stri
 
   return chat({
     model: MODELS.reasoning(),
-    system: (await steviSystemPrompt()) + '\n\n' + PEST_HANDOFF_REMINDER,
+    system: (await steviSystemPrompt(packOverride)) + '\n\n' + PEST_HANDOFF_REMINDER,
     maxTokens: 900,
     user:
       `${parts.join('\n')}\n\n` +
@@ -230,7 +234,8 @@ async function handleVision(msg: InboundMessage, media: ChatImage): Promise<stri
 async function handleText(
   msg: InboundMessage,
   intent: Intent,
-  context: string | null
+  context: string | null,
+  packOverride?: string | null
 ): Promise<string> {
   const extra = intent === 'pest_triage' ? '\n\n' + PEST_HANDOFF_REMINDER : '';
 
@@ -247,7 +252,7 @@ async function handleText(
 
   return chat({
     model: MODELS.reasoning(),
-    system: (await steviSystemPrompt()) + extra,
+    system: (await steviSystemPrompt(packOverride)) + extra,
     maxTokens: 900,
     user: (msg.text ?? '') + ctx,
   });
@@ -259,6 +264,9 @@ export interface ReasonDeps {
   media?: ChatImage | null;
   /** Extra derived context (farm card facts) to ground the reply. */
   context?: string | null;
+  /** Gym only: run the LLM voice paths against a specific style-pack body
+   * (challenger) instead of the active one. Omit in production. */
+  packOverride?: string | null;
 }
 
 /** Produce a reply for a routed message. */
@@ -280,12 +288,12 @@ export async function reason(
   }
 
   if (msg.kind === 'image' && deps.media) {
-    return handleVision(msg, deps.media);
+    return handleVision(msg, deps.media, deps.packOverride);
   }
 
   if (!msg.text) {
     return 'Recebi sua mensagem, mas não consegui ler o conteúdo. Me manda em texto ou áudio que eu te ajudo!';
   }
 
-  return handleText(msg, intent, deps.context ?? null);
+  return handleText(msg, intent, deps.context ?? null, deps.packOverride);
 }

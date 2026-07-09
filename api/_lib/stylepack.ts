@@ -57,9 +57,15 @@ export async function getActiveStylePack(
   return cache.body;
 }
 
-/** The full system prompt for farmer-facing generation: base + active voice. */
-export async function steviSystemPrompt(): Promise<string> {
-  return composeSystem(SYSTEM_PROMPT, await getActiveStylePack());
+/**
+ * The full system prompt for farmer-facing generation: base + voice.
+ * `packOverride` lets the Gym run the real brain against a *challenger* pack
+ * without activating it (pass the body; pass null for base-only). Omit it in
+ * production so the active pack is used.
+ */
+export async function steviSystemPrompt(packOverride?: string | null): Promise<string> {
+  const pack = packOverride !== undefined ? packOverride : await getActiveStylePack();
+  return composeSystem(SYSTEM_PROMPT, pack);
 }
 
 /** Test hook: clear the module cache between cases. */

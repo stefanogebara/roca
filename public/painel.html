@@ -134,14 +134,7 @@
     <section class="panel" id="p-conversas"><div class="loading">Carregando…</div></section>
     <section class="panel" id="p-voz"><div class="loading">Carregando…</div></section>
     <section class="panel" id="p-digests"><div class="loading">Carregando…</div></section>
-    <section class="panel" id="p-gym">
-      <div class="soon">
-        <span class="serif">O Treino (Gym) chega na Fase B</span>
-        Personas de produtores simulados treinam a voz da Stevi contra o cérebro real,
-        com um juiz de 3 lentes (naturalidade · clareza · segurança) e veto de segurança.
-        Aqui você vai ver as rodadas, os placares e ativar a versão vencedora.
-      </div>
-    </section>
+    <section class="panel" id="p-gym"><div class="loading">Carregando…</div></section>
   </div>
 
   <script>
@@ -185,6 +178,7 @@
       if (tab === 'conversas') return loadConversas();
       if (tab === 'voz') return loadVoz();
       if (tab === 'digests') return loadDigests();
+      if (tab === 'gym') return loadGym();
     }
 
     async function loadOverview() {
@@ -298,6 +292,40 @@
           const card = el('div', 'card digest');
           card.append(el('div', 'when', fmtDate(d.ranAt)));
           const pre = el('pre'); pre.textContent = d.text || '(sem texto)'; card.append(pre);
+          p.append(card);
+        }
+      } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+
+    async function loadGym() {
+      const p = $('#p-gym'); p.innerHTML = '<div class="loading">Carregando…</div>';
+      try {
+        const d = await api('gym');
+        p.innerHTML = '';
+        const intro = el('div', 'card');
+        intro.append(el('h3', null, 'Treino da voz (Gym)'));
+        intro.append(Object.assign(el('p','meta'), {textContent: 'Produtores simulados conversam com o cérebro real da Stevi; um juiz de 3 lentes (naturalidade · clareza · segurança, com veto de segurança) compara a voz campeã contra uma desafiante. Rodar uma rodada: '}));
+        intro.append(Object.assign(el('code','mono'), {textContent: 'npm run gym -- <campeã> <desafiante>'}));
+        p.append(intro);
+
+        const pc = el('div', 'card');
+        pc.append(el('h3', null, 'Personas (' + d.personas.length + ')'));
+        const wrap = el('div');
+        d.personas.forEach(pe => { const s = el('span','pill'); s.textContent = pe.label + (pe.crop?(' · '+pe.crop):''); wrap.append(s); });
+        pc.append(wrap); p.append(pc);
+
+        if (!d.runs.length) { p.append(el('div','empty','Nenhuma rodada ainda. Rode `npm run gym -- 1 2` para começar.')); return; }
+        for (const r of d.runs) {
+          const card = el('div', 'card');
+          card.append(el('div','when', fmtDate(r.ran_at)));
+          card.append(Object.assign(el('div'), {innerHTML: '<b class="serif" style="font-size:19px;color:var(--green)">v'+r.champion+' vs v'+r.challenger+'</b> &nbsp; campeã '+(r.tally.A||0)+' · desafiante '+(r.tally.B||0)+' · empate '+(r.tally.tie||0)}));
+          card.append(Object.assign(el('div','notes'), {textContent: '→ recomendado: v'+r.recommended+' — '+(r.reason||'')}));
+          if (Array.isArray(r.verdicts) && r.verdicts.length) {
+            const det = el('details'); det.append(Object.assign(el('summary'),{textContent:'Ver veredictos por persona'}));
+            const ul = el('div');
+            r.verdicts.forEach(v => { const line = el('div','meta'); const w = v.winner==='A'?'campeã':v.winner==='B'?'DESAFIANTE':'empate'; const flag = v.safety&&(v.safety.A||v.safety.B)?' ⚠️ violação de segurança':''; line.textContent = '• '+v.persona+': '+w+flag; ul.append(line); });
+            det.append(ul); card.append(det);
+          }
           p.append(card);
         }
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }

@@ -26,6 +26,8 @@ export interface ChatOptions {
   image?: ChatImage | null;
   audio?: ChatAudio | null;
   maxTokens?: number;
+  /** Sampling temperature. Omit for provider default; the Gym runs personas hot. */
+  temperature?: number;
 }
 
 type ContentPart =
@@ -71,6 +73,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     body: JSON.stringify({
       model: opts.model,
       max_tokens: opts.maxTokens ?? 600,
+      ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
       messages,
     }),
   });
