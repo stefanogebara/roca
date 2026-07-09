@@ -75,6 +75,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
+    if (action === 'template') {
+      // Submit the personalized v2 first-touch template (idempotent) and
+      // report its approval status — avoids the WhatsApp Manager UI round-trip.
+      const { submitV2Template } = await import('../_lib/prospect/template');
+      res.status(200).json({ success: true, data: await submitV2Template() });
+      return;
+    }
+
     if (action === 'dispatch') {
       const dryRun = (body as { dryRun?: unknown }).dryRun !== false; // default to a safe dry-run
       const report = await runDispatch({ dryRun });
