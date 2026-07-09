@@ -6,6 +6,7 @@ import {
   planBatch,
   clampDailyCap,
   isOptOut,
+  brtDayStartIso,
   DAILY_CAP_CEILING,
   type ProspectLike,
 } from '../api/_lib/prospect/core';
@@ -70,6 +71,15 @@ describe('pacing', () => {
     expect(planBatch(items, { dailyCap: 20, sentToday: 18, batchSize: 8 })).toHaveLength(2); // cap nearly hit
     expect(planBatch(items, { dailyCap: 20, sentToday: 20, batchSize: 8 })).toHaveLength(0); // cap hit
     expect(planBatch(items, { dailyCap: 999, sentToday: 0, batchSize: 8 })).toHaveLength(8); // ceiling still caps overall
+  });
+});
+
+describe('brtDayStartIso', () => {
+  it('returns 03:00 UTC (00:00 BRT) of the current BRT day', () => {
+    // 2026-07-08 15:00 UTC → BRT day is the 8th → start = 8th 03:00 UTC.
+    expect(brtDayStartIso(new Date('2026-07-08T15:00:00Z'))).toBe('2026-07-08T03:00:00.000Z');
+    // 2026-07-08 02:00 UTC = 23:00 BRT on the 7th → start = 7th 03:00 UTC.
+    expect(brtDayStartIso(new Date('2026-07-08T02:00:00Z'))).toBe('2026-07-07T03:00:00.000Z');
   });
 });
 

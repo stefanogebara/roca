@@ -63,6 +63,20 @@ export function normalizePhoneBR(raw: string | null | undefined): string | null 
   return `+55${digits}`;
 }
 
+/** UTC ISO for the start of the current BRT calendar day (for the daily cap). */
+export function brtDayStartIso(now: Date): string {
+  const shifted = new Date(now.getTime() + BRT_OFFSET_MIN * 60_000);
+  const midnightBrtUtc = Date.UTC(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth(),
+    shifted.getUTCDate(),
+    3, // 00:00 BRT == 03:00 UTC
+    0,
+    0
+  );
+  return new Date(midnightBrtUtc).toISOString();
+}
+
 /** BRT wall-clock parts for a given instant (pure; no local-tz dependence). */
 function brtParts(now: Date): { day: number; hour: number } {
   const shifted = new Date(now.getTime() + BRT_OFFSET_MIN * 60_000);
