@@ -31,6 +31,29 @@ const PERSONA_RULES =
   'Responda SEMPRE como o produtor, curto, no registro dele. NÃO seja a Stevi. ' +
   'Se já resolveu ou perdeu o interesse, responda apenas com o token [FIM]. Uma mensagem só.';
 
+const RETRIES = 2; // extra attempts after the first (OpenRouter blips are common)
+
+/**
+ * Retry a flaky LLM call a few times before giving up, so one transient empty
+ * completion doesn't discard a whole persona transcript (observed on real runs).
+ * Small linear backoff; rethrows the last error if every attempt fails.
+ */
+async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < RETRIES) {
+        log.error(`${label} failed (attempt ${attempt + 1}/${RETRIES + 1}), retrying:`, (e as Error).message);
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 /** Build the text InboundMessage a simulated farmer turn sends to Stevi. */
 function farmerMessage(persona: Persona, index: number, text: string): InboundMessage {
   return {
@@ -76,7 +99,9 @@ export async function simulate(
   try {
     // Turn 1: the persona's fixed opener.
     turns.push({ role: 'farmer', text: persona.opener });
-    const firstReply = await steviReply(farmerMessage(persona, 1, persona.opener), packBody);
+    const firstReply = await withRetry('stevi-reply', () =>
+      steviReply(farmerMessage(persona, 1, persona.opener), packBody)
+    );
     if (firstReply.includes(END_TOKEN)) {
       return { persona: persona.key, packVersion, turns };
     }
@@ -84,13 +109,15 @@ export async function simulate(
 
     // Turns 2..maxTurns: the persona LLM improvises follow-ups.
     for (let i = 2; i <= maxTurns; i++) {
-      const raw = await chat({
-        model: MODELS.router(),
-        temperature: 0.9,
-        maxTokens: 120,
-        system: `${persona.brief}\n\n${PERSONA_RULES}`,
-        user: dialoguePrompt(turns),
-      });
+      const raw = await withRetry('persona-turn', () =>
+        chat({
+          model: MODELS.router(),
+          temperature: 0.9,
+          maxTokens: 120,
+          system: `${persona.brief}\n\n${PERSONA_RULES}`,
+          user: dialoguePrompt(turns),
+        })
+      );
 
       // Persona ended the conversation (explicit token or nothing to say).
       const trimmed = raw.trim();
@@ -99,7 +126,9 @@ export async function simulate(
       const farmerText = trimmed;
       turns.push({ role: 'farmer', text: farmerText });
 
-      const reply = await steviReply(farmerMessage(persona, i, farmerText), packBody);
+      const reply = await withRetry('stevi-reply', () =>
+        steviReply(farmerMessage(persona, i, farmerText), packBody)
+      );
       // If Stevi's reply carries the end token, record it stripped and stop.
       if (reply.includes(END_TOKEN)) {
         turns.push({ role: 'stevi', text: reply.replace(END_TOKEN, '').trim() });
