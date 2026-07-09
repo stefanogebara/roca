@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Stevi · Painel</title>
+  <link rel="icon" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --green: #14432f; --green-2: #1f6b47; --leaf: #2e9e63;
+      --cream: #f4efe4; --card: #ffffff; --ink: #1a2420; --muted: #6b7a72;
+      --line: #e3dccb; --amber: #b7791f; --red: #b23b3b;
+      --shadow: 0 1px 2px rgba(20,40,30,.06), 0 6px 20px rgba(20,40,30,.06);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: var(--ink); background: var(--cream);
+      -webkit-font-smoothing: antialiased; font-size: 15px; line-height: 1.5;
+    }
+    .serif { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-synthesis: none; letter-spacing: .2px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    a { color: var(--green-2); }
+
+    /* Login */
+    #login { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+    .login-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 40px 36px; width: 100%; max-width: 380px; text-align: center; }
+    .brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px; }
+    .brand .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--green); display: grid; place-items: center; color: #efe8; font-size: 18px; }
+    .login-card h1 { font-size: 30px; margin: 4px 0 2px; }
+    .login-card p { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
+    input[type=password], input[type=text] { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: #fbfaf6; }
+    input:focus { outline: 2px solid var(--leaf); border-color: transparent; }
+    button { font: inherit; cursor: pointer; }
+    .btn { background: var(--green); color: #fff; border: none; border-radius: 10px; padding: 12px 16px; font-weight: 600; width: 100%; margin-top: 12px; }
+    .btn:hover { background: var(--green-2); }
+    .btn.small { width: auto; padding: 7px 12px; font-size: 13px; margin: 0; }
+    .btn.ghost { background: transparent; color: var(--green-2); border: 1px solid var(--line); }
+    .err { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 16px; }
+
+    /* App shell */
+    #app { display: none; max-width: 1080px; margin: 0 auto; padding: 0 20px 60px; }
+    header.top { display: flex; align-items: center; justify-content: space-between; padding: 22px 2px 14px; }
+    header.top .brand h1 { font-size: 26px; margin: 0; }
+    header.top .brand { justify-content: flex-start; }
+    .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+    .tab { background: none; border: none; padding: 10px 14px; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: var(--green); border-bottom-color: var(--leaf); }
+    .tab .em-breve { font-size: 10px; background: var(--line); color: var(--muted); border-radius: 6px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Stat cards */
+    .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+    .stat .n { font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1; color: var(--green); }
+    .stat .n.warn { color: var(--amber); } .stat .n.bad { color: var(--red); }
+    .stat .l { color: var(--muted); font-size: 12.5px; margin-top: 6px; text-transform: uppercase; letter-spacing: .5px; }
+
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-bottom: 16px; }
+    .card h3 { margin: 0 0 12px; font-size: 15px; }
+    .bars .bar { display: grid; grid-template-columns: 130px 1fr 40px; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
+    .bars .track { background: #eef2ee; border-radius: 6px; height: 10px; overflow: hidden; }
+    .bars .fill { background: var(--leaf); height: 100%; }
+    .bars .v { text-align: right; color: var(--muted); }
+
+    /* Conversation list */
+    .conv { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 8px; cursor: pointer; box-shadow: var(--shadow); }
+    .conv:hover { border-color: var(--leaf); }
+    .conv .who { font-weight: 600; }
+    .conv .meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+    .conv .right { text-align: right; color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .pill { display: inline-block; background: #eef4ef; color: var(--green-2); border-radius: 20px; padding: 1px 9px; font-size: 11.5px; margin-right: 4px; }
+
+    /* Thread */
+    .thread { display: flex; flex-direction: column; gap: 8px; }
+    .msg { max-width: 78%; padding: 9px 12px; border-radius: 14px; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+    .msg.in { align-self: flex-start; background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+    .msg.out { align-self: flex-end; background: #dcf3e3; border-bottom-right-radius: 4px; }
+    .msg .tag { display: block; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+    .backlink { background: none; border: none; color: var(--green-2); padding: 0 0 12px; font-weight: 600; }
+
+    /* Style packs */
+    .pack { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow); }
+    .pack .hd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+    .badge.on { background: var(--leaf); color: #fff; } .badge.off { background: #eef2ee; color: var(--muted); }
+    .pack .notes { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+    .pack pre { background: #faf8f2; border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow: auto; font-size: 12.5px; max-height: 320px; white-space: pre-wrap; }
+
+    .digest pre { background: #faf8f2; border: 1px solid var(--line); border-radius: 10px; padding: 14px; white-space: pre-wrap; font-family: inherit; font-size: 13.5px; }
+    .digest .when { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+    .loading { color: var(--muted); padding: 20px 0; }
+    .soon { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .soon .serif { font-size: 26px; color: var(--green); display: block; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="login">
+    <form class="login-card" id="loginForm">
+      <div class="brand"><span class="mark">🌱</span><span class="serif" style="font-size:30px;color:var(--green)">Stevi</span></div>
+      <h1 class="serif">Painel</h1>
+      <p>Área dos fundadores · Stefano &amp; Vitoria</p>
+      <input type="password" id="pw" placeholder="Senha" autocomplete="current-password" autofocus />
+      <button class="btn" type="submit">Entrar</button>
+      <div class="err" id="loginErr"></div>
+    </form>
+  </div>
+
+  <!-- APP -->
+  <div id="app">
+    <header class="top">
+      <div class="brand"><span class="mark" style="width:30px;height:30px;font-size:16px">🌱</span><h1 class="serif" style="color:var(--green)">Stevi · Painel</h1></div>
+      <button class="btn ghost small" id="logout">Sair</button>
+    </header>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="overview">Visão geral</button>
+      <button class="tab" data-tab="conversas">Conversas</button>
+      <button class="tab" data-tab="voz">Voz</button>
+      <button class="tab" data-tab="digests">Resumos</button>
+      <button class="tab" data-tab="gym">Treino<span class="em-breve">em breve</span></button>
+    </nav>
+
+    <section class="panel active" id="p-overview"><div class="loading">Carregando…</div></section>
+    <section class="panel" id="p-conversas"><div class="loading">Carregando…</div></section>
+    <section class="panel" id="p-voz"><div class="loading">Carregando…</div></section>
+    <section class="panel" id="p-digests"><div class="loading">Carregando…</div></section>
+    <section class="panel" id="p-gym">
+      <div class="soon">
+        <span class="serif">O Treino (Gym) chega na Fase B</span>
+        Personas de produtores simulados treinam a voz da Stevi contra o cérebro real,
+        com um juiz de 3 lentes (naturalidade · clareza · segurança) e veto de segurança.
+        Aqui você vai ver as rodadas, os placares e ativar a versão vencedora.
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const $ = (s, r=document) => r.querySelector(s);
+    const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+    const api = async (path, opts={}) => {
+      const r = await fetch('/api/ops/' + path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...opts });
+      if (r.status === 401) { showLogin(); throw new Error('unauthorized'); }
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || 'erro');
+      return j.data;
+    };
+    const fmtDate = (s) => { if (!s) return '—'; const d = new Date(s); return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); };
+
+    function showLogin() { $('#app').style.display = 'none'; $('#login').style.display = 'grid'; }
+    function showApp() { $('#login').style.display = 'none'; $('#app').style.display = 'block'; loadTab('overview'); }
+
+    $('#loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('#loginErr').textContent = '';
+      try {
+        const r = await fetch('/api/ops/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('#pw').value }) });
+        const j = await r.json();
+        if (j.success) { $('#pw').value=''; showApp(); }
+        else $('#loginErr').textContent = j.error || 'senha incorreta';
+      } catch { $('#loginErr').textContent = 'erro de conexão'; }
+    });
+    $('#logout').addEventListener('click', () => { document.cookie = 'stevi_ops=; Max-Age=0; Path=/'; showLogin(); });
+
+    const loaded = {};
+    $('#tabs').addEventListener('click', (e) => {
+      const b = e.target.closest('.tab'); if (!b) return;
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === b));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      $('#p-' + b.dataset.tab).classList.add('active');
+      loadTab(b.dataset.tab);
+    });
+
+    function loadTab(tab) {
+      if (tab === 'overview') return loadOverview();
+      if (tab === 'conversas') return loadConversas();
+      if (tab === 'voz') return loadVoz();
+      if (tab === 'digests') return loadDigests();
+    }
+
+    async function loadOverview() {
+      const p = $('#p-overview');
+      try {
+        const d = await api('overview');
+        p.innerHTML = '';
+        const stats = el('div', 'stats');
+        const cards = [
+          ['Produtores', d.users], ['Novos (7d)', d.newUsers7d],
+          ['Msgs recebidas', d.inbound], ['Msgs enviadas', d.outbound],
+          ['Recebidas (7d)', d.inbound7d], ['Pedidos de agrônomo', d.referrals],
+          ['Falhas (7d)', d.failures7d, d.failures7d>0?'warn':''], ['Voz ativa', d.activePack!=null?('v'+d.activePack):'—'],
+        ];
+        for (const [l, n, cls] of cards) {
+          const c = el('div', 'stat');
+          c.append(el('div', 'n ' + (cls||''), String(n)), el('div', 'l', l));
+          stats.append(c);
+        }
+        p.append(stats);
+        const intents = Object.entries(d.byIntent||{}).sort((a,b)=>b[1]-a[1]);
+        const card = el('div', 'card'); card.append(el('h3', null, 'Intenções (últimos 7 dias)'));
+        if (!intents.length) card.append(el('div', 'empty', 'Sem tráfego nos últimos 7 dias.'));
+        else {
+          const max = intents[0][1]; const bars = el('div', 'bars');
+          for (const [k, v] of intents) {
+            const row = el('div', 'bar'); const track = el('div', 'track'); const fill = el('div', 'fill');
+            fill.style.width = Math.round(v/max*100) + '%'; track.append(fill);
+            row.append(el('span', 'mono', k), track, el('span', 'v', String(v))); bars.append(row);
+          }
+          card.append(bars);
+        }
+        p.append(card);
+      } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+
+    async function loadConversas() {
+      const p = $('#p-conversas'); p.innerHTML = '<div class="loading">Carregando…</div>';
+      try {
+        const rows = await api('conversations');
+        p.innerHTML = '';
+        if (!rows.length) { p.innerHTML = '<div class="empty">Nenhuma conversa ainda.</div>'; return; }
+        for (const c of rows) {
+          const item = el('div', 'conv');
+          const left = el('div');
+          left.append(el('div', 'who', (c.name ? c.name + ' · ' : '') + c.phone));
+          const meta = el('div', 'meta');
+          if (c.uf) meta.append(Object.assign(el('span','pill'), {textContent: c.uf}));
+          (c.crop||[]).forEach(cr => meta.append(Object.assign(el('span','pill'), {textContent: cr})));
+          meta.append(document.createTextNode(c.messages + ' msgs'));
+          left.append(meta);
+          const right = el('div', 'right', fmtDate(c.lastAt));
+          item.append(left, right);
+          item.addEventListener('click', () => openThread(c));
+          p.append(item);
+        }
+      } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+
+    async function openThread(c) {
+      const p = $('#p-conversas'); p.innerHTML = '<div class="loading">Carregando…</div>';
+      try {
+        const msgs = await api('conversations?userId=' + encodeURIComponent(c.userId));
+        p.innerHTML = '';
+        const back = el('button', 'backlink', '← Voltar'); back.addEventListener('click', loadConversas); p.append(back);
+        p.append(el('h3', null, (c.name ? c.name + ' · ' : '') + c.phone));
+        const thread = el('div', 'thread');
+        for (const m of msgs) {
+          const b = el('div', 'msg ' + (m.direction === 'in' ? 'in' : 'out'), m.text || '('+m.kind+')');
+          b.append(el('span', 'tag', [m.kind, m.intent, fmtDate(m.at)].filter(Boolean).join(' · ')));
+          thread.append(b);
+        }
+        p.append(thread);
+      } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+
+    async function loadVoz() {
+      const p = $('#p-voz'); p.innerHTML = '<div class="loading">Carregando…</div>';
+      try {
+        const packs = await api('voice?body=1');
+        p.innerHTML = '';
+        p.append(el('p', 'meta', 'A voz da Stevi é uma camada versionada, trocável sem deploy. Ativar aplica em ~3 min.'));
+        if (!packs.length) { p.append(el('div', 'empty', 'Nenhum style pack ainda.')); return; }
+        for (const pk of packs) {
+          const card = el('div', 'pack');
+          const hd = el('div', 'hd');
+          const left = el('div');
+          left.append(Object.assign(el('span'), {innerHTML: '<b class="serif" style="font-size:20px;color:var(--green)">v'+pk.version+'</b> <span class="badge '+(pk.active?'on':'off')+'">'+(pk.active?'ATIVA':'inativa')+'</span> <span class="meta">'+pk.chars+' caracteres · '+fmtDate(pk.createdAt)+'</span>'}));
+          hd.append(left);
+          if (!pk.active) { const b = el('button','btn small','Ativar'); b.addEventListener('click', ()=>activate(pk.version)); hd.append(b); }
+          card.append(hd);
+          if (pk.notes) card.append(el('p','notes', pk.notes));
+          if (pk.body) { const det = el('details'); det.append(Object.assign(el('summary'),{textContent:'Ver conteúdo'})); const pre = el('pre'); pre.textContent = pk.body; det.append(pre); card.append(det); }
+          p.append(card);
+        }
+      } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+    async function activate(version) {
+      if (!confirm('Ativar a voz v'+version+' em produção?')) return;
+      try { await api('voice', { method:'POST', body: JSON.stringify({version}) }); loadVoz(); }
+      catch (e) { alert('Erro: '+e.message); }
+    }
+
+    async function loadDigests() {
+      const p = $('#p-digests'); p.innerHTML = '<div class="loading">Carregando…</div>';
+      try {
+        const rows = await api('digests');
+        p.innerHTML = '';
+        if (!rows.length) { p.innerHTML = '<div class="empty">Nenhum resumo diário ainda.</div>'; return; }
+        for (const d of rows) {
+          const card = el('div', 'card digest');
+          card.append(el('div', 'when', fmtDate(d.ranAt)));
+          const pre = el('pre'); pre.textContent = d.text || '(sem texto)'; card.append(pre);
+          p.append(card);
+        }
+      } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+
+    // Probe session: if overview loads, we're in; else show login.
+    (async () => {
+      try { await api('overview'); showApp(); }
+      catch { showLogin(); }
+    })();
+  </script>
+</body>
+</html>

@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 const SRC = 'web';
 const OUT = 'public';
-const ASSETS = ['index.html', 'styles.css', 'app.js', 'favicon.svg', 'og-image.png'];
+const ASSETS = ['index.html', 'styles.css', 'app.js', 'favicon.svg', 'og-image.png', 'painel.html'];
 
 mkdirSync(OUT, { recursive: true });
 let copied = 0;

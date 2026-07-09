@@ -15,5 +15,6 @@
   "crons": [
     { "path": "/api/cron/monitor", "schedule": "0 11 * * *" },
     { "path": "/api/cron/digest", "schedule": "0 21 * * *" }
-  ]
+  ],
+  "rewrites": [{ "source": "/painel", "destination": "/painel.html" }]
 }
