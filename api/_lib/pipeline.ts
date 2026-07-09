@@ -173,6 +173,14 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
       return ['Montar resumo', 'Quero um agrônomo'];
     case 'referral':
       return ['Montar resumo'];
+    case 'general':
+      // Q&A is the highest-volume intent; scaffolded next steps are the
+      // evidence-backed engagement lever (Farmer.Chat: suggested follow-ups
+      // drove ~45% of interactions).
+      return ['Posso pulverizar?', 'Ver satélite', 'Quero um agrônomo'];
+    case 'brief':
+      // The resumo exists to hand to a professional — offer the connection.
+      return ['Quero um agrônomo'];
     default:
       return undefined;
   }

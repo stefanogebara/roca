@@ -47,6 +47,14 @@ describe('buttonsForIntent', () => {
     expect(buttonsForIntent('pest_triage')).toBeDefined();
     // Referral offers the "Montar resumo" next step (help prep for the agrônomo).
     expect(buttonsForIntent('referral')).toEqual(['Montar resumo']);
+    // Q&A answers scaffold the three main flows (highest-volume intent).
+    expect(buttonsForIntent('general')).toEqual([
+      'Posso pulverizar?',
+      'Ver satélite',
+      'Quero um agrônomo',
+    ]);
+    // After the resumo, the natural next step is the professional.
+    expect(buttonsForIntent('brief')).toEqual(['Quero um agrônomo']);
     // Onboarding asks a question buttons would fight with — stays button-free.
     expect(buttonsForIntent('onboarding')).toBeUndefined();
   });
