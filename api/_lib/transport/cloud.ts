@@ -35,6 +35,10 @@ interface CloudMessage {
     list_reply?: { id: string; title: string };
   };
   button?: { text?: string };
+  contacts?: Array<{
+    name?: { formatted_name?: string };
+    phones?: Array<{ phone?: string }>;
+  }>;
 }
 
 function classifyMime(mime: string | undefined): InboundKind {
@@ -142,6 +146,22 @@ export class CloudApiAdapter implements TransportAdapter {
       case 'button':
         text = msg.button?.text?.trim() || null;
         break;
+      case 'contacts': {
+        // Shared contact card(s) → text summary, so both the farmer pipeline
+        // and the prospect agent can use it without a new inbound kind.
+        const cards = (msg.contacts ?? []) as Array<{
+          name?: { formatted_name?: string };
+          phones?: Array<{ phone?: string }>;
+        }>;
+        text = cards
+          .map((c) => {
+            const phones = (c.phones ?? []).map((p) => p.phone).filter(Boolean).join(', ');
+            return `[contato compartilhado] ${c.name?.formatted_name ?? '(sem nome)'}${phones ? ` — ${phones}` : ''}`;
+          })
+          .join('\n')
+          .trim() || null;
+        break;
+      }
       default:
         kind = 'unsupported';
     }

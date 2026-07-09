@@ -216,3 +216,74 @@ export async function addOptout(phone: string, reason: string): Promise<void> {
   const { error } = await db.from('prospect_optouts').upsert({ phone, reason }, { onConflict: 'phone' });
   if (error) log.error('addOptout failed:', error.message);
 }
+
+// ── Conversation agent support (prospect_messages + agent toggle) ────────────
+
+export interface ProspectMessage {
+  direction: 'in' | 'out';
+  kind: string;
+  text: string | null;
+  created_at: string;
+}
+
+/** Append a message to a prospect's thread (best-effort). */
+export async function logProspectMessage(
+  prospectId: string,
+  direction: 'in' | 'out',
+  kind: string,
+  text: string | null
+): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('prospect_messages')
+    .insert({ prospect_id: prospectId, direction, kind, text });
+  if (error) log.error('logProspectMessage failed:', error.message);
+}
+
+/** Load a prospect's thread, oldest first (bounded). */
+export async function getProspectThread(
+  prospectId: string,
+  limit = 30
+): Promise<ProspectMessage[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('prospect_messages')
+    .select('direction, kind, text, created_at')
+    .eq('prospect_id', prospectId)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) {
+    log.error('getProspectThread failed:', error.message);
+    return [];
+  }
+  return (data ?? []) as ProspectMessage[];
+}
+
+/** Founder takeover switch: enable/disable the conversation agent. */
+export async function setProspectAgentEnabled(prospectId: string, enabled: boolean): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('prospects')
+    .update({ agent_enabled: enabled, updated_at: new Date().toISOString() })
+    .eq('id', prospectId);
+  if (error) log.error('setProspectAgentEnabled failed:', error.message);
+}
+
+/** Merge extracted qualification into the prospect row (nulls don't overwrite). */
+export async function mergeProspectQualification(
+  prospectId: string,
+  q: Record<string, unknown>
+): Promise<void> {
+  const db = getDb();
+  const { data } = await db.from('prospects').select('qualification').eq('id', prospectId).maybeSingle();
+  const current = ((data as { qualification: Record<string, unknown> | null } | null)?.qualification) ?? {};
+  const merged: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(q)) {
+    if (v !== null && v !== undefined) merged[k] = v;
+  }
+  const { error } = await db
+    .from('prospects')
+    .update({ qualification: merged, updated_at: new Date().toISOString() })
+    .eq('id', prospectId);
+  if (error) log.error('mergeProspectQualification failed:', error.message);
+}

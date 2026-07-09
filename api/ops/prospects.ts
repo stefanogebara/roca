@@ -2,7 +2,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireOps } from '../_lib/opsAuth';
 import { createLogger } from '../_lib/logger';
 import { parseProspectLines, type ProspectStatus } from '../_lib/prospect/core';
-import { listProspects, importProspects, setProspectStatus } from '../_lib/prospect/db';
+import {
+  listProspects,
+  importProspects,
+  setProspectStatus,
+  getProspectThread,
+  setProspectAgentEnabled,
+} from '../_lib/prospect/db';
 import { runDispatch } from '../_lib/prospect/dispatch';
 
 const log = createLogger('ops');
@@ -38,6 +44,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const ok = await setProspectStatus(id, status as ProspectStatus);
       res.status(ok ? 200 : 500).json(ok ? { success: true } : { success: false, error: 'update failed' });
+      return;
+    }
+
+    if (action === 'thread') {
+      const id = String((body as { id?: unknown }).id ?? '');
+      if (!id) {
+        res.status(400).json({ success: false, error: 'id required' });
+        return;
+      }
+      res.status(200).json({ success: true, data: await getProspectThread(id, 100) });
+      return;
+    }
+
+    if (action === 'agent') {
+      const id = String((body as { id?: unknown }).id ?? '');
+      const enabled = (body as { enabled?: unknown }).enabled === true;
+      if (!id) {
+        res.status(400).json({ success: false, error: 'id required' });
+        return;
+      }
+      await setProspectAgentEnabled(id, enabled);
+      res.status(200).json({ success: true });
       return;
     }
 

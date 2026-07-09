@@ -390,7 +390,18 @@
         [pr.kind, pr.city, pr.uf].filter(Boolean).forEach(v => meta.append(Object.assign(el('span','pill'),{textContent:v})));
         if (pr.wa_status !== 'valid') meta.append(Object.assign(el('span','pill'),{textContent:'nº '+pr.wa_status}));
         if (pr.send_status) meta.append(Object.assign(el('span','pill'),{textContent:'envio: '+pr.send_status}));
+        if (pr.agent_enabled === false) meta.append(Object.assign(el('span','pill'),{textContent:'🤖 agente OFF'}));
         left.append(meta);
+        // Qualification the agent extracted from the conversation.
+        if (pr.qualification && Object.values(pr.qualification).some(v => v != null)) {
+          const q = pr.qualification, bits = [];
+          if (q.accepts_leads != null) bits.push(q.accepts_leads ? '✅ aceita leads' : '❌ não aceita leads');
+          if (q.response_time) bits.push('⏱ ' + q.response_time);
+          if (q.format_pref) bits.push('💰 ' + q.format_pref);
+          if (q.coverage && q.coverage.length) bits.push('📍 ' + q.coverage.join(', '));
+          if (q.crops && q.crops.length) bits.push('🌱 ' + q.crops.join(', '));
+          if (bits.length) left.append(el('div', 'empty', bits.join(' · ')));
+        }
         const sel = el('select');
         sel.style.cssText = 'padding:4px 8px;border-radius:8px;border:1px solid var(--line,#e3dccb);background:#fff;font:inherit;cursor:pointer';
         for (const s of ['discovered','ready','discarded']) { const o=el('option',null,s); o.value=s; if(s===pr.status) o.selected=true; sel.append(o); }
@@ -402,7 +413,48 @@
           catch (e) { if (e.message!=='unauthorized') { alert('Não deu pra salvar.'); } }
           finally { sel.disabled = false; }
         });
-        item.append(left, el('div','right')).lastChild.append(sel);
+        const right = el('div','right');
+        // Conversation thread (agent ↔ prospect) + human-takeover toggle.
+        if (pr.status === 'replied' || pr.status === 'contacted' || pr.send_status) {
+          const chatBtn = el('button', 'btn small', '💬 conversa');
+          chatBtn.addEventListener('click', async () => {
+            let box = item.nextElementSibling;
+            if (box && box.classList.contains('prospect-thread')) { box.remove(); return; }
+            box = el('div', 'card prospect-thread');
+            box.style.cssText = 'margin:4px 0 12px 16px;padding:12px';
+            box.append(el('div', 'loading', 'Carregando conversa…'));
+            item.after(box);
+            try {
+              const thread = await api('prospects', { method:'POST', body: JSON.stringify({ action:'thread', id: pr.id }) });
+              box.innerHTML = '';
+              const tg = el('button', 'btn small', pr.agent_enabled === false ? '▶️ religar agente' : '⏸ assumir conversa (desliga agente)');
+              tg.addEventListener('click', async () => {
+                const enable = pr.agent_enabled === false;
+                try {
+                  await api('prospects', { method:'POST', body: JSON.stringify({ action:'agent', id: pr.id, enabled: enable }) });
+                  pr.agent_enabled = enable;
+                  tg.textContent = enable ? '⏸ assumir conversa (desliga agente)' : '▶️ religar agente';
+                } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra salvar.'); }
+              });
+              box.append(tg);
+              if (!thread.length) box.append(el('div','empty','Sem mensagens ainda (o primeiro contato foi o template).'));
+              for (const m of thread) {
+                const line = el('div', 'empty');
+                line.style.cssText = m.direction === 'out'
+                  ? 'text-align:right;background:#eef7ee;border-radius:8px;padding:6px 10px;margin:4px 0 4px 40px'
+                  : 'background:#f6f2e8;border-radius:8px;padding:6px 10px;margin:4px 40px 4px 0';
+                const kindTag = m.kind !== 'text' ? '['+m.kind+'] ' : '';
+                line.textContent = kindTag + (m.text ?? '') + '  · ' + fmtDate(m.created_at);
+                box.append(line);
+              }
+            } catch (e) {
+              if (e.message!=='unauthorized') box.innerHTML = '<div class="empty">Erro: '+e.message+'</div>';
+            }
+          });
+          right.append(chatBtn);
+        }
+        right.append(sel);
+        item.append(left, right);
         wrap.append(item);
       }
     }

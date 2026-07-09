@@ -9,10 +9,11 @@ import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
 import { buildFarmCard } from './farmcard';
 import { buildAgronomoBrief } from './brief';
-import { handleProspectInbound } from './prospect/inbound';
+import { handleProspectInbound, respondAsProspectAgent } from './prospect/inbound';
+import { parseVcards, describeContactCards } from './transport/vcard';
 import { transcribeVoice } from './transcribe';
 import { checkOutbound } from './compliance';
-import type { ChatImage } from './llm';
+import { describeImage, type ChatImage } from './llm';
 import {
   upsertUser,
   logMessage,
@@ -301,15 +302,13 @@ export async function handleInbound(
   }
 
   // Prospect replies: honour an opt-out ("sair") immediately and permanently
-  // before any other handling. A non-opt-out prospect reply is annotated and
-  // falls through to normal handling (a curious coop rep can still talk to Stevi).
-  if (msg.text) {
-    const pr = await handleProspectInbound(msg.from, msg.text);
-    if (pr.handled && pr.reply) {
-      await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
-      if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
-      return;
-    }
+  // before any other handling. A non-opt-out prospect reply is routed to the
+  // partnerships conversation agent after media normalization (below).
+  const pr = await handleProspectInbound(msg.from, msg.text ?? null);
+  if (pr.handled && pr.reply) {
+    await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
+    if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
+    return;
   }
 
   // Rate limit before any expensive work (media fetch, LLM). The current message
@@ -338,6 +337,7 @@ export async function handleInbound(
   const MEDIA_BASE64_CAP = 11_000_000;
   let media: ChatImage | null = null;
   let transcript: string | null = null;
+  let contactText: string | null = null;
   let mediaTooLarge = false;
   if (msg.mediaUrl && adapter.fetchMedia) {
     try {
@@ -345,6 +345,11 @@ export async function handleInbound(
       if (fetched.base64.length > MEDIA_BASE64_CAP) {
         log.error(`media over cap (${fetched.base64.length} b64 chars) — skipped`);
         mediaTooLarge = true;
+      } else if (fetched.mime.includes('vcard')) {
+        // Shared contact card (Twilio delivers vCards as media).
+        contactText = describeContactCards(
+          parseVcards(Buffer.from(fetched.base64, 'base64').toString('utf8'))
+        );
       } else if (msg.kind === 'image') {
         media = { base64: fetched.base64, mime: fetched.mime };
       } else if (msg.kind === 'voice') {
@@ -361,6 +366,36 @@ export async function handleInbound(
 
   // Attach the transcript to the already-claimed inbound row (observability).
   if (transcript) await updateInboundTranscript(msg.messageId, transcript);
+
+  // Prospect conversation agent: a reply from a cold-messaged business talks to
+  // the partnerships persona, not farmer-Stevi. Media is normalized to text
+  // first (voice transcript, vision description, vCard summary).
+  if (pr.prospect) {
+    let inboundText = effective.text ?? '';
+    let inboundKind = 'text';
+    if (contactText) {
+      inboundText = [inboundText, contactText].filter(Boolean).join('\n');
+      inboundKind = 'contact';
+    } else if (msg.kind === 'voice' && transcript) {
+      inboundKind = 'voice';
+    } else if (msg.kind === 'image' && media) {
+      inboundKind = 'image';
+      try {
+        const caption = await describeImage(media);
+        inboundText = [inboundText, `[imagem enviada: ${caption}]`].filter(Boolean).join('\n');
+      } catch (e) {
+        log.error('prospect image description failed:', (e as Error).message);
+        inboundText = [inboundText, '[imagem enviada — não consegui processar]'].filter(Boolean).join('\n');
+      }
+    }
+    if (!inboundText) inboundText = '[mensagem sem texto legível]';
+
+    const agentReply = await respondAsProspectAgent(pr.prospect, inboundText, inboundKind);
+    if (agentReply) {
+      await sendOrRecord(adapter, msg.from, { text: agentReply }, userId, 'prospect_agent');
+    }
+    return; // prospects never fall through to the farmer pipeline
+  }
 
   let intent: Intent;
   let replyText: string;

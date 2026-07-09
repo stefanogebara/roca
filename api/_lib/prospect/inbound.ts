@@ -7,7 +7,17 @@
  */
 
 import { normalizePhoneBR, isOptOut } from './core';
-import { findProspectByPhone, addOptout, markProspectReplied } from './db';
+import {
+  findProspectByPhone,
+  addOptout,
+  markProspectReplied,
+  logProspectMessage,
+  getProspectThread,
+  mergeProspectQualification,
+  type ProspectRow,
+} from './db';
+import { AGENT_NAME, needsEscalation, buildAgentReply, extractQualification } from './agent';
+import { alertFounders } from '../alert';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-inbound');
@@ -17,9 +27,12 @@ export interface ProspectInboundResult {
   handled: boolean;
   /** A reply to send when handled (opt-out confirmation), else null. */
   reply: string | null;
+  /** The matched prospect (null when the sender isn't one) — lets the pipeline
+   * route non-opt-out replies to the conversation agent after media handling. */
+  prospect: ProspectRow | null;
 }
 
-const NOT_A_PROSPECT: ProspectInboundResult = { handled: false, reply: null };
+const NOT_A_PROSPECT: ProspectInboundResult = { handled: false, reply: null, prospect: null };
 
 /**
  * Inspect an inbound from `waFrom` (raw WhatsApp id). If it's from a known
@@ -44,10 +57,52 @@ export async function handleProspectInbound(
     return {
       handled: true,
       reply: 'Perfeito, não mando mais mensagens. 👍 Se um dia quiser conhecer a Stevi, é só chamar. Bom trabalho!',
+      prospect,
     };
   }
 
-  // A prospect engaged — valuable signal. Let the normal pipeline take the reply.
+  // A prospect engaged — valuable signal. The pipeline routes it to the
+  // conversation agent (or, with agent_enabled=false, leaves it to the founder).
   await markProspectReplied(prospect.id);
-  return NOT_A_PROSPECT;
+  return { handled: false, reply: null, prospect };
+}
+
+/**
+ * The conversation-agent turn for a prospect reply. `inboundText` must already
+ * be normalized (voice transcribed, image described, vCard summarized). Logs
+ * both directions to the thread, escalates to the founders when the trigger
+ * fires (pricing/contract/human ask), and merges extracted qualification.
+ * Returns the reply to send, or null when the agent is off (human takeover).
+ */
+export async function respondAsProspectAgent(
+  prospect: ProspectRow,
+  inboundText: string,
+  inboundKind: string
+): Promise<string | null> {
+  await logProspectMessage(prospect.id, 'in', inboundKind, inboundText);
+
+  if ((prospect as ProspectRow & { agent_enabled?: boolean }).agent_enabled === false) {
+    // Human takeover: record, ping the founder, stay silent.
+    await alertFounders(
+      `💬 Prospect ${prospect.name} respondeu (agente desligado — responda você): "${inboundText.slice(0, 150)}"`
+    );
+    return null;
+  }
+
+  if (needsEscalation(inboundText)) {
+    await alertFounders(
+      `📞 Prospect ${prospect.name} pediu preço/contrato/humano — assuma a conversa: "${inboundText.slice(0, 150)}"`
+    );
+  }
+
+  const thread = await getProspectThread(prospect.id);
+  const reply = await buildAgentReply(prospect.name, thread, inboundText);
+  await logProspectMessage(prospect.id, 'out', 'text', reply);
+
+  // Extracted from the whole thread; a failure only costs freshness.
+  const q = await extractQualification([...thread, { direction: 'in', text: inboundText }]);
+  if (q) await mergeProspectQualification(prospect.id, q as Record<string, unknown>);
+
+  log.info(`agent (${AGENT_NAME}) replied to prospect ${prospect.id}`);
+  return reply;
 }

@@ -4,7 +4,7 @@
  * — no SDK dependency, no streaming, WhatsApp-sized replies.
  */
 
-import { requireEnv } from './env';
+import { requireEnv, MODELS } from './env';
 import { withRetry, isTransient } from './retry';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -35,6 +35,16 @@ type ContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }
   | { type: 'input_audio'; input_audio: { data: string; format: string } };
+
+/** Short PT-BR description of an image (for feeding vision into text-only flows). */
+export async function describeImage(image: ChatImage): Promise<string> {
+  return chat({
+    model: MODELS.reasoning(),
+    maxTokens: 120,
+    user: 'Descreva esta imagem em 1-2 frases objetivas, em português.',
+    image,
+  });
+}
 
 /**
  * Send one chat turn and return the assistant text. Throws on API failure.
