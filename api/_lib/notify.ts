@@ -51,6 +51,37 @@ export function formatReferralEmail(n: ReferralNotice): { subject: string; body:
 }
 
 /**
+ * WhatsApp ping to the founders' own numbers (FOUNDER_WA_NUMBERS, comma-
+ * separated E.164) via the same transport that serves farmers. Fail-soft:
+ * founders' numbers must be reachable by the current transport (sandbox-joined
+ * during beta), and a miss here is logged, not fatal — the email and the
+ * painel row are the durable notifications.
+ */
+export async function pingFoundersWhatsApp(
+  send: (to: string, text: string) => Promise<void>,
+  n: ReferralNotice
+): Promise<void> {
+  const numbers = (process.env.FOUNDER_WA_NUMBERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (numbers.length === 0) return;
+  const text =
+    `🌱 Novo pedido de agrônomo!\n\n` +
+    `Produtor: ${n.maskedPhone}\n` +
+    `Estado: ${n.uf ?? '—'} · Culturas: ${n.crops?.length ? n.crops.join(', ') : '—'}\n` +
+    `Pedido: "${n.topic}"\n\n` +
+    `Thread no painel: ${PAINEL_URL}`;
+  for (const to of numbers) {
+    try {
+      await withRetry(() => send(to, text), { attempts: 2 });
+    } catch (e) {
+      log.error(`founder WhatsApp ping to ${to.slice(0, 6)}… failed:`, (e as Error).message);
+    }
+  }
+}
+
+/**
  * Send the referral notice to the founders. Fail-soft: a mail failure never
  * blocks the farmer's reply, but it is logged and alerted — never silent.
  */

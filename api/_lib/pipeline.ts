@@ -30,7 +30,7 @@ import {
 import { parseCrops, joinCrops } from './tools/crops';
 import { withRetry } from './retry';
 import { alertFounders } from './alert';
-import { sendReferralNotification } from './notify';
+import { sendReferralNotification, pingFoundersWhatsApp } from './notify';
 import { maskWa } from './opsData';
 import { createLogger } from './logger';
 
@@ -290,13 +290,16 @@ export async function handleInbound(
         topic: effective.text.slice(0, 280),
         consentVersion: REFERRAL_CONSENT_VERSION,
       });
-      // Concierge handoff: a human hears about the opt-in immediately.
-      await sendReferralNotification({
+      // Concierge handoff: a human hears about the opt-in immediately —
+      // email + WhatsApp ping to the founders' own numbers.
+      const notice = {
         maskedPhone: maskWa(msg.from),
         uf: profile.uf,
         crops: profile.crop,
         topic: effective.text.slice(0, 280),
-      });
+      };
+      await sendReferralNotification(notice);
+      await pingFoundersWhatsApp((to, text) => adapter.send({ to, text }), notice);
     }
     replyText = REFERRAL_REPLY;
   } else if (msg.kind === 'voice' && !transcript) {
