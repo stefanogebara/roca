@@ -21,6 +21,10 @@ export interface DigestStats {
   byIntent: Record<string, number>;
   byKind: Record<string, number>;
   referrals: number;
+  /** Open leads still to contact (status novo/legacy 'new'), any day — the CRM
+   * backlog. Shown even on a quiet day so it never goes unworked. Optional so
+   * existing DigestStats fixtures stay valid. */
+  openLeads?: number;
   /** Active farmers this period who already knew Stevi (created before the
    * window) — the daily retention signal. */
   returningUsers: number;
@@ -96,7 +100,7 @@ export async function computeDigestStats(since: string, until: string): Promise<
     returningUsers = count ?? 0;
   }
 
-  const [{ count: newUsers }, { count: referrals }] = await Promise.all([
+  const [{ count: newUsers }, { count: referrals }, { count: openLeads }] = await Promise.all([
     db
       .from('users')
       .select('id', { count: 'exact', head: true })
@@ -107,6 +111,11 @@ export async function computeDigestStats(since: string, until: string): Promise<
       .select('id', { count: 'exact', head: true })
       .gte('created_at', since)
       .lt('created_at', until),
+    // Open backlog across all time: still 'novo' (or legacy 'new'/null).
+    db
+      .from('referral_requests')
+      .select('id', { count: 'exact', head: true })
+      .or('status.eq.novo,status.eq.new,status.is.null'),
   ]);
 
   return {
@@ -118,6 +127,7 @@ export async function computeDigestStats(since: string, until: string): Promise<
     byIntent,
     byKind,
     referrals: referrals ?? 0,
+    openLeads: openLeads ?? 0,
     returningUsers,
     failures,
     sampleQuestions,
@@ -141,6 +151,10 @@ export function formatDigest(s: DigestStats): string {
   lines.push(`🌱 *Stevi — resumo do dia* (${dm(s.since)}→${dm(s.until)})`);
   lines.push('');
   lines.push(`👥 ${s.inboundTotal} mensagens de ${s.uniqueUsers} produtor(es) · ${s.newUsers} novo(s)`);
+  // The CRM backlog nudge — shown even on a quiet day so leads never go stale.
+  if ((s.openLeads ?? 0) > 0) {
+    lines.push(`📋 Leads a contatar: ${s.openLeads} (veja no painel → Leads)`);
+  }
   if (s.inboundTotal === 0) {
     lines.push('');
     lines.push('Nenhuma conversa no período. 🤙');
@@ -157,4 +171,21 @@ export function formatDigest(s: DigestStats): string {
     for (const q of s.sampleQuestions) lines.push(`• ${q}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * Strip verbatim farmer text before PERSISTING a digest run. LGPD deletion
+ * wipes the messages table, but persisted digests used to keep raw excerpts
+ * forever (security review M4). The delivered WhatsApp digest still carries
+ * the samples; only the stored copy is scrubbed. Pure — unit-tested.
+ */
+export function scrubDigestForPersistence(
+  stats: DigestStats,
+  text: string
+): { stats: DigestStats; text: string } {
+  const cut = text.indexOf('💬 Amostras');
+  return {
+    stats: { ...stats, sampleQuestions: [] },
+    text: cut === -1 ? text : text.slice(0, cut).trimEnd(),
+  };
 }
