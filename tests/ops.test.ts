@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { mintToken, verifyToken, safeEqual, passwordOk } from '../api/_lib/opsAuth';
+import {
+  mintToken,
+  verifyToken,
+  safeEqual,
+  passwordOk,
+  loginThrottled,
+  LOGIN_MAX_FAILS_PER_IP,
+  LOGIN_MAX_FAILS_GLOBAL,
+} from '../api/_lib/opsAuth';
 import { maskWa } from '../api/_lib/opsData';
 
 beforeAll(() => {
@@ -55,6 +63,26 @@ describe('passwordOk / safeEqual', () => {
     expect(safeEqual('abc', 'abc')).toBe(true);
     expect(safeEqual('abc', 'abcd')).toBe(false);
     expect(safeEqual('abc', 'abd')).toBe(false);
+  });
+});
+
+describe('loginThrottled', () => {
+  it('allows below both limits', () => {
+    expect(loginThrottled(0, 0)).toBe(false);
+    expect(loginThrottled(LOGIN_MAX_FAILS_PER_IP - 1, LOGIN_MAX_FAILS_GLOBAL - 1)).toBe(false);
+  });
+
+  it('throttles at the per-IP limit', () => {
+    expect(loginThrottled(LOGIN_MAX_FAILS_PER_IP, 0)).toBe(true);
+  });
+
+  it('throttles at the global limit (IP-rotation defense)', () => {
+    expect(loginThrottled(0, LOGIN_MAX_FAILS_GLOBAL)).toBe(true);
+  });
+
+  it('fails closed when a count query errored (null)', () => {
+    expect(loginThrottled(null, 0)).toBe(true);
+    expect(loginThrottled(0, null)).toBe(true);
   });
 });
 

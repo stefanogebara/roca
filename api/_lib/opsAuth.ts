@@ -39,6 +39,20 @@ export function passwordOk(submitted: string): boolean {
   return typeof submitted === 'string' && submitted.length > 0 && safeEqual(submitted, expected);
 }
 
+// Login throttling policy. Counts come from ops_login_attempts (DB-backed —
+// serverless has no memory between invocations). The global cap defends
+// against per-IP limits being sidestepped by IP rotation.
+export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+export const LOGIN_MAX_FAILS_PER_IP = 5;
+export const LOGIN_MAX_FAILS_GLOBAL = 20;
+
+/** Decide whether a login attempt may proceed. `null` means the count query
+ * failed — fail CLOSED: a login we can't throttle is a login we don't accept. */
+export function loginThrottled(ipFails: number | null, globalFails: number | null): boolean {
+  if (ipFails === null || globalFails === null) return true;
+  return ipFails >= LOGIN_MAX_FAILS_PER_IP || globalFails >= LOGIN_MAX_FAILS_GLOBAL;
+}
+
 /** Mint a signed session token: base64url(payloadJson).hmac. `now` injectable. */
 export function mintToken(now: number = Date.now()): string {
   const payload = b64url(Buffer.from(JSON.stringify({ sub: 'ops', exp: now + TTL_MS })));

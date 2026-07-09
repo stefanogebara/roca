@@ -383,6 +383,37 @@ export async function setTwilioContentSid(
   if (error) log.error('setTwilioContentSid failed:', error.message);
 }
 
+/** Record an ops-console login attempt (brute-force throttling evidence). */
+export async function recordOpsLoginAttempt(ip: string, success: boolean): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('ops_login_attempts').insert({ ip, success });
+  if (error) log.error('recordOpsLoginAttempt failed:', error.message);
+}
+
+/**
+ * Count failed ops-console logins since `sinceIso` — for one IP, or globally
+ * when `ip` is null. Returns null on error so the caller can fail CLOSED
+ * (unlike the farmer rate limit, denying a founder login is the safe default).
+ */
+export async function countOpsLoginFailures(
+  ip: string | null,
+  sinceIso: string
+): Promise<number | null> {
+  const db = getDb();
+  let q = db
+    .from('ops_login_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('success', false)
+    .gte('created_at', sinceIso);
+  if (ip) q = q.eq('ip', ip);
+  const { count, error } = await q;
+  if (error) {
+    log.error('countOpsLoginFailures failed:', error.message);
+    return null;
+  }
+  return count ?? 0;
+}
+
 /** LGPD deletion: wipe a user's data on request. */
 export async function deleteUserData(waId: string): Promise<boolean> {
   const db = getDb();
