@@ -140,16 +140,34 @@ export interface ProspectInput {
 }
 
 /**
- * Bulk-insert prospects, skipping duplicates (the partial unique index on phone
- * makes a repeat phone a no-op). Returns how many rows were newly inserted.
+ * Bulk-insert prospects, skipping phones that already exist. We dedup explicitly
+ * (rather than ON CONFLICT) because the phone unique index is partial
+ * (`where phone is not null`), which ON CONFLICT can't target. Rows without a
+ * phone (invalid) are always inserted so ops can see and fix them. Returns the
+ * number of rows newly inserted.
  */
 export async function importProspects(rows: ProspectInput[]): Promise<number> {
   if (!rows.length) return 0;
   const db = getDb();
-  const { data, error } = await db
-    .from('prospects')
-    .upsert(rows, { onConflict: 'phone', ignoreDuplicates: true })
-    .select('id');
+
+  const phones = [...new Set(rows.map((r) => r.phone).filter((v): v is string => !!v))];
+  const existing = new Set<string>();
+  if (phones.length) {
+    const { data, error } = await db.from('prospects').select('phone').in('phone', phones);
+    if (error) throw new Error(`importProspects dedup query failed: ${error.message}`);
+    for (const r of (data ?? []) as Array<{ phone: string | null }>) if (r.phone) existing.add(r.phone);
+  }
+
+  const seen = new Set<string>();
+  const toInsert = rows.filter((r) => {
+    if (!r.phone) return true; // invalid — always keep for review
+    if (existing.has(r.phone) || seen.has(r.phone)) return false; // dedup vs DB + within batch
+    seen.add(r.phone);
+    return true;
+  });
+  if (!toInsert.length) return 0;
+
+  const { data, error } = await db.from('prospects').insert(toInsert).select('id');
   if (error) {
     log.error('importProspects failed:', error.message);
     throw new Error(error.message);
