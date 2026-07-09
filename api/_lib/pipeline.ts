@@ -47,7 +47,17 @@ const log = createLogger('pipeline');
 const RATE_MAX_PER_WINDOW = 15;
 const RATE_WINDOW_MS = 60_000;
 
-const LGPD_DELETE = /\b(apaga|apagar|exclui|excluir|delet)\w*\s+(meus?\s+)?dados\b/i;
+// Deletion request — covers "apaga meus dados" plus the phrasings the security
+// review flagged as missed ("quero ser esquecido", "cancela meu cadastro",
+// account variants). Deliberately requires dados/conta/cadastro or the
+// esquecido idiom so "como apago a ferrugem" can't wipe an account.
+const LGPD_DELETE =
+  /\b(apag|exclu|delet|cancel)\w*\s+(meus?\s+dados|minha\s+conta|meu\s+cadastro)\b|\bquero\s+ser\s+esquecid[oa]\b/i;
+
+/** Whether a message is an LGPD account-deletion request. */
+export function isDeletionRequest(text: string): boolean {
+  return LGPD_DELETE.test(text);
+}
 const CONSENT_NOTE =
   '\n\n_Pra te dar conselhos melhores eu guardo sua localização e o histórico da conversa. É só o necessário, e você pode pedir "apaga meus dados" quando quiser. Mais tarde posso te conectar com um agrônomo de verdade se precisar._';
 
@@ -253,7 +263,7 @@ export async function handleInbound(
 ): Promise<void> {
   // LGPD deletion short-circuit — honour it before anything else. No DB write
   // on a send failure here: the user's data was just deleted, keep it that way.
-  if (msg.text && LGPD_DELETE.test(msg.text)) {
+  if (msg.text && isDeletionRequest(msg.text)) {
     await deleteUserData(msg.from);
     try {
       await withRetry(() =>
@@ -307,12 +317,20 @@ export async function handleInbound(
   }
 
   // Media fetch (image or voice) — provider-agnostic, lazy, fail-soft.
+  // Size cap before any LLM work: an oversized payload is a cost-abuse vector
+  // (each image feeds two reasoning-tier vision calls) and breaks model input
+  // limits anyway. ~8 MB binary ≈ 11 MB base64.
+  const MEDIA_BASE64_CAP = 11_000_000;
   let media: ChatImage | null = null;
   let transcript: string | null = null;
+  let mediaTooLarge = false;
   if (msg.mediaUrl && adapter.fetchMedia) {
     try {
       const fetched = await adapter.fetchMedia(msg.mediaUrl);
-      if (msg.kind === 'image') {
+      if (fetched.base64.length > MEDIA_BASE64_CAP) {
+        log.error(`media over cap (${fetched.base64.length} b64 chars) — skipped`);
+        mediaTooLarge = true;
+      } else if (msg.kind === 'image') {
         media = { base64: fetched.base64, mime: fetched.mime };
       } else if (msg.kind === 'voice') {
         transcript = await transcribeVoice(fetched.base64, fetched.mime);
@@ -401,6 +419,10 @@ export async function handleInbound(
       }
     }
     replyText = REFERRAL_REPLY;
+  } else if (mediaTooLarge) {
+    intent = 'general';
+    replyText =
+      'Opa, esse arquivo veio grande demais pra eu processar. 😅 Manda de novo como foto normal (sem ser em qualidade máxima/documento) que eu dou conta.';
   } else if (msg.kind === 'voice' && !transcript) {
     intent = 'general';
     replyText =

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireOps } from '../_lib/opsAuth';
+import { createLogger } from '../_lib/logger';
 import { getDb } from '../_lib/db';
 import { PERSONAS } from '../_lib/gym/personas';
 
@@ -8,6 +9,8 @@ import { PERSONAS } from '../_lib/gym/personas';
  * Runs themselves are CLI-triggered (npm run gym) because they make many LLM
  * calls; this endpoint is read-only.
  */
+const log = createLogger('ops');
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (!requireOps(req, res)) return;
   try {
@@ -25,6 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       },
     });
   } catch (e) {
-    res.status(500).json({ success: false, error: (e as Error).message });
+    log.error(`gym failed:`, (e as Error).message);
+    res.status(500).json({ success: false, error: 'erro interno' });
   }
 }

@@ -7,7 +7,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { computeDigestStats, formatDigest } from '../_lib/digest';
+import { computeDigestStats, formatDigest, scrubDigestForPersistence } from '../_lib/digest';
 import { getDb } from '../_lib/db';
 import { TwilioAdapter } from '../_lib/transport/twilio';
 import { createLogger } from '../_lib/logger';
@@ -37,15 +37,18 @@ export default async function handler(
   const stats = await computeDigestStats(since.toISOString(), until.toISOString());
   const text = formatDigest(stats);
 
-  // Persist the run (best-effort).
+  // Persist the run (best-effort) — scrubbed: no verbatim farmer text outlives
+  // the messages table, so "apaga meus dados" stays complete. The delivered
+  // WhatsApp digest below keeps the samples.
   try {
     const db = getDb();
+    const scrubbed = scrubDigestForPersistence(stats, text);
     const { error } = await db.from('digests').insert({
       ran_at: until.toISOString(),
       period_start: since.toISOString(),
       period_end: until.toISOString(),
-      stats,
-      text,
+      stats: scrubbed.stats,
+      text: scrubbed.text,
     });
     if (error) log.error('digest insert failed:', error.message);
   } catch (e) {
