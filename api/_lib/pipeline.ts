@@ -29,6 +29,7 @@ import {
   hasRecentReferral,
 } from './db';
 import { parseCrops, joinCrops } from './tools/crops';
+import type { PestCardData } from './cards/pest';
 import { withRetry } from './retry';
 import { alertFounders } from './alert';
 import { sendReferralNotification, pingFoundersWhatsApp } from './notify';
@@ -131,6 +132,16 @@ async function cardUrlFor(
     log.error('cardUrlFor failed:', (e as Error).message);
   }
   return undefined;
+}
+
+/** Public URL for the pest-triage card, built from the vision identification. */
+function pestCardUrl(c: PestCardData): string {
+  const q = new URLSearchParams({ type: 'pest', pest: c.pest, confidence: c.confidence });
+  if (c.crop) q.set('crop', c.crop);
+  if (c.evidence) q.set('evidence', c.evidence.slice(0, 160));
+  if (c.products != null) q.set('products', String(c.products));
+  if (c.groups && c.groups.length) q.set('groups', c.groups.slice(0, 4).join('|'));
+  return `${PUBLIC_BASE}/api/card?${q.toString()}`;
 }
 
 /**
@@ -269,6 +280,7 @@ export async function handleInbound(
 
   let intent: Intent;
   let replyText: string;
+  let pestCard: PestCardData | undefined;
 
   // If we asked what they grow (right after the farm card) and they replied with
   // recognizable crops, capture them. A non-crop reply clears the wait and falls
@@ -334,7 +346,13 @@ export async function handleInbound(
         ? 'field_health'
         : await routeIntent(effective);
     try {
-      replyText = await reason(effective, intent, { userId, media });
+      replyText = await reason(effective, intent, {
+        userId,
+        media,
+        onPestCard: (c) => {
+          pestCard = c;
+        },
+      });
     } catch (e) {
       log.error('reasoning failed:', (e as Error).message);
       replyText = FALLBACK_REPLY;
@@ -349,7 +367,7 @@ export async function handleInbound(
 
   if (firstContact) finalText += CONSENT_NOTE;
 
-  const mediaUrl = await cardUrlFor(intent, effective, userId);
+  const mediaUrl = pestCard ? pestCardUrl(pestCard) : await cardUrlFor(intent, effective, userId);
   const sent = await sendOrRecord(
     adapter,
     msg.from,

@@ -184,6 +184,16 @@ const GROUP_HINTS: Array<{ re: RegExp; group: string }> = [
   { re: /(mancozeb|clorotalonil|oxicloreto de cobre|cobre)/, group: 'multissítios (protetores)' },
 ];
 
+/** Distinct FRAC/IRAC chemical groups present among a hit's registered actives. */
+export function chemicalGroups(hit: AgrofitLookup): string[] {
+  const groups = new Set<string>();
+  for (const a of hit.entry.ativos) {
+    const s = strip(a);
+    for (const g of GROUP_HINTS) if (g.re.test(s)) groups.add(g.group);
+  }
+  return [...groups];
+}
+
 /**
  * Compose a grounded, WhatsApp-sized context block for the reasoning model.
  * Informational only — lists what is registered and nudges rotation + handoff.

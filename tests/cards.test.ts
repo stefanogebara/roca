@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { spraySvg } from '../api/_lib/cards/spray';
 import { ndviSvg } from '../api/_lib/cards/ndviCard';
 import { farmSvg } from '../api/_lib/cards/farm';
+import { pestSvg } from '../api/_lib/cards/pest';
 import { svgToPng } from '../api/_lib/cards/render';
 import type { HourAssessment } from '../api/_lib/tools/deltaT';
 
@@ -104,6 +105,42 @@ describe('farmSvg', () => {
         spray: { verdict: 'go', deltaT: 5, windKmh: 8 },
         vazio: { active: false },
       })
+    );
+    expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  });
+});
+
+describe('pestSvg', () => {
+  it('renders pest, confidence, crop, evidence, groups and the compliance line', () => {
+    const svg = pestSvg({
+      pest: 'Ferrugem asiática',
+      crop: 'soja',
+      confidence: 'alta',
+      evidence: 'pústulas alaranjadas com halo amarelo',
+      products: 318,
+      groups: ['estrobilurinas', 'triazóis'],
+    });
+    expect(svg).toMatch(/^<svg/);
+    expect(svg).toContain('Ferrugem asiática');
+    expect(svg).toContain('confiança alta');
+    expect(svg).toContain('cultura: soja');
+    expect(svg).toContain('pústulas alaranjadas');
+    expect(svg).toContain('estrobilurinas');
+    expect(svg).toContain('318 produtos registrados');
+    // Compliance line is always present — triagem, não prescrição.
+    expect(svg).toContain('só o agrônomo, no receituário');
+    expect(svg).toContain('triagem, não prescrição');
+  });
+  it('handles low confidence and no Agrofit match without groups', () => {
+    const svg = pestSvg({ pest: 'algo incerto', confidence: 'baixa', products: null, groups: [] });
+    expect(svg).toContain('confiança baixa');
+    expect(svg).toContain('Sem registro localizado no Agrofit');
+    expect(svg).toContain('só o agrônomo, no receituário');
+    expect(svg).not.toContain('undefined');
+  });
+  it('rasterizes to a valid PNG', () => {
+    const png = svgToPng(
+      pestSvg({ pest: 'Lagarta-do-cartucho', crop: 'milho', confidence: 'media', products: 120, groups: ['piretroides'] })
     );
     expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
   });

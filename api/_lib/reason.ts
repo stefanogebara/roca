@@ -22,7 +22,8 @@ import {
 } from './tools/ndvi';
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
-import { lookupPest, normalizeCrop, groundingBlock } from './tools/agrofit';
+import { lookupPest, normalizeCrop, groundingBlock, chemicalGroups } from './tools/agrofit';
+import type { PestCardData } from './cards/pest';
 import { createLogger } from './logger';
 
 const log = createLogger('reason');
@@ -206,10 +207,11 @@ const PHOTO_RETRY_MSG =
 async function handleVision(
   msg: InboundMessage,
   media: ChatImage,
-  packOverride?: string | null
+  packOverride?: string | null,
+  onPestCard?: (c: PestCardData) => void
 ): Promise<string> {
   try {
-    return await triagePhoto(msg, media, packOverride);
+    return await triagePhoto(msg, media, packOverride, onPestCard);
   } catch (e) {
     log.error('handleVision failed:', (e as Error).message);
     return PHOTO_RETRY_MSG;
@@ -219,7 +221,8 @@ async function handleVision(
 async function triagePhoto(
   msg: InboundMessage,
   media: ChatImage,
-  packOverride?: string | null
+  packOverride?: string | null,
+  onPestCard?: (c: PestCardData) => void
 ): Promise<string> {
   const id = await identifyFromPhoto(msg, media);
 
@@ -240,6 +243,17 @@ async function triagePhoto(
   if (id.pest && id.confidence !== 'baixa') {
     const hit = lookupPest(normalizeCrop(id.crop), id.pest);
     if (hit) grounding = groundingBlock(hit);
+    // Emit the visual triage card alongside the text (compliance line baked in).
+    if (id.pest && onPestCard) {
+      onPestCard({
+        pest: id.pest,
+        crop: id.crop,
+        confidence: id.confidence,
+        evidence: id.evidence,
+        products: hit?.entry.products ?? null,
+        groups: hit ? chemicalGroups(hit) : [],
+      });
+    }
   }
 
   const parts: string[] = [];
@@ -299,6 +313,9 @@ export interface ReasonDeps {
   /** Gym only: run the LLM voice paths against a specific style-pack body
    * (challenger) instead of the active one. Omit in production. */
   packOverride?: string | null;
+  /** Photo triage only: called with card data when a pest is identified with
+   * enough confidence, so the caller can attach the visual triage card. */
+  onPestCard?: (c: PestCardData) => void;
 }
 
 /** Produce a reply for a routed message. */
@@ -320,7 +337,7 @@ export async function reason(
   }
 
   if (msg.kind === 'image' && deps.media) {
-    return handleVision(msg, deps.media, deps.packOverride);
+    return handleVision(msg, deps.media, deps.packOverride, deps.onPestCard);
   }
 
   if (!msg.text) {

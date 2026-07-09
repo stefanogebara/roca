@@ -13,6 +13,7 @@ import { svgToPng } from './_lib/cards/render';
 import { spraySvg } from './_lib/cards/spray';
 import { ndviSvg } from './_lib/cards/ndviCard';
 import { farmSvg } from './_lib/cards/farm';
+import { pestSvg } from './_lib/cards/pest';
 import { fetchHourlyWeather } from './_lib/tools/weather';
 import { assessHour, sprayWindow } from './_lib/tools/deltaT';
 import {
@@ -113,6 +114,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         vazio: vazio && vazio.known ? { active: vazio.active } : null,
       });
       maxAge = 900; // weather shifts hourly
+    } else if (type === 'pest') {
+      const pest = String(req.query.pest ?? '').trim();
+      if (!pest) {
+        res.status(400).send('pest required');
+        return;
+      }
+      const confRaw = String(req.query.confidence ?? 'media');
+      const confidence =
+        confRaw === 'alta' || confRaw === 'baixa' ? confRaw : ('media' as const);
+      const products = num(req.query.products);
+      const groups = String(req.query.groups ?? '')
+        .split('|')
+        .map((g) => g.trim())
+        .filter(Boolean);
+      svg = pestSvg({
+        pest,
+        crop: req.query.crop ? String(req.query.crop) : null,
+        confidence,
+        evidence: req.query.evidence ? String(req.query.evidence) : null,
+        products: products ?? null,
+        groups,
+      });
+      maxAge = 3600; // a given triage result is stable
     } else {
       res.status(400).send('unknown card type');
       return;
