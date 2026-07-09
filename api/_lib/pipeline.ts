@@ -97,6 +97,11 @@ async function cardUrlFor(
   userId: string | null
 ): Promise<string | undefined> {
   try {
+    // Pin drop → the farm card (soil + spray + vazio) as the onboarding payback.
+    if (msg.kind === 'location' && msg.location) {
+      const { lat, lon } = msg.location;
+      return `${PUBLIC_BASE}/api/card?type=farm&lat=${lat}&lon=${lon}`;
+    }
     if (intent === 'spray_window') {
       let coords = msg.location;
       if (!coords && userId) coords = await getFarmLocation(userId);

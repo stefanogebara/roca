@@ -12,9 +12,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { svgToPng } from './_lib/cards/render';
 import { spraySvg } from './_lib/cards/spray';
 import { ndviSvg } from './_lib/cards/ndviCard';
+import { farmSvg } from './_lib/cards/farm';
 import { fetchHourlyWeather } from './_lib/tools/weather';
 import { assessHour, sprayWindow } from './_lib/tools/deltaT';
 import { classifyVigor, classifyUniformity, UNIFORMITY_MIN_SAMPLES } from './_lib/tools/ndvi';
+import { fetchSoil, textureLabel } from './_lib/tools/soil';
+import { reverseGeocodeUf } from './_lib/tools/geo';
+import { vazioStatus } from './_lib/tools/calendar';
 import { createLogger } from './_lib/logger';
 
 const log = createLogger('card');
@@ -64,6 +68,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         uniformity,
       });
       maxAge = 86_400; // a given scene's read is stable
+    } else if (type === 'farm') {
+      const lat = num(req.query.lat);
+      const lon = num(req.query.lon);
+      if (lat == null || lon == null) {
+        res.status(400).send('lat/lon required');
+        return;
+      }
+      // Recompute the same primitives the text farm card uses, in parallel and
+      // fail-soft — a slow/down layer just drops from the card, never blocks it.
+      const [soilR, sprayR, ufR] = await Promise.allSettled([
+        fetchSoil(lat, lon),
+        (async () => sprayWindow(await fetchHourlyWeather({ lat, lon }, 12)))(),
+        reverseGeocodeUf(lat, lon),
+      ]);
+      const soil = soilR.status === 'fulfilled' ? soilR.value : null;
+      const now = sprayR.status === 'fulfilled' ? sprayR.value.now : null;
+      const uf = ufR.status === 'fulfilled' ? ufR.value : null;
+      const vazio = uf ? vazioStatus(uf, new Date()) : null;
+      svg = farmSvg({
+        uf,
+        soil: soil
+          ? {
+              texture: textureLabel(soil),
+              ph: soil.ph,
+              acid: soil.ph != null && soil.ph < 5.5,
+            }
+          : null,
+        spray: now
+          ? { verdict: now.verdict, deltaT: now.deltaT, windKmh: now.windKmh }
+          : null,
+        vazio: vazio && vazio.known ? { active: vazio.active } : null,
+      });
+      maxAge = 900; // weather shifts hourly
     } else {
       res.status(400).send('unknown card type');
       return;
