@@ -77,6 +77,16 @@ const COMMODITIES: Array<{
   { key: 'milho', label: 'Milho (Chicago)', symbol: 'ZC=F', toSaca: milhoSacaBrl },
 ];
 
+/** Commodities explicitly named in a message — an explicit ask beats the
+ * profile filter ("cotação do café" from a soy grower must quote café). */
+export function askedCommodities(text: string): string[] {
+  const asked: string[] = [];
+  if (/caf[ée]/i.test(text)) asked.push('cafe');
+  if (/\bsoja\b/i.test(text)) asked.push('soja');
+  if (/\bmilho\b/i.test(text)) asked.push('milho');
+  return asked;
+}
+
 export interface PricesResult {
   quotes: CommodityQuote[];
   usdBrl: number | null;

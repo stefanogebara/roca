@@ -31,7 +31,7 @@ import {
   getActivityLog,
 } from './db';
 import { buildHistoryReply } from './caderno';
-import { fetchPrices, formatPricesReply } from './tools/prices';
+import { fetchPrices, formatPricesReply, askedCommodities } from './tools/prices';
 import { parseCrops, joinCrops } from './tools/crops';
 import type { PestCardData } from './cards/pest';
 import { withRetry } from './retry';
@@ -359,8 +359,10 @@ export async function handleInbound(
     // Commodity quotes — the price habit loop. Crop-filtered when known.
     intent = 'prices';
     if (userId && user?.awaiting) await setAwaiting(userId, null);
+    // An explicitly named commodity beats the profile filter.
+    const asked = askedCommodities(effective.text);
     const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
-    const { quotes, usdBrl } = await fetchPrices(profile.crop);
+    const { quotes, usdBrl } = await fetchPrices(asked.length > 0 ? asked : profile.crop);
     replyText = formatPricesReply(quotes, usdBrl);
   } else if (effective.kind === 'text' && effective.text && isBriefRequest(effective.text)) {
     // Assemble the agrônomo briefing from the farmer's profile + recent messages.

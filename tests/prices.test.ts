@@ -4,6 +4,7 @@ import {
   sojaSacaBrl,
   milhoSacaBrl,
   formatPricesReply,
+  askedCommodities,
   type CommodityQuote,
 } from '../api/_lib/tools/prices';
 import { isPriceRequest } from '../api/_lib/pipeline';
@@ -48,6 +49,17 @@ describe('formatPricesReply', () => {
   it('handles an empty quote list without pretending', () => {
     const t = formatPricesReply([], 5.42);
     expect(t).toMatch(/n[ãa]o consegui/i);
+  });
+});
+
+describe('askedCommodities', () => {
+  it('extracts explicitly named commodities', () => {
+    expect(askedCommodities('cotação do café')).toEqual(['cafe']);
+    expect(askedCommodities('quanto tá a soja e o milho?')).toEqual(['soja', 'milho']);
+  });
+  it('returns empty for a generic ask (falls back to profile)', () => {
+    expect(askedCommodities('cotações')).toEqual([]);
+    expect(askedCommodities('quanto tá o dólar')).toEqual([]);
   });
 });
 
