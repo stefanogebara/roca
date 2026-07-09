@@ -274,10 +274,24 @@
           const meta = el('div', 'meta');
           if (l.uf) meta.append(Object.assign(el('span','pill'), {textContent: l.uf}));
           (l.crop||[]).forEach(cr => meta.append(Object.assign(el('span','pill'), {textContent: cr})));
-          meta.append(Object.assign(el('span','pill'), {textContent: l.status || 'novo'}));
           left.append(meta);
           if (l.topic) left.append(el('div', 'meta', '“' + l.topic + '”'));
-          item.append(left, el('div', 'right', fmtDate(l.at)));
+          // Status selector — the mini-CRM. Change persists immediately.
+          const sel = el('select');
+          sel.style.cssText = 'padding:4px 8px;border-radius:8px;border:1px solid var(--line,#e3dccb);background:#fff;font:inherit;color:var(--ink,#1a2420);cursor:pointer';
+          for (const s of ['novo','contatado','fechado']) {
+            const o = el('option', null, s); o.value = s;
+            if (s === (l.status||'novo')) o.selected = true;
+            sel.append(o);
+          }
+          sel.addEventListener('change', async () => {
+            const prev = l.status; sel.disabled = true;
+            try { await api('leads', { method: 'POST', body: JSON.stringify({ id: l.id, status: sel.value }) }); l.status = sel.value; }
+            catch (e) { if (e.message!=='unauthorized') { sel.value = prev||'novo'; alert('Não deu pra salvar o status.'); } }
+            finally { sel.disabled = false; }
+          });
+          const right = el('div', 'right'); right.append(sel, el('div', null, fmtDate(l.at)));
+          item.append(left, right);
           p.append(item);
         }
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }

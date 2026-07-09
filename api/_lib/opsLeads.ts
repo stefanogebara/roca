@@ -11,6 +11,31 @@ import { createLogger } from './logger';
 
 const log = createLogger('ops-leads');
 
+/** Lead pipeline states (the mini-CRM). Legacy 'new' rows read as 'novo'. */
+export const LEAD_STATUSES = ['novo', 'contatado', 'fechado'] as const;
+export type LeadStatus = (typeof LEAD_STATUSES)[number];
+
+export function isLeadStatus(s: unknown): s is LeadStatus {
+  return typeof s === 'string' && (LEAD_STATUSES as readonly string[]).includes(s);
+}
+
+/** Normalise stored status (older rows may hold 'new') to a display value. */
+function normStatus(s: string | null): LeadStatus {
+  if (s === 'contatado' || s === 'fechado') return s;
+  return 'novo';
+}
+
+/** Update a lead's pipeline status. Returns whether the write succeeded. */
+export async function setLeadStatus(id: string, status: LeadStatus): Promise<boolean> {
+  const db = getDb();
+  const { error } = await db.from('referral_requests').update({ status }).eq('id', id);
+  if (error) {
+    log.error('setLeadStatus failed:', error.message);
+    return false;
+  }
+  return true;
+}
+
 export interface LeadRow {
   id: string;
   /** Masked phone, e.g. "+55 ••••2121". */
@@ -18,7 +43,7 @@ export interface LeadRow {
   uf: string | null;
   crop: string[] | null;
   topic: string | null;
-  status: string;
+  status: LeadStatus;
   at: string;
 }
 
@@ -60,7 +85,7 @@ export async function opsLeads(): Promise<LeadRow[]> {
     uf: r.uf,
     crop: r.crop,
     topic: r.topic,
-    status: r.status ?? 'novo',
+    status: normStatus(r.status),
     at: r.created_at,
   }));
 }
