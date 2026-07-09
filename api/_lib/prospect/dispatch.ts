@@ -43,6 +43,9 @@ export interface DispatchOptions {
 export interface DispatchReport {
   dryRun: boolean;
   skippedOutsideHours: boolean;
+  /** True when a safety precondition (opt-outs/cap) couldn't be verified → no sends. */
+  aborted: boolean;
+  error?: string;
   eligible: number;
   planned: number;
   sent: number;
@@ -58,14 +61,26 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
 
   if (!dryRun && !opts.force && !isBusinessHours(now)) {
     log.info('dispatch skipped — outside business hours');
-    return { dryRun, skippedOutsideHours: true, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [] };
+    return { dryRun, skippedOutsideHours: true, aborted: false, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [] };
   }
 
-  const [optouts, ready, sentToday] = await Promise.all([
-    loadOptouts(),
-    loadReadyProspects(),
-    countSentSince(brtDayStartIso(now)),
-  ]);
+  // Preconditions FAIL CLOSED: if opt-outs or the daily count can't be verified,
+  // abort the whole run rather than risk over-sending / hitting an opted-out number.
+  let optouts: Set<string>;
+  let ready: Awaited<ReturnType<typeof loadReadyProspects>>;
+  let sentToday: number;
+  try {
+    [optouts, ready, sentToday] = await Promise.all([
+      loadOptouts(),
+      loadReadyProspects(),
+      countSentSince(brtDayStartIso(now)),
+    ]);
+  } catch (e) {
+    const error = (e as Error).message;
+    log.error('dispatch aborted — safety precondition unavailable:', error);
+    if (!dryRun) await alertFounders(`⛔ Prospecção abortada: não deu pra verificar opt-outs/limite (${error.slice(0, 120)}). Nenhum envio feito.`);
+    return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [] };
+  }
 
   const eligible = ready.filter((p) => eligibleToSend(p, optouts));
   const batch = planBatch(eligible, { dailyCap: opts.dailyCap ?? DAILY_CAP_DEFAULT, sentToday });
@@ -80,18 +95,34 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
       recipients.push({ id: p.id, name: p.name, phone, result: 'planned' });
       continue;
     }
+    let wamid: string;
     try {
-      const { wamid } = await sendProspectTemplate(phone, TEMPLATE_NAME, TEMPLATE_LANG, [
-        p.name.slice(0, 60),
-      ]);
-      await recordSend(p.id, { wamid, template: TEMPLATE_NAME });
-      recipients.push({ id: p.id, name: p.name, phone, result: 'sent' });
-      sent++;
+      ({ wamid } = await sendProspectTemplate(phone, TEMPLATE_NAME, TEMPLATE_LANG, [p.name.slice(0, 60)]));
     } catch (e) {
+      // Send itself failed → nothing went out; record + continue is safe.
       await recordSendFailed(p.id);
       recipients.push({ id: p.id, name: p.name, phone, result: 'failed' });
       failed++;
       log.error(`dispatch send failed for ${p.id}:`, (e as Error).message);
+      if (batch.indexOf(p) < batch.length - 1) await sleep(PER_SEND_DELAY_MS);
+      continue;
+    }
+
+    // The message WENT OUT. If we can't record it, stop the batch: continuing
+    // risks re-sending this one next run (it still looks unsent). Page ops with
+    // the wamid to reconcile by hand.
+    try {
+      await recordSend(p.id, { wamid, template: TEMPLATE_NAME });
+      recipients.push({ id: p.id, name: p.name, phone, result: 'sent' });
+      sent++;
+    } catch (e) {
+      sent++; // it did send — count it, then abort to avoid a duplicate next run
+      recipients.push({ id: p.id, name: p.name, phone, result: 'sent' });
+      log.error(`recordSend failed after a live send for ${p.id}:`, (e as Error).message);
+      await alertFounders(
+        `⚠️ Prospecção: enviado pra ${p.name} (wamid ${wamid}) mas NÃO consegui gravar. Batch interrompido — confira o cadastro pra não reenviar.`
+      );
+      break;
     }
     if (batch.indexOf(p) < batch.length - 1) await sleep(PER_SEND_DELAY_MS);
   }
@@ -99,5 +130,5 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   if (failed > 0) {
     await alertFounders(`⚠️ Prospecção: ${failed} de ${batch.length} envio(s) falharam.`);
   }
-  return { dryRun, skippedOutsideHours: false, eligible: eligible.length, planned: batch.length, sent, failed, recipients };
+  return { dryRun, skippedOutsideHours: false, aborted: false, eligible: eligible.length, planned: batch.length, sent, failed, recipients };
 }

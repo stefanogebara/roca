@@ -47,32 +47,44 @@ export async function loadReadyProspects(limit = 200): Promise<ProspectRow[]> {
   return (data ?? []) as ProspectRow[];
 }
 
-/** The opt-out blocklist as a set of E.164 numbers. */
+/**
+ * The opt-out blocklist as a set of E.164 numbers. FAILS CLOSED: if we can't
+ * read the blocklist we must NOT send (sending to an opted-out number is an LGPD
+ * violation + a ban risk), so this throws and the dispatch aborts. A null result
+ * with no error is also treated as unverifiable → throw.
+ */
 export async function loadOptouts(): Promise<Set<string>> {
   const db = getDb();
   const { data, error } = await db.from('prospect_optouts').select('phone');
-  if (error) {
-    log.error('loadOptouts failed:', error.message);
-    return new Set();
+  if (error || data == null) {
+    throw new Error(`loadOptouts unavailable: ${error?.message ?? 'null result'}`);
   }
-  return new Set((data ?? []).map((r) => (r as { phone: string }).phone));
+  return new Set((data as Array<{ phone: string }>).map((r) => r.phone));
 }
 
-/** How many prospects were already contacted since a given instant (daily cap). */
+/**
+ * How many prospects were already contacted since a given instant (daily cap).
+ * FAILS CLOSED: on error we throw so the run aborts rather than resetting the cap
+ * to 0 and over-sending from a fresh number.
+ */
 export async function countSentSince(sinceIso: string): Promise<number> {
   const db = getDb();
   const { count, error } = await db
     .from('prospects')
     .select('id', { count: 'exact', head: true })
     .gte('sent_at', sinceIso);
-  if (error) {
-    log.error('countSentSince failed:', error.message);
-    return 0;
+  if (error || count == null) {
+    throw new Error(`countSentSince unavailable: ${error?.message ?? 'null count'}`);
   }
-  return count ?? 0;
+  return count;
 }
 
-/** Mark a prospect contacted after a successful template send. */
+/**
+ * Mark a prospect contacted after a successful template send. THROWS on failure:
+ * the message already went out, so an unrecorded send is a duplicate-send hazard
+ * next run — the caller must stop the batch and page ops to reconcile the wamid,
+ * not silently continue.
+ */
 export async function recordSend(
   id: string,
   fields: { wamid: string; template: string }
@@ -89,7 +101,7 @@ export async function recordSend(
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
-  if (error) log.error('recordSend failed:', error.message);
+  if (error) throw new Error(`recordSend failed for ${id} (wamid ${fields.wamid}): ${error.message}`);
 }
 
 /** Mark a prospect's send as failed (surfaced in ops; never silently dropped). */
