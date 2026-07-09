@@ -31,6 +31,7 @@ import {
   getActivityLog,
 } from './db';
 import { buildHistoryReply } from './caderno';
+import { fetchPrices, formatPricesReply } from './tools/prices';
 import { parseCrops, joinCrops } from './tools/crops';
 import type { PestCardData } from './cards/pest';
 import { withRetry } from './retry';
@@ -83,6 +84,19 @@ const HISTORY_INTENT =
 /** Whether a message asks for the farmer's own history/caderno. */
 export function isHistoryRequest(text: string): boolean {
   return HISTORY_INTENT.test(text);
+}
+
+// Commodity quote asks — "cotação do café", "quanto tá a soja", "preço do
+// milho", bare "cotações". Anchored to the commodities we can quote so
+// "preço do frete" doesn't match.
+// (no trailing \b after the commodity group: "café" ends in a non-ASCII word
+// char, which JS \b mishandles — accent-aware lookahead instead)
+const PRICE_INTENT =
+  /\bcota[çc][õo]es?\b|\b(cota[çc][ãa]o|pre[çc]o)\b[^.?!]*\b(caf[ée]|soja|milho|d[óo]lar)(?![\wÀ-ÿ])|\bquanto\s+(t[áa]|est[áa]|anda)\s+(o\s+|a\s+)?(caf[ée]|soja|milho|d[óo]lar)(?![\wÀ-ÿ])/i;
+
+/** Whether a message asks for commodity quotes. */
+export function isPriceRequest(text: string): boolean {
+  return PRICE_INTENT.test(text);
 }
 
 // Request to assemble the "resumo pro agrônomo" — the briefing the farmer
@@ -196,6 +210,8 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
     case 'history':
       // From the season record, the useful next steps are the pro handoffs.
       return ['Montar resumo', 'Quero um agrônomo'];
+    case 'prices':
+      return ['Posso pulverizar?', 'Ver satélite'];
     default:
       return undefined;
   }
@@ -339,6 +355,13 @@ export async function handleInbound(
     replyText = userId
       ? buildHistoryReply(await getFarmProfile(userId), await getActivityLog(userId))
       : buildHistoryReply({ uf: null, crop: null }, []);
+  } else if (effective.kind === 'text' && effective.text && isPriceRequest(effective.text)) {
+    // Commodity quotes — the price habit loop. Crop-filtered when known.
+    intent = 'prices';
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+    const { quotes, usdBrl } = await fetchPrices(profile.crop);
+    replyText = formatPricesReply(quotes, usdBrl);
   } else if (effective.kind === 'text' && effective.text && isBriefRequest(effective.text)) {
     // Assemble the agrônomo briefing from the farmer's profile + recent messages.
     intent = 'brief';
