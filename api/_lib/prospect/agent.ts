@@ -20,7 +20,10 @@ import { createLogger } from '../logger';
 
 const log = createLogger('prospect-agent');
 
-export const AGENT_NAME = process.env.PROSPECT_AGENT_NAME || 'Olívia';
+// Named after the cofounder — prospects talk "with Vitória". A prospect who
+// explicitly asks to talk to a person still escalates (the trigger includes
+// her name), so the human Vitória can take over her namesake's thread.
+export const AGENT_NAME = process.env.PROSPECT_AGENT_NAME || 'Vitória';
 
 // ── Escalation triggers (inbound) ───────────────────────────────────────────
 
