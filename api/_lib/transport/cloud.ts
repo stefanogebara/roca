@@ -166,6 +166,25 @@ export class CloudApiAdapter implements TransportAdapter {
     if (!token || !phoneId) {
       throw new Error('WHATSAPP_CLOUD_TOKEN / WHATSAPP_CLOUD_PHONE_NUMBER_ID not configured');
     }
+    // Media path: an image message with the text as caption. On failure, fall
+    // back to plain text so a broken card never drops the reply.
+    if (msg.mediaUrl) {
+      const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: msg.to,
+          type: 'image',
+          image: { link: msg.mediaUrl, caption: msg.text.slice(0, 1024) },
+        }),
+      });
+      if (res.ok) return;
+      await this.send({ to: msg.to, text: msg.text, buttons: msg.buttons });
+      return;
+    }
+
     // Interactive reply buttons (≤3, titles ≤20 chars, body ≤1024) when
     // requested; plain text otherwise. A rejected interactive send retries as
     // plain text — every rich message carries its plain-text twin.

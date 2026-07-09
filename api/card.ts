@@ -1,0 +1,80 @@
+/**
+ * Public card image endpoint: renders a PNG card that WhatsApp fetches by URL
+ * (Twilio media_url / Cloud image link). Unauthenticated by necessity — the
+ * data it renders is the farmer's own low-sensitivity weather/vigor, encoded in
+ * the query string. No secrets, no PII.
+ *
+ *   /api/card?type=spray&lat=-12.5&lon=-55.7
+ *   /api/card?type=ndvi&ndvi=0.62&std=0.08&samples=9&date=2026-06-29
+ */
+
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { svgToPng } from './_lib/cards/render';
+import { spraySvg } from './_lib/cards/spray';
+import { ndviSvg } from './_lib/cards/ndviCard';
+import { fetchHourlyWeather } from './_lib/tools/weather';
+import { assessHour, sprayWindow } from './_lib/tools/deltaT';
+import { classifyVigor, classifyUniformity, UNIFORMITY_MIN_SAMPLES } from './_lib/tools/ndvi';
+import { createLogger } from './_lib/logger';
+
+const log = createLogger('card');
+
+function num(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const type = String(req.query.type ?? '');
+  try {
+    let svg: string;
+    let maxAge = 600;
+
+    if (type === 'spray') {
+      const lat = num(req.query.lat);
+      const lon = num(req.query.lon);
+      if (lat == null || lon == null) {
+        res.status(400).send('lat/lon required');
+        return;
+      }
+      const hours = await fetchHourlyWeather({ lat, lon }, 12);
+      const assessed = hours.map(assessHour);
+      const { bestUpcoming } = sprayWindow(hours);
+      svg = spraySvg(assessed, bestUpcoming);
+      maxAge = 900; // weather shifts hourly
+    } else if (type === 'ndvi') {
+      const ndvi = num(req.query.ndvi);
+      const date = String(req.query.date ?? '');
+      if (ndvi == null || !date) {
+        res.status(400).send('ndvi/date required');
+        return;
+      }
+      const std = num(req.query.std);
+      const samples = num(req.query.samples) ?? undefined;
+      const vigor = classifyVigor(ndvi);
+      const uniformity =
+        std != null && samples != null && samples >= UNIFORMITY_MIN_SAMPLES
+          ? classifyUniformity(std)
+          : null;
+      svg = ndviSvg({
+        ndvi,
+        date,
+        samples,
+        vigor: { label: vigor.label, note: vigor.note },
+        uniformity,
+      });
+      maxAge = 86_400; // a given scene's read is stable
+    } else {
+      res.status(400).send('unknown card type');
+      return;
+    }
+
+    const png = svgToPng(svg);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge}`);
+    res.status(200).send(png);
+  } catch (e) {
+    log.error(`card render failed (${type}):`, (e as Error).message);
+    res.status(500).send('card render failed');
+  }
+}

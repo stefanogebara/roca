@@ -35,6 +35,13 @@ export interface OutboundMessage {
    * rich message carries its plain-text twin.
    */
   buttons?: string[];
+  /**
+   * Optional image to attach (public PNG URL — a rendered card). When present,
+   * adapters send an image message with `text` as the caption/body and skip
+   * buttons; on any send failure they fall back to plain text so a broken image
+   * never drops the reply.
+   */
+  mediaUrl?: string;
 }
 
 /**

@@ -139,6 +139,23 @@ export class TwilioAdapter implements TransportAdapter {
       To: `whatsapp:${msg.to}`,
     };
 
+    // Media path: send the image with the text as body. On any failure, retry
+    // text-only so a broken card URL never drops the reply. Media + quick-reply
+    // buttons can't coexist in one Twilio message, so media wins here.
+    if (msg.mediaUrl) {
+      params.Body = msg.text;
+      params.MediaUrl = msg.mediaUrl;
+      const res = await fetch(`${TWILIO_API}/Accounts/${sid}/Messages.json`, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(params).toString(),
+      });
+      if (res.ok) return;
+      log.error(`media send failed ${res.status}, retrying text-only:`, (await res.text()).slice(0, 120));
+      await this.send({ to: msg.to, text: msg.text, buttons: msg.buttons });
+      return;
+    }
+
     // Buttons path: resolve (or create) the content template for this button-set.
     // Any failure degrades to plain text — the farmer always gets the message.
     let interactive = false;

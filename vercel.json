@@ -10,6 +10,10 @@
     },
     "api/cron/digest.ts": {
       "maxDuration": 30
+    },
+    "api/card.ts": {
+      "maxDuration": 30,
+      "includeFiles": "api/_lib/cards/fonts/*.ttf"
     }
   },
   "crons": [
