@@ -38,6 +38,8 @@ export async function setLeadStatus(id: string, status: LeadStatus): Promise<boo
 
 export interface LeadRow {
   id: string;
+  /** Farmer's user id — lets the console open the full conversation thread. */
+  userId: string | null;
   /** Masked phone, e.g. "+55 ••••2121". */
   phone: string;
   uf: string | null;
@@ -81,6 +83,7 @@ export async function opsLeads(): Promise<LeadRow[]> {
 
   return rows.map((r) => ({
     id: r.id,
+    userId: r.user_id,
     phone: maskWa(r.user_id ? phoneById.get(r.user_id) ?? null : null),
     uf: r.uf,
     crop: r.crop,
