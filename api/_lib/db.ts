@@ -408,6 +408,33 @@ export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
     .filter((x): x is AlertTarget => x !== null);
 }
 
+export interface FarmPin extends AlertTarget {
+  lat: number;
+  lon: number;
+}
+
+/** Every farm with a location pin — targets for weather-driven alerts. */
+export async function listFarmsWithCoords(): Promise<FarmPin[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('farms')
+    .select('lat, lon, users!inner(id, wa_id)')
+    .not('lat', 'is', null)
+    .not('lon', 'is', null);
+  if (error) {
+    log.error('listFarmsWithCoords failed:', error.message);
+    return [];
+  }
+  return (data ?? [])
+    .map((r) => {
+      const u = r.users as unknown as { id: string; wa_id: string } | null;
+      return u && r.lat != null && r.lon != null
+        ? { userId: u.id, waId: u.wa_id, lat: r.lat as number, lon: r.lon as number }
+        : null;
+    })
+    .filter((x): x is FarmPin => x !== null);
+}
+
 /**
  * Claim a proactive alert for a user (unique user_id+dedup_key). Returns false
  * when already alerted (23505) or on error — never double-pings a farmer.

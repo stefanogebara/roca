@@ -21,6 +21,9 @@ export interface DigestStats {
   byIntent: Record<string, number>;
   byKind: Record<string, number>;
   referrals: number;
+  /** Active farmers this period who already knew Stevi (created before the
+   * window) — the daily retention signal. */
+  returningUsers: number;
   failures: number;
   sampleQuestions: string[];
 }
@@ -80,6 +83,19 @@ export async function computeDigestStats(since: string, until: string): Promise<
     .slice(0, 6)
     .map((r) => (r.raw as string).replace(/\s+/g, ' ').slice(0, 90));
 
+  // Returning = active this window AND created before it started.
+  const activeIds = [...new Set(inbound.map((r) => r.user_id).filter(Boolean))] as string[];
+  let returningUsers = 0;
+  if (activeIds.length > 0) {
+    const { count, error: retErr } = await db
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .in('id', activeIds)
+      .lt('created_at', since);
+    if (retErr) log.error('returning-users query failed:', retErr.message);
+    returningUsers = count ?? 0;
+  }
+
   const [{ count: newUsers }, { count: referrals }] = await Promise.all([
     db
       .from('users')
@@ -102,6 +118,7 @@ export async function computeDigestStats(since: string, until: string): Promise<
     byIntent,
     byKind,
     referrals: referrals ?? 0,
+    returningUsers,
     failures,
     sampleQuestions,
   };
@@ -129,6 +146,7 @@ export function formatDigest(s: DigestStats): string {
     lines.push('Nenhuma conversa no período. 🤙');
     return lines.join('\n');
   }
+  lines.push(`🔁 Voltaram: ${s.returningUsers} de ${s.uniqueUsers} ativos já conheciam a Stevi`);
   lines.push(`🎯 Intenções: ${topEntries(s.byIntent)}`);
   lines.push(`📎 Tipos: ${topEntries(s.byKind)}`);
   if (s.referrals > 0) lines.push(`🤝 Pedidos de agrônomo: ${s.referrals}`);

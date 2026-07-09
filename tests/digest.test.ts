@@ -10,6 +10,7 @@ const base: DigestStats = {
   byIntent: { pest_triage: 5, spray_window: 3, field_health: 2, referral: 1, smalltalk: 1 },
   byKind: { text: 8, image: 2, location: 1, voice: 1 },
   referrals: 1,
+  returningUsers: 2,
   failures: 1,
   sampleQuestions: ['que praga é essa na soja?', 'posso pulverizar hoje?'],
 };
@@ -32,6 +33,11 @@ describe('formatDigest', () => {
     expect(intentLine.indexOf('pest_triage')).toBeLessThan(intentLine.indexOf('spray_window'));
   });
 
+  it('reports returning farmers — the retention signal', () => {
+    const t = formatDigest(base);
+    expect(t).toMatch(/🔁.*2 de 4/);
+  });
+
   it('includes sample questions', () => {
     const t = formatDigest(base);
     expect(t).toMatch(/que praga é essa/);
@@ -50,6 +56,7 @@ describe('formatDigest', () => {
       byIntent: {},
       byKind: {},
       referrals: 0,
+      returningUsers: 0,
       failures: 0,
       sampleQuestions: [],
     };

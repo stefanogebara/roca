@@ -14,7 +14,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { upcomingTransitions, isCalendarStale } from '../_lib/tools/calendar';
-import { runVazioAlerts, type AlertRunResult } from '../_lib/alerts';
+import { runVazioAlerts, runFrostAlerts, type AlertRunResult } from '../_lib/alerts';
 import { TwilioAdapter } from '../_lib/transport/twilio';
 import { getDb } from '../_lib/db';
 import { createLogger } from '../_lib/logger';
@@ -60,14 +60,21 @@ export default async function handler(
   // showing up 7 days in a row alerts each farmer once). Fail-soft: an alert
   // problem never fails the monitoring run itself.
   let alerts: AlertRunResult | null = null;
+  let frost: AlertRunResult | null = null;
   try {
     const adapter = new TwilioAdapter();
     alerts = await runVazioAlerts(transitions, (to, text) => adapter.send({ to, text }));
     if (alerts.sent > 0 || alerts.failed > 0) {
       findings.push(`Alertas de vazio: ${alerts.sent} enviado(s), ${alerts.failed} falha(s).`);
     }
+    // Frost (geada) alerts — daily min forecast per farm pin, July–Aug matters
+    // most for MG coffee. Same dedup discipline as vazio.
+    frost = await runFrostAlerts((to, text) => adapter.send({ to, text }));
+    if (frost.sent > 0 || frost.failed > 0) {
+      findings.push(`Alertas de geada: ${frost.sent} enviado(s), ${frost.failed} falha(s).`);
+    }
   } catch (e) {
-    log.error('vazio alerts run failed:', (e as Error).message);
+    log.error('alerts run failed:', (e as Error).message);
   }
 
   // Record the run (best-effort; a DB hiccup shouldn't fail the cron).
@@ -86,6 +93,6 @@ export default async function handler(
 
   res.status(200).json({
     success: true,
-    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts },
+    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost },
   });
 }
