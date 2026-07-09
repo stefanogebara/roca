@@ -125,6 +125,7 @@
     <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="overview">Visão geral</button>
       <button class="tab" data-tab="conversas">Conversas</button>
+      <button class="tab" data-tab="leads">Leads</button>
       <button class="tab" data-tab="voz">Voz</button>
       <button class="tab" data-tab="digests">Resumos</button>
       <button class="tab" data-tab="gym">Treino<span class="em-breve">em breve</span></button>
@@ -132,6 +133,7 @@
 
     <section class="panel active" id="p-overview"><div class="loading">Carregando…</div></section>
     <section class="panel" id="p-conversas"><div class="loading">Carregando…</div></section>
+    <section class="panel" id="p-leads"><div class="loading">Carregando…</div></section>
     <section class="panel" id="p-voz"><div class="loading">Carregando…</div></section>
     <section class="panel" id="p-digests"><div class="loading">Carregando…</div></section>
     <section class="panel" id="p-gym"><div class="loading">Carregando…</div></section>
@@ -176,6 +178,7 @@
     function loadTab(tab) {
       if (tab === 'overview') return loadOverview();
       if (tab === 'conversas') return loadConversas();
+      if (tab === 'leads') return loadLeads();
       if (tab === 'voz') return loadVoz();
       if (tab === 'digests') return loadDigests();
       if (tab === 'gym') return loadGym();
@@ -252,6 +255,31 @@
           thread.append(b);
         }
         p.append(thread);
+      } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+
+    async function loadLeads() {
+      const p = $('#p-leads'); p.innerHTML = '<div class="loading">Carregando…</div>';
+      try {
+        const rows = await api('leads');
+        p.innerHTML = '';
+        const head = el('div', 'card');
+        head.append(el('h3', null, 'Pedidos de agrônomo'));
+        head.append(el('div', 'empty', rows.length ? (rows.length + ' produtor(es) pediram pra falar com um agrônomo.') : 'Nenhum pedido de agrônomo ainda.'));
+        p.append(head);
+        for (const l of rows) {
+          const item = el('div', 'conv');
+          const left = el('div');
+          left.append(el('div', 'who', l.phone));
+          const meta = el('div', 'meta');
+          if (l.uf) meta.append(Object.assign(el('span','pill'), {textContent: l.uf}));
+          (l.crop||[]).forEach(cr => meta.append(Object.assign(el('span','pill'), {textContent: cr})));
+          meta.append(Object.assign(el('span','pill'), {textContent: l.status || 'novo'}));
+          left.append(meta);
+          if (l.topic) left.append(el('div', 'meta', '“' + l.topic + '”'));
+          item.append(left, el('div', 'right', fmtDate(l.at)));
+          p.append(item);
+        }
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
     }
 
