@@ -9,6 +9,7 @@ import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
 import { buildFarmCard } from './farmcard';
 import { buildAgronomoBrief } from './brief';
+import { handleProspectInbound } from './prospect/inbound';
 import { transcribeVoice } from './transcribe';
 import { checkOutbound } from './compliance';
 import type { ChatImage } from './llm';
@@ -297,6 +298,18 @@ export async function handleInbound(
   if (!claimed) {
     log.info('duplicate inbound ignored:', msg.messageId);
     return;
+  }
+
+  // Prospect replies: honour an opt-out ("sair") immediately and permanently
+  // before any other handling. A non-opt-out prospect reply is annotated and
+  // falls through to normal handling (a curious coop rep can still talk to Stevi).
+  if (msg.text) {
+    const pr = await handleProspectInbound(msg.from, msg.text);
+    if (pr.handled && pr.reply) {
+      await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
+      if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
+      return;
+    }
   }
 
   // Rate limit before any expensive work (media fetch, LLM). The current message

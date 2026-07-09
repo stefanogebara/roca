@@ -189,6 +189,27 @@ export async function setProspectStatus(id: string, status: ProspectStatus): Pro
   return true;
 }
 
+/** Find a prospect by its E.164 phone (to recognise inbound replies from prospects). */
+export async function findProspectByPhone(phone: string): Promise<ProspectRow | null> {
+  const db = getDb();
+  const { data, error } = await db.from('prospects').select('*').eq('phone', phone).maybeSingle();
+  if (error) {
+    log.error('findProspectByPhone failed:', error.message);
+    return null;
+  }
+  return (data as ProspectRow) ?? null;
+}
+
+/** Mark a prospect as having replied (engagement signal for ops). */
+export async function markProspectReplied(id: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('prospects')
+    .update({ status: 'replied', send_status: 'replied', updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) log.error('markProspectReplied failed:', error.message);
+}
+
 /** Add a phone to the hard opt-out blocklist (idempotent on the unique index). */
 export async function addOptout(phone: string, reason: string): Promise<void> {
   const db = getDb();
