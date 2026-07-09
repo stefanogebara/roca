@@ -20,7 +20,8 @@ export type Intent =
   | 'general'
   | 'onboarding'
   | 'smalltalk'
-  | 'referral';
+  | 'referral'
+  | 'brief';
 
 const ROUTER_INSTRUCTION = `Classifique a mensagem do produtor rural em UMA categoria. Responda só com a palavra-chave.
 

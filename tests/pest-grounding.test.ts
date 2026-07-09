@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groundedHit } from '../api/_lib/reason';
+import { groundedHit } from '../api/_lib/tools/agrofit';
 
 // Regression for the crop-confusion bug the gym surfaced: a generic pest query
 // must ground in the farmer's OWN crop, not whichever crop wins by product-count.

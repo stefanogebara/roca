@@ -22,7 +22,7 @@ import {
 } from './tools/ndvi';
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
-import { lookupPest, normalizeCrop, groundingBlock, chemicalGroups, type AgrofitLookup } from './tools/agrofit';
+import { groundingBlock, chemicalGroups, groundedHit } from './tools/agrofit';
 import type { PestCardData } from './cards/pest';
 import { createLogger } from './logger';
 
@@ -55,27 +55,6 @@ async function extractPestTarget(
     log.error('pest target extraction failed:', (e as Error).message);
     return { crop: null, pest: null };
   }
-}
-
-/**
- * Resolve the Agrofit entry for a pest, scoped to the right crop. An explicit
- * crop in the message wins; otherwise we prefer the farmer's KNOWN crop(s) so a
- * generic "ferrugem" from a café grower grounds in café — not soja (which
- * `lookupPest(null, …)` would pick by product-count tiebreak). Only when neither
- * is available do we fall back to the crop-agnostic search.
- */
-export function groundedHit(
-  textCrop: string | null,
-  pest: string,
-  knownCrops?: string[] | null
-): AgrofitLookup | null {
-  const explicit = normalizeCrop(textCrop);
-  if (explicit) return lookupPest(explicit, pest);
-  for (const c of knownCrops ?? []) {
-    const hit = lookupPest(normalizeCrop(c), pest);
-    if (hit) return hit; // first known crop the pest is actually registered for
-  }
-  return lookupPest(null, pest);
 }
 
 /** Agrofit grounding for a pest question, or null if nothing matched. */

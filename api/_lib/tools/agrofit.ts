@@ -184,6 +184,27 @@ const GROUP_HINTS: Array<{ re: RegExp; group: string }> = [
   { re: /(mancozeb|clorotalonil|oxicloreto de cobre|cobre)/, group: 'multissítios (protetores)' },
 ];
 
+/**
+ * Resolve the Agrofit entry for a pest, scoped to the right crop. An explicit
+ * crop (from the message/photo) wins; otherwise we prefer the farmer's KNOWN
+ * crop(s) so a generic "ferrugem" from a café grower grounds in café — not soja
+ * (which `lookupPest(null, …)` would pick by product-count tiebreak). Only when
+ * neither is available do we fall back to the crop-agnostic search.
+ */
+export function groundedHit(
+  textCrop: string | null,
+  pest: string,
+  knownCrops?: string[] | null
+): AgrofitLookup | null {
+  const explicit = normalizeCrop(textCrop);
+  if (explicit) return lookupPest(explicit, pest);
+  for (const c of knownCrops ?? []) {
+    const hit = lookupPest(normalizeCrop(c), pest);
+    if (hit) return hit; // first known crop the pest is actually registered for
+  }
+  return lookupPest(null, pest);
+}
+
 /** Distinct FRAC/IRAC chemical groups present among a hit's registered actives. */
 export function chemicalGroups(hit: AgrofitLookup): string[] {
   const groups = new Set<string>();

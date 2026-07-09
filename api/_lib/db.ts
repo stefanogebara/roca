@@ -316,6 +316,28 @@ export async function countRecentInbound(userId: string, sinceIso: string): Prom
   return count ?? 0;
 }
 
+/**
+ * The farmer's own recent words (inbound text/transcripts), newest first — used
+ * to synthesize the agrônomo briefing from what they actually described.
+ */
+export async function getRecentInboundText(userId: string, limit = 12): Promise<string[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('messages')
+    .select('raw, transcript')
+    .eq('user_id', userId)
+    .eq('direction', 'in')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    log.error('getRecentInboundText failed:', error.message);
+    return [];
+  }
+  return ((data ?? []) as Array<{ raw: string | null; transcript: string | null }>)
+    .map((m) => (m.transcript ?? m.raw ?? '').trim())
+    .filter((t) => t.length > 0);
+}
+
 export interface FarmProfile {
   uf: string | null;
   crop: string[] | null;

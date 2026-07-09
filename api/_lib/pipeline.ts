@@ -8,6 +8,7 @@ import type { TransportAdapter, InboundMessage } from './transport/types';
 import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
 import { buildFarmCard } from './farmcard';
+import { buildAgronomoBrief } from './brief';
 import { transcribeVoice } from './transcribe';
 import { checkOutbound } from './compliance';
 import type { ChatImage } from './llm';
@@ -70,6 +71,15 @@ const FIELD_HEALTH_INTENT =
 /** Whether a message asks for a satellite/vigor read of the field. */
 export function isFieldHealthRequest(text: string): boolean {
   return FIELD_HEALTH_INTENT.test(text);
+}
+
+// Request to assemble the "resumo pro agrônomo" — the briefing the farmer
+// forwards to a real agronomist. Also fired by the "Montar resumo" quick-reply.
+const BRIEF_INTENT = /\bresumo\b|prepara[r]?\s+(pra|pro|para o)\s+agr[oôó]nomo/i;
+
+/** Whether a message asks Stevi to assemble the agrônomo briefing. */
+export function isBriefRequest(text: string): boolean {
+  return BRIEF_INTENT.test(text);
 }
 
 // Bump this string whenever REFERRAL_REPLY's wording changes — it's stored with
@@ -160,7 +170,9 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
     case 'field_health':
       return ['Posso pulverizar?', 'Quero um agrônomo'];
     case 'pest_triage':
-      return ['Quero um agrônomo'];
+      return ['Montar resumo', 'Quero um agrônomo'];
+    case 'referral':
+      return ['Montar resumo'];
     default:
       return undefined;
   }
@@ -297,6 +309,11 @@ export async function handleInbound(
     }
     intent = 'onboarding';
     replyText = `Anotado: você trabalha com ${joinCrops(cropAnswer)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`;
+  } else if (effective.kind === 'text' && effective.text && isBriefRequest(effective.text)) {
+    // Assemble the agrônomo briefing from the farmer's profile + recent messages.
+    intent = 'brief';
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    replyText = await buildAgronomoBrief(userId);
   } else if (effective.kind === 'text' && effective.text && isReferralRequest(effective.text)) {
     // Explicit agrônomo referral request — the business-model seed.
     intent = 'referral';

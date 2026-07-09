@@ -3,6 +3,7 @@ import {
   buttonsForIntent,
   isFieldHealthRequest,
   isReferralRequest,
+  isBriefRequest,
 } from '../api/_lib/pipeline';
 import type { Intent } from '../api/_lib/router';
 
@@ -15,6 +16,7 @@ const ALL_INTENTS: Intent[] = [
   'onboarding',
   'smalltalk',
   'referral',
+  'brief',
 ];
 
 describe('buttonsForIntent', () => {
@@ -43,8 +45,9 @@ describe('buttonsForIntent', () => {
     expect(buttonsForIntent('spray_window')).toBeDefined();
     expect(buttonsForIntent('field_health')).toBeDefined();
     expect(buttonsForIntent('pest_triage')).toBeDefined();
-    // Referral reply is terminal; onboarding asks a question buttons would fight.
-    expect(buttonsForIntent('referral')).toBeUndefined();
+    // Referral offers the "Montar resumo" next step (help prep for the agrônomo).
+    expect(buttonsForIntent('referral')).toEqual(['Montar resumo']);
+    // Onboarding asks a question buttons would fight with — stays button-free.
     expect(buttonsForIntent('onboarding')).toBeUndefined();
   });
 
@@ -53,6 +56,9 @@ describe('buttonsForIntent', () => {
     // titles, taps silently fall through to the generic router. Pin it.
     expect(isFieldHealthRequest('Ver satélite')).toBe(true);
     expect(isReferralRequest('Quero um agrônomo')).toBe(true);
+    expect(isBriefRequest('Montar resumo')).toBe(true);
+    // The resumo trigger must not swallow unrelated messages.
+    expect(isBriefRequest('Ver satélite')).toBe(false);
     // 'Posso pulverizar?' goes through the LLM router (spray_window) — regex
     // guards don't apply, but it must not false-positive the other two.
     expect(isFieldHealthRequest('Posso pulverizar?')).toBe(false);
