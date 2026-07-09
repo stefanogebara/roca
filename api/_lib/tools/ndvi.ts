@@ -25,8 +25,14 @@ const log = createLogger('ndvi');
 
 const STAC_URL = 'https://earth-search.aws.element84.com/v1/search';
 const TITILER_POINT = 'https://titiler.xyz/cog/point';
+const TITILER_BBOX = 'https://titiler.xyz/cog/bbox';
 const TIMEOUT_MS = 9000;
 const LOOKBACK_DAYS = 75;
+
+/** Mini-map: half-width in degrees around the pin (~0.006° ≈ 650 m each side). */
+const THUMB_HALF_DEG = 0.006;
+const THUMB_MAX_SIZE = 384; // px longest edge — small enough to inline in the card
+const THUMB_TIMEOUT_MS = 8000;
 
 /** Field-sampling grid: a (2·ring+1)² lattice at GRID_SPACING_M between points. */
 const GRID_RING = 1; // 3×3 = 9 pixels
@@ -188,6 +194,8 @@ async function pointValue(cogUrl: string, lat: number, lon: number): Promise<num
 interface Scene {
   red: string;
   nir: string;
+  /** True-colour (TCI) COG href — 8-bit RGB, ready to render as a thumbnail. */
+  visual: string | null;
   date: string;
   cloud: number;
 }
@@ -209,7 +217,7 @@ async function findLatestScene(lat: number, lon: number): Promise<Scene | null> 
   })) as {
     features?: Array<{
       properties: { datetime: string; 'eo:cloud_cover'?: number };
-      assets: { red?: { href: string }; nir?: { href: string } };
+      assets: { red?: { href: string }; nir?: { href: string }; visual?: { href: string } };
     }>;
   };
 
@@ -220,9 +228,49 @@ async function findLatestScene(lat: number, lon: number): Promise<Scene | null> 
   return {
     red,
     nir,
+    visual: item.assets.visual?.href ?? null,
     date: item.properties.datetime.slice(0, 10),
     cloud: Math.round(item.properties['eo:cloud_cover'] ?? 0),
   };
+}
+
+/**
+ * A true-colour Sentinel-2 thumbnail of the field, as an inline PNG data URI —
+ * the "sua lavoura vista de cima" mini-map. Crops the scene's visual (TCI) COG to
+ * a small bbox around the pin via titiler. Fails soft to null (titiler down, no
+ * visual asset, timeout) so the vigor card still renders without the image. ⚠️
+ * Same public-titiler caveat as the point reads — self-host for production.
+ */
+export async function fetchSceneThumb(
+  lat: number,
+  lon: number
+): Promise<{ dataUri: string; date: string } | null> {
+  try {
+    const scene = await findLatestScene(lat, lon);
+    if (!scene?.visual) return null;
+    const bbox = [
+      lon - THUMB_HALF_DEG,
+      lat - THUMB_HALF_DEG,
+      lon + THUMB_HALF_DEG,
+      lat + THUMB_HALF_DEG,
+    ].join(',');
+    const url = `${TITILER_BBOX}/${bbox}.png?url=${encodeURIComponent(scene.visual)}&max_size=${THUMB_MAX_SIZE}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), THUMB_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length < 200) return null; // titiler error bodies are tiny
+      return { dataUri: `data:image/png;base64,${buf.toString('base64')}`, date: scene.date };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    log.error('fetchSceneThumb failed:', (e as Error).message);
+    return null;
+  }
 }
 
 /** NDVI at one lon/lat from a resolved scene, or null if a band read fails. */

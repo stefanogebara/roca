@@ -116,6 +116,12 @@ async function cardUrlFor(
           const q = new URLSearchParams({ type: 'ndvi', ndvi: String(r.ndvi), date: r.date });
           if (r.std != null) q.set('std', String(r.std));
           if (r.samples != null) q.set('samples', String(r.samples));
+          // Pin coords let the card add a true-colour mini-map of the field.
+          const loc = await getFarmLocation(userId);
+          if (loc) {
+            q.set('lat', String(loc.lat));
+            q.set('lon', String(loc.lon));
+          }
           return `${PUBLIC_BASE}/api/card?${q.toString()}`;
         }
       }

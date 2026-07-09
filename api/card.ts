@@ -15,7 +15,12 @@ import { ndviSvg } from './_lib/cards/ndviCard';
 import { farmSvg } from './_lib/cards/farm';
 import { fetchHourlyWeather } from './_lib/tools/weather';
 import { assessHour, sprayWindow } from './_lib/tools/deltaT';
-import { classifyVigor, classifyUniformity, UNIFORMITY_MIN_SAMPLES } from './_lib/tools/ndvi';
+import {
+  classifyVigor,
+  classifyUniformity,
+  fetchSceneThumb,
+  UNIFORMITY_MIN_SAMPLES,
+} from './_lib/tools/ndvi';
 import { fetchSoil, textureLabel } from './_lib/tools/soil';
 import { reverseGeocodeUf } from './_lib/tools/geo';
 import { vazioStatus } from './_lib/tools/calendar';
@@ -60,12 +65,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         std != null && samples != null && samples >= UNIFORMITY_MIN_SAMPLES
           ? classifyUniformity(std)
           : null;
+      // Optional true-colour mini-map when we have the pin. Fail-soft: no coords
+      // or titiler down → card renders without the image.
+      const lat = num(req.query.lat);
+      const lon = num(req.query.lon);
+      const thumb =
+        lat != null && lon != null ? (await fetchSceneThumb(lat, lon))?.dataUri ?? null : null;
       svg = ndviSvg({
         ndvi,
         date,
         samples,
         vigor: { label: vigor.label, note: vigor.note },
         uniformity,
+        thumb,
       });
       maxAge = 86_400; // a given scene's read is stable
     } else if (type === 'farm') {

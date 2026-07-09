@@ -52,6 +52,24 @@ describe('ndviSvg', () => {
     expect(svg).not.toMatch(/Uniformidade/);
     expect(svg).toContain('leitura de um ponto');
   });
+  it('embeds the mini-map image and caption when a thumb is provided', () => {
+    const thumb = 'data:image/png;base64,AAAA';
+    const svg = ndviSvg({
+      ndvi: 0.62,
+      date: '2026-06-29',
+      samples: 9,
+      vigor: { label: 'lavoura vigorosa', note: 'x' },
+      uniformity: null,
+      thumb,
+    });
+    expect(svg).toContain(`<image href="${thumb}"`);
+    expect(svg).toContain('Sua lavoura vista de cima');
+  });
+  it('omits the mini-map when no thumb is provided', () => {
+    const svg = ndviSvg({ ndvi: 0.62, date: '2026-06-29', vigor: { label: 'x', note: 'y' } });
+    expect(svg).not.toContain('<image');
+    expect(svg).not.toContain('vista de cima');
+  });
 });
 
 describe('farmSvg', () => {
