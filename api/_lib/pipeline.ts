@@ -29,7 +29,9 @@ import {
   getCachedNdvi,
   hasRecentReferral,
   getActivityLog,
+  getRecentTurns,
 } from './db';
+import { formatTurnsBlock } from './memory';
 import { buildHistoryReply } from './caderno';
 import { fetchPrices, formatPricesReply, askedCommodities } from './tools/prices';
 import { parseCrops, joinCrops } from './tools/crops';
@@ -440,9 +442,16 @@ export async function handleInbound(
         ? 'field_health'
         : await routeIntent(effective);
     try {
+      // Working memory: the last few turns, so follow-ups ("e o que eu
+      // faço?") resolve their referent. Fail-soft — no memory beats no reply.
+      const history =
+        userId && effective.kind === 'text'
+          ? formatTurnsBlock(await getRecentTurns(userId, msg.messageId))
+          : null;
       replyText = await reason(effective, intent, {
         userId,
         media,
+        history,
         onPestCard: (c) => {
           pestCard = c;
         },

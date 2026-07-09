@@ -286,7 +286,8 @@ async function handleText(
   intent: Intent,
   context: string | null,
   packOverride?: string | null,
-  knownCrops?: string[] | null
+  knownCrops?: string[] | null,
+  history?: string | null
 ): Promise<string> {
   const extra = intent === 'pest_triage' ? '\n\n' + PEST_HANDOFF_REMINDER : '';
 
@@ -298,6 +299,7 @@ async function handleText(
   }
 
   const blocks: string[] = [];
+  if (history) blocks.push(history);
   if (grounding) blocks.push(`[Registro Agrofit — use isto como base, não invente]\n${grounding}`);
   if (context) blocks.push(`[Dados derivados da lavoura]\n${context}`);
   const ctx = blocks.length ? '\n\n' + blocks.join('\n\n') : '';
@@ -316,6 +318,9 @@ export interface ReasonDeps {
   media?: ChatImage | null;
   /** Extra derived context (farm card facts) to ground the reply. */
   context?: string | null;
+  /** Recent conversation turns, pre-formatted (memory.ts) — so "e o que eu
+   * faço?" knows what "isso" refers to. */
+  history?: string | null;
   /** Gym only: run the LLM voice paths against a specific style-pack body
    * (challenger) instead of the active one. Omit in production. */
   packOverride?: string | null;
@@ -356,5 +361,12 @@ export async function reason(
     return 'Recebi sua mensagem, mas não consegui ler o conteúdo. Me manda em texto ou áudio que eu te ajudo!';
   }
 
-  return handleText(msg, intent, deps.context ?? null, deps.packOverride, knownCrops);
+  return handleText(
+    msg,
+    intent,
+    deps.context ?? null,
+    deps.packOverride,
+    knownCrops,
+    deps.history ?? null
+  );
 }

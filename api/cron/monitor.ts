@@ -21,7 +21,7 @@ import {
   type AlertRunResult,
 } from '../_lib/alerts';
 import { TwilioAdapter } from '../_lib/transport/twilio';
-import { getDb } from '../_lib/db';
+import { getDb, purgeExpiredRows } from '../_lib/db';
 import { createLogger } from '../_lib/logger';
 
 const log = createLogger('monitor');
@@ -95,6 +95,16 @@ export default async function handler(
     log.error('fire alerts run failed:', (e as Error).message);
   }
 
+  // LGPD retention: purge rows past their useful life (see purgeExpiredRows).
+  let purged: Record<string, number> = {};
+  try {
+    purged = await purgeExpiredRows();
+    const total = Object.values(purged).reduce((a, b) => a + b, 0);
+    if (total > 0) findings.push(`Retenção: ${total} registro(s) antigos removidos.`);
+  } catch (e) {
+    log.error('retention purge failed:', (e as Error).message);
+  }
+
   // Record the run (best-effort; a DB hiccup shouldn't fail the cron).
   try {
     const db = getDb();
@@ -111,6 +121,6 @@ export default async function handler(
 
   res.status(200).json({
     success: true,
-    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost, fire },
+    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost, fire, purged },
   });
 }

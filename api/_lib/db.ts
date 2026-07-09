@@ -361,6 +361,44 @@ export async function getActivityLog(
   return (data ?? []) as Array<{ intent: string | null; created_at: string }>;
 }
 
+/**
+ * Recent conversation turns (both directions), oldest first, for reasoning
+ * context. Excludes the newest inbound row when it matches the message being
+ * processed (it was already claimed/logged before reasoning runs).
+ */
+export async function getRecentTurns(
+  userId: string,
+  currentMessageId: string | undefined,
+  limit = 6
+): Promise<Array<{ role: 'produtor' | 'stevi'; text: string }>> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('messages')
+    .select('direction, raw, transcript, provider_message_id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit + 1);
+  if (error) {
+    log.error('getRecentTurns failed:', error.message);
+    return [];
+  }
+  const rows = (data ?? []) as Array<{
+    direction: 'in' | 'out';
+    raw: string | null;
+    transcript: string | null;
+    provider_message_id: string | null;
+  }>;
+  return rows
+    .filter((r) => !(currentMessageId && r.provider_message_id === currentMessageId))
+    .slice(0, limit)
+    .reverse()
+    .map((r) => ({
+      role: r.direction === 'in' ? ('produtor' as const) : ('stevi' as const),
+      text: (r.transcript ?? r.raw ?? '').trim(),
+    }))
+    .filter((t) => t.text.length > 0);
+}
+
 export interface FarmProfile {
   uf: string | null;
   crop: string[] | null;
@@ -525,6 +563,36 @@ export async function hasRecentReferral(userId: string, sinceIso: string): Promi
     return false; // fail-open: better a duplicate email than a missed lead
   }
   return (count ?? 0) > 0;
+}
+
+/**
+ * Data retention (LGPD minimization): purge rows past their useful life.
+ * messages 365d (the caderno reads 180d), farmer_alerts 90d (dedup horizon is
+ * days), ops_login_attempts 30d (throttle window is minutes), monitor_runs
+ * 180d. Called by the daily monitor cron; each delete is independent.
+ */
+export async function purgeExpiredRows(): Promise<Record<string, number>> {
+  const db = getDb();
+  const targets: Array<{ table: string; days: number }> = [
+    { table: 'messages', days: 365 },
+    { table: 'farmer_alerts', days: 90 },
+    { table: 'ops_login_attempts', days: 30 },
+    { table: 'monitor_runs', days: 180 },
+  ];
+  const purged: Record<string, number> = {};
+  for (const t of targets) {
+    const cutoff = new Date(Date.now() - t.days * 86_400_000).toISOString();
+    const { count, error } = await db
+      .from(t.table)
+      .delete({ count: 'exact' })
+      .lt('created_at', cutoff);
+    if (error) {
+      log.error(`purge ${t.table} failed:`, error.message);
+      continue;
+    }
+    if (count) purged[t.table] = count;
+  }
+  return purged;
 }
 
 /** Record an ops-console login attempt (brute-force throttling evidence). */
