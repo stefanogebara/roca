@@ -383,6 +383,78 @@ export async function setTwilioContentSid(
   if (error) log.error('setTwilioContentSid failed:', error.message);
 }
 
+export interface AlertTarget {
+  userId: string;
+  waId: string;
+}
+
+/** Soy growers with a farm in the given UF — targets for vazio alerts. */
+export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('farms')
+    .select('user_id, crop, users!inner(id, wa_id, state)')
+    .eq('users.state', uf.toUpperCase())
+    .contains('crop', ['soja']);
+  if (error) {
+    log.error('listSojaFarmersByUf failed:', error.message);
+    return [];
+  }
+  return (data ?? [])
+    .map((r) => {
+      const u = r.users as unknown as { id: string; wa_id: string } | null;
+      return u ? { userId: u.id, waId: u.wa_id } : null;
+    })
+    .filter((x): x is AlertTarget => x !== null);
+}
+
+/**
+ * Claim a proactive alert for a user (unique user_id+dedup_key). Returns false
+ * when already alerted (23505) or on error — never double-pings a farmer.
+ */
+export async function claimFarmerAlert(
+  userId: string,
+  kind: string,
+  dedupKey: string
+): Promise<boolean> {
+  const db = getDb();
+  const { error } = await db
+    .from('farmer_alerts')
+    .insert({ user_id: userId, kind, dedup_key: dedupKey });
+  if (error) {
+    if (error.code !== '23505') log.error('claimFarmerAlert failed:', error.message);
+    return false;
+  }
+  return true;
+}
+
+/** Release an alert claim (send failed; let the next run retry). Best-effort. */
+export async function releaseFarmerAlert(userId: string, dedupKey: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('farmer_alerts')
+    .delete()
+    .eq('user_id', userId)
+    .eq('dedup_key', dedupKey);
+  if (error) log.error('releaseFarmerAlert failed:', error.message);
+}
+
+/** Whether the user already opted into a referral since `sinceIso` — used to
+ * keep founder notifications quiet on repeat taps (the row is still recorded). */
+export async function hasRecentReferral(userId: string, sinceIso: string): Promise<boolean> {
+  const db = getDb();
+  const { count, error } = await db
+    .from('referral_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', sinceIso);
+  if (error) {
+    log.error('hasRecentReferral failed:', error.message);
+    return false; // fail-open: better a duplicate email than a missed lead
+  }
+  return (count ?? 0) > 0;
+}
+
 /** Record an ops-console login attempt (brute-force throttling evidence). */
 export async function recordOpsLoginAttempt(ip: string, success: boolean): Promise<void> {
   const db = getDb();

@@ -26,6 +26,7 @@ import {
   getFarm,
   getFarmLocation,
   getCachedNdvi,
+  hasRecentReferral,
 } from './db';
 import { parseCrops, joinCrops } from './tools/crops';
 import { withRetry } from './retry';
@@ -290,22 +291,30 @@ export async function handleInbound(
     if (userId) {
       if (user?.awaiting) await setAwaiting(userId, null);
       const profile = await getFarmProfile(userId);
+      // Checked BEFORE inserting the new row: repeat taps within 24h stay
+      // quiet on founder channels (the row below is still recorded for audit).
+      const alreadyNotified = await hasRecentReferral(
+        userId,
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      );
       await createReferralRequest(userId, {
         uf: profile.uf,
         crop: profile.crop,
         topic: effective.text.slice(0, 280),
         consentVersion: REFERRAL_CONSENT_VERSION,
       });
-      // Concierge handoff: a human hears about the opt-in immediately —
-      // email + WhatsApp ping to the founders' own numbers.
-      const notice = {
-        maskedPhone: maskWa(msg.from),
-        uf: profile.uf,
-        crops: profile.crop,
-        topic: effective.text.slice(0, 280),
-      };
-      await sendReferralNotification(notice);
-      await pingFoundersWhatsApp((to, text) => adapter.send({ to, text }), notice);
+      if (!alreadyNotified) {
+        // Concierge handoff: a human hears about the opt-in immediately —
+        // email + WhatsApp ping to the founders' own numbers.
+        const notice = {
+          maskedPhone: maskWa(msg.from),
+          uf: profile.uf,
+          crops: profile.crop,
+          topic: effective.text.slice(0, 280),
+        };
+        await sendReferralNotification(notice);
+        await pingFoundersWhatsApp((to, text) => adapter.send({ to, text }), notice);
+      }
     }
     replyText = REFERRAL_REPLY;
   } else if (msg.kind === 'voice' && !transcript) {

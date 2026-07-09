@@ -14,6 +14,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { upcomingTransitions, isCalendarStale } from '../_lib/tools/calendar';
+import { runVazioAlerts, type AlertRunResult } from '../_lib/alerts';
+import { TwilioAdapter } from '../_lib/transport/twilio';
 import { getDb } from '../_lib/db';
 import { createLogger } from '../_lib/logger';
 
@@ -53,6 +55,21 @@ export default async function handler(
     );
   }
 
+  // Proactive farmer alerts: soy growers in a transitioning UF get one
+  // WhatsApp heads-up per transition (DB-claimed dedup — the same transition
+  // showing up 7 days in a row alerts each farmer once). Fail-soft: an alert
+  // problem never fails the monitoring run itself.
+  let alerts: AlertRunResult | null = null;
+  try {
+    const adapter = new TwilioAdapter();
+    alerts = await runVazioAlerts(transitions, (to, text) => adapter.send({ to, text }));
+    if (alerts.sent > 0 || alerts.failed > 0) {
+      findings.push(`Alertas de vazio: ${alerts.sent} enviado(s), ${alerts.failed} falha(s).`);
+    }
+  } catch (e) {
+    log.error('vazio alerts run failed:', (e as Error).message);
+  }
+
   // Record the run (best-effort; a DB hiccup shouldn't fail the cron).
   try {
     const db = getDb();
@@ -69,6 +86,6 @@ export default async function handler(
 
   res.status(200).json({
     success: true,
-    data: { ran_at: now.toISOString(), stale, transitions, findings },
+    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts },
   });
 }
