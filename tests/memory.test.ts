@@ -9,7 +9,7 @@ describe('formatTurnsBlock', () => {
   ];
 
   it('renders chronological labeled turns', () => {
-    const b = formatTurnsBlock(turns);
+    const b = formatTurnsBlock(turns)!;
     expect(b).toContain('Produtor: que praga é essa na soja?');
     expect(b).toContain('Stevi: Pelas fotos parece ferrugem');
     expect(b.indexOf('que praga')).toBeLessThan(b.indexOf('e o que eu faço'));
