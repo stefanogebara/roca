@@ -107,13 +107,26 @@ async function handleFieldHealth(userId: string | null): Promise<string> {
       ? `média de ${samples} pontos num raio de ~40 m ao redor do pin`
       : 'um ponto (10 m) no pin';
 
+  // Image age: satellites only pass every few days and clouds skip scenes, so
+  // the freshest usable image can still be weeks old. Be honest about it — a
+  // stale NDVI could mislead ("minha lavoura tá rala" when it's just old data).
+  const ageDays = Math.max(0, Math.round((Date.now() - Date.parse(reading.date)) / 86_400_000));
+  const dateLabel = ageDays <= 10 ? `${d}/${m}/${y}` : `${d}/${m}/${y}, há ${ageDays} dias`;
+
   const lines = [
-    `🛰️ Última imagem de satélite (Sentinel-2, ${d}/${m}/${y}) da sua lavoura:`,
+    `🛰️ Última imagem de satélite (Sentinel-2, ${dateLabel}) da sua lavoura:`,
     '',
     `${v.emoji} NDVI ~${reading.ndvi.toFixed(2)} — ${v.label}.`,
     `${v.note}`,
     `_(${scope})_`,
   ];
+
+  if (ageDays > 21) {
+    lines.push(
+      '',
+      `⏳ Essa é a imagem sem nuvens mais recente que consegui — de ${ageDays} dias atrás. Pode não refletir como a lavoura está hoje.`
+    );
+  }
 
   if (reading.std != null && samples >= UNIFORMITY_MIN_SAMPLES) {
     const u = classifyUniformity(reading.std);

@@ -28,6 +28,12 @@ const TITILER_POINT = 'https://titiler.xyz/cog/point';
 const TITILER_BBOX = 'https://titiler.xyz/cog/bbox';
 const TIMEOUT_MS = 9000;
 const LOOKBACK_DAYS = 75;
+/** Hard cloud ceiling: scenes cloudier than this are never used. */
+const CLOUD_HARD_MAX = 40;
+/** A scene at/under this cloud % is "clear enough" — recency wins among these. */
+const CLOUD_PREFERRED_MAX = 25;
+/** How many recent scenes to consider when balancing recency vs cloud. */
+const SCENE_CANDIDATES = 20;
 
 /** Mini-map: half-width in degrees around the pin (~0.006° ≈ 650 m each side). */
 const THUMB_HALF_DEG = 0.006;
@@ -200,7 +206,14 @@ interface Scene {
   cloud: number;
 }
 
-/** Find the latest low-cloud Sentinel-2 scene covering the point, or null. */
+/**
+ * Find the best Sentinel-2 scene for the point. A farmer asking "how's my crop
+ * now" wants the most *recent* usable image, not the all-time clearest — so we
+ * pull the recent scenes (newest first) and take the newest one that's clear
+ * enough (cloud ≤ CLOUD_PREFERRED_MAX). Only if none of the recent scenes are
+ * clear do we fall back to the least-cloudy in the window. Returns null if
+ * nothing under the hard cloud ceiling covers the point.
+ */
 async function findLatestScene(lat: number, lon: number): Promise<Scene | null> {
   const since = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
   const search = (await fetchJson(STAC_URL, {
@@ -210,9 +223,10 @@ async function findLatestScene(lat: number, lon: number): Promise<Scene | null> 
       collections: ['sentinel-2-l2a'],
       bbox: [lon - 0.02, lat - 0.02, lon + 0.02, lat + 0.02],
       datetime: `${since}T00:00:00Z/..`,
-      query: { 'eo:cloud_cover': { lt: 40 } },
-      sortby: [{ field: 'properties.eo:cloud_cover', direction: 'asc' }],
-      limit: 1,
+      query: { 'eo:cloud_cover': { lt: CLOUD_HARD_MAX } },
+      // Newest first — recency is the primary axis; we filter by cloud in code.
+      sortby: [{ field: 'properties.datetime', direction: 'desc' }],
+      limit: SCENE_CANDIDATES,
     }),
   })) as {
     features?: Array<{
@@ -221,16 +235,21 @@ async function findLatestScene(lat: number, lon: number): Promise<Scene | null> 
     }>;
   };
 
-  const item = search.features?.[0];
-  const red = item?.assets.red?.href;
-  const nir = item?.assets.nir?.href;
-  if (!item || !red || !nir) return null;
+  const usable = (search.features ?? []).filter((f) => f.assets.red?.href && f.assets.nir?.href);
+  if (usable.length === 0) return null;
+
+  // Newest clear-enough scene; else the least-cloudy of the recent candidates.
+  const cloudOf = (f: (typeof usable)[number]) => f.properties['eo:cloud_cover'] ?? 0;
+  const item =
+    usable.find((f) => cloudOf(f) <= CLOUD_PREFERRED_MAX) ??
+    usable.reduce((best, f) => (cloudOf(f) < cloudOf(best) ? f : best), usable[0]);
+
   return {
-    red,
-    nir,
+    red: item.assets.red!.href,
+    nir: item.assets.nir!.href,
     visual: item.assets.visual?.href ?? null,
     date: item.properties.datetime.slice(0, 10),
-    cloud: Math.round(item.properties['eo:cloud_cover'] ?? 0),
+    cloud: Math.round(cloudOf(item)),
   };
 }
 
