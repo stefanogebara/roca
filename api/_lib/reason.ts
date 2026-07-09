@@ -13,7 +13,7 @@ import { PEST_HANDOFF_REMINDER } from './prompts/system';
 import { steviSystemPrompt } from './stylepack';
 import { fetchHourlyWeather } from './tools/weather';
 import { sprayWindow, type SprayWindow } from './tools/deltaT';
-import { getFarmLocation, getFarm, getCachedNdvi, setCachedNdvi } from './db';
+import { getFarmLocation, getFarm, getCachedNdvi, setCachedNdvi, getFarmProfile } from './db';
 import {
   fetchFieldNdvi,
   classifyVigor,
@@ -22,7 +22,7 @@ import {
 } from './tools/ndvi';
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
-import { lookupPest, normalizeCrop, groundingBlock, chemicalGroups } from './tools/agrofit';
+import { lookupPest, normalizeCrop, groundingBlock, chemicalGroups, type AgrofitLookup } from './tools/agrofit';
 import type { PestCardData } from './cards/pest';
 import { createLogger } from './logger';
 
@@ -57,11 +57,32 @@ async function extractPestTarget(
   }
 }
 
+/**
+ * Resolve the Agrofit entry for a pest, scoped to the right crop. An explicit
+ * crop in the message wins; otherwise we prefer the farmer's KNOWN crop(s) so a
+ * generic "ferrugem" from a café grower grounds in café — not soja (which
+ * `lookupPest(null, …)` would pick by product-count tiebreak). Only when neither
+ * is available do we fall back to the crop-agnostic search.
+ */
+export function groundedHit(
+  textCrop: string | null,
+  pest: string,
+  knownCrops?: string[] | null
+): AgrofitLookup | null {
+  const explicit = normalizeCrop(textCrop);
+  if (explicit) return lookupPest(explicit, pest);
+  for (const c of knownCrops ?? []) {
+    const hit = lookupPest(normalizeCrop(c), pest);
+    if (hit) return hit; // first known crop the pest is actually registered for
+  }
+  return lookupPest(null, pest);
+}
+
 /** Agrofit grounding for a pest question, or null if nothing matched. */
-async function pestGrounding(text: string): Promise<string | null> {
+async function pestGrounding(text: string, knownCrops?: string[] | null): Promise<string | null> {
   const target = await extractPestTarget(text);
   if (!target.pest) return null;
-  const hit = lookupPest(normalizeCrop(target.crop), target.pest);
+  const hit = groundedHit(target.crop, target.pest, knownCrops);
   return hit ? groundingBlock(hit) : null;
 }
 
@@ -208,10 +229,11 @@ async function handleVision(
   msg: InboundMessage,
   media: ChatImage,
   packOverride?: string | null,
-  onPestCard?: (c: PestCardData) => void
+  onPestCard?: (c: PestCardData) => void,
+  knownCrops?: string[] | null
 ): Promise<string> {
   try {
-    return await triagePhoto(msg, media, packOverride, onPestCard);
+    return await triagePhoto(msg, media, packOverride, onPestCard, knownCrops);
   } catch (e) {
     log.error('handleVision failed:', (e as Error).message);
     return PHOTO_RETRY_MSG;
@@ -222,7 +244,8 @@ async function triagePhoto(
   msg: InboundMessage,
   media: ChatImage,
   packOverride?: string | null,
-  onPestCard?: (c: PestCardData) => void
+  onPestCard?: (c: PestCardData) => void,
+  knownCrops?: string[] | null
 ): Promise<string> {
   const id = await identifyFromPhoto(msg, media);
 
@@ -241,13 +264,15 @@ async function triagePhoto(
 
   let grounding: string | null = null;
   if (id.pest && id.confidence !== 'baixa') {
-    const hit = lookupPest(normalizeCrop(id.crop), id.pest);
+    // Vision's crop wins when it saw one; else fall back to the farmer's known
+    // crop so grounding never lands on the wrong culture (e.g. café for soja).
+    const hit = groundedHit(id.crop, id.pest, knownCrops);
     if (hit) grounding = groundingBlock(hit);
     // Emit the visual triage card alongside the text (compliance line baked in).
     if (id.pest && onPestCard) {
       onPestCard({
         pest: id.pest,
-        crop: id.crop,
+        crop: id.crop ?? hit?.crop ?? null,
         confidence: id.confidence,
         evidence: id.evidence,
         products: hit?.entry.products ?? null,
@@ -281,14 +306,16 @@ async function handleText(
   msg: InboundMessage,
   intent: Intent,
   context: string | null,
-  packOverride?: string | null
+  packOverride?: string | null,
+  knownCrops?: string[] | null
 ): Promise<string> {
   const extra = intent === 'pest_triage' ? '\n\n' + PEST_HANDOFF_REMINDER : '';
 
-  // Ground pest/disease questions in the Agrofit registry.
+  // Ground pest/disease questions in the Agrofit registry (scoped to the
+  // farmer's crop when the message doesn't name one).
   let grounding: string | null = null;
   if (intent === 'pest_triage' && msg.text) {
-    grounding = await pestGrounding(msg.text);
+    grounding = await pestGrounding(msg.text, knownCrops);
   }
 
   const blocks: string[] = [];
@@ -336,13 +363,19 @@ export async function reason(
     return handleFieldHealth(deps.userId);
   }
 
+  // The farmer's registered crop(s), used to scope pest grounding to the right
+  // culture when the message/photo doesn't make the crop obvious.
+  const needsCrop = msg.kind === 'image' || intent === 'pest_triage';
+  const knownCrops =
+    needsCrop && deps.userId ? (await getFarmProfile(deps.userId)).crop : null;
+
   if (msg.kind === 'image' && deps.media) {
-    return handleVision(msg, deps.media, deps.packOverride, deps.onPestCard);
+    return handleVision(msg, deps.media, deps.packOverride, deps.onPestCard, knownCrops);
   }
 
   if (!msg.text) {
     return 'Recebi sua mensagem, mas não consegui ler o conteúdo. Me manda em texto ou áudio que eu te ajudo!';
   }
 
-  return handleText(msg, intent, deps.context ?? null, deps.packOverride);
+  return handleText(msg, intent, deps.context ?? null, deps.packOverride, knownCrops);
 }
