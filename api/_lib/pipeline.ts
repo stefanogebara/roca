@@ -30,6 +30,8 @@ import {
 import { parseCrops, joinCrops } from './tools/crops';
 import { withRetry } from './retry';
 import { alertFounders } from './alert';
+import { sendReferralNotification } from './notify';
+import { maskWa } from './opsData';
 import { createLogger } from './logger';
 
 const log = createLogger('pipeline');
@@ -287,6 +289,13 @@ export async function handleInbound(
         crop: profile.crop,
         topic: effective.text.slice(0, 280),
         consentVersion: REFERRAL_CONSENT_VERSION,
+      });
+      // Concierge handoff: a human hears about the opt-in immediately.
+      await sendReferralNotification({
+        maskedPhone: maskWa(msg.from),
+        uf: profile.uf,
+        crops: profile.crop,
+        topic: effective.text.slice(0, 280),
       });
     }
     replyText = REFERRAL_REPLY;
