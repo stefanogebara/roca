@@ -191,13 +191,32 @@ async function identifyFromPhoto(msg: InboundMessage, media: ChatImage): Promise
   }
 }
 
+// When a photo can't be read at all (unsupported/corrupt/off-domain image that
+// the vision provider rejects), ask for a better one instead of a generic error.
+const PHOTO_RETRY_MSG =
+  'Não consegui abrir bem essa foto 🙈. Manda de novo focando na folha ou na praga, de pertinho e com boa luz, que aí eu consigo te ajudar. Se preferir, me descreve por texto o que você tá vendo.';
+
 /**
  * Photo triage, grounded. Vision identifies → we look the pest up in Agrofit →
  * a compose pass writes the WhatsApp answer using the registry as its base. If
  * identification fails we fall back to a single direct vision answer, so a photo
- * always gets a useful, safe reply.
+ * always gets a useful, safe reply. Any hard failure (image the provider can't
+ * process) returns a friendly "send a clearer photo" ask rather than throwing.
  */
 async function handleVision(
+  msg: InboundMessage,
+  media: ChatImage,
+  packOverride?: string | null
+): Promise<string> {
+  try {
+    return await triagePhoto(msg, media, packOverride);
+  } catch (e) {
+    log.error('handleVision failed:', (e as Error).message);
+    return PHOTO_RETRY_MSG;
+  }
+}
+
+async function triagePhoto(
   msg: InboundMessage,
   media: ChatImage,
   packOverride?: string | null
