@@ -47,6 +47,19 @@ function loadAgrofit(): AgrofitFile {
 const AGROFIT = loadAgrofit();
 export const AGROFIT_SOURCE = AGROFIT.meta.source;
 
+/** Every distinct registered active-ingredient name in the slice (deduped,
+ * original casing). Used by the compliance gate to spot ingredient+dose
+ * prescription shapes on the way out. */
+export function allActiveIngredients(): string[] {
+  const set = new Set<string>();
+  for (const pests of Object.values(AGROFIT.data)) {
+    for (const entry of Object.values(pests)) {
+      for (const a of entry.ativos) set.add(a);
+    }
+  }
+  return [...set];
+}
+
 export type CropKey = 'soja' | 'milho' | 'pastagem' | 'cafe' | 'citros';
 
 const ALL_CROPS: CropKey[] = ['soja', 'milho', 'pastagem', 'cafe', 'citros'];

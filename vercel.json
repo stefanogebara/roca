@@ -3,7 +3,7 @@
   "functions": {
     "api/webhook.ts": {
       "maxDuration": 60,
-      "includeFiles": "api/_lib/data/agrofit.json"
+      "includeFiles": "api/_lib/data/*.json"
     },
     "api/cron/monitor.ts": {
       "maxDuration": 30

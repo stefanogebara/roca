@@ -16,6 +16,10 @@ const OUT = 'knowledge/agrofit/registry-slice.json';
 // The runtime reads the bundled copy; keep it in sync automatically so a rebuild
 // can never leave stale grounding shipped in the function.
 const RUNTIME_OUT = 'api/_lib/data/agrofit.json';
+// Commercial brand names (MARCA_COMERCIAL) for the compliance gate's
+// brand-plus-dose prescription check. Same row filter as the slice.
+const BRANDS_OUT = 'knowledge/agrofit/brands.json';
+const BRANDS_RUNTIME_OUT = 'api/_lib/data/agrofit-brands.json';
 
 // Focus crops → canonical key. "Todas as culturas" is kept separate and
 // unioned into every crop at query time.
@@ -46,6 +50,9 @@ function multi(s) {
     .map((x) => x.trim())
     .filter(Boolean);
 }
+
+// Brand names seen on kept rows (any focus crop or "todas").
+const brands = new Set();
 
 // crop -> pestKey -> { pest, sci:Set, classes:Set, ativos:Set, n }
 // (MODO_DE_ACAO dropped: free-text "sistêmico/contato" with dozens of spelling
@@ -90,6 +97,10 @@ for await (const row of parser) {
   const ativos = multi(row.INGREDIENTE_ATIVO).map(cleanActive).filter(Boolean);
 
   kept++;
+  const marca = (row.MARCA_COMERCIAL ?? '').trim();
+  // ≥4 chars keeps the lexicon meaningful; the runtime check additionally
+  // requires proper-noun casing + a dose, so short codes add nothing.
+  if (marca.length >= 4) brands.add(marca);
   for (const t of targets) for (const p of pests) bucket(t, p, sci, classe, ativos);
 }
 
@@ -117,6 +128,11 @@ const meta = {
 
 writeFileSync(OUT, JSON.stringify({ meta, data: out }));
 copyFileSync(OUT, RUNTIME_OUT);
+
+const brandList = [...brands].sort();
+writeFileSync(BRANDS_OUT, JSON.stringify({ meta: { source: meta.source, filter: meta.filter }, brands: brandList }));
+copyFileSync(BRANDS_OUT, BRANDS_RUNTIME_OUT);
+console.log(`brands: ${brandList.length} -> ${BRANDS_OUT} (+ runtime copy)`);
 console.log(`seen=${seen} kept=${kept}`);
 console.log('pests per crop:', JSON.stringify(meta.crops));
 const bytes = JSON.stringify({ meta, data: out }).length;
