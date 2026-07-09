@@ -335,7 +335,11 @@ export async function reason(
   intent: Intent,
   deps: ReasonDeps
 ): Promise<string> {
-  if (intent === 'smalltalk') {
+  // The canned intro only serves farmers with NO recent context. A bare
+  // follow-up ("e o que eu faço agora?") often router-classifies as smalltalk;
+  // with history present it must reach the model so the referent resolves —
+  // caught live: a ferrugem follow-up got the intro instead of an answer.
+  if (intent === 'smalltalk' && !deps.history) {
     return 'Opa! Eu sou a Stevi, sua ajudante de lavoura aqui no WhatsApp. 🌱 Você pode me mandar foto de uma folha ou praga pra eu dar uma olhada, perguntar "posso pulverizar hoje?" (me manda sua localização), ou tirar dúvidas sobre soja, milho, pasto, café e citros. Importante: eu ajudo a entender e a saber o que perguntar — quem prescreve produto é o agrônomo. Como posso ajudar?';
   }
 
