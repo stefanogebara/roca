@@ -14,7 +14,12 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { upcomingTransitions, isCalendarStale } from '../_lib/tools/calendar';
-import { runVazioAlerts, runFrostAlerts, type AlertRunResult } from '../_lib/alerts';
+import {
+  runVazioAlerts,
+  runFrostAlerts,
+  runFireAlerts,
+  type AlertRunResult,
+} from '../_lib/alerts';
 import { TwilioAdapter } from '../_lib/transport/twilio';
 import { getDb } from '../_lib/db';
 import { createLogger } from '../_lib/logger';
@@ -77,6 +82,19 @@ export default async function handler(
     log.error('alerts run failed:', (e as Error).message);
   }
 
+  // Fire proximity (INPE Queimadas) — isolated so an INPE outage can't take
+  // the frost/vazio stages down with it (and vice versa).
+  let fire: AlertRunResult | null = null;
+  try {
+    const adapter = new TwilioAdapter();
+    fire = await runFireAlerts((to, text) => adapter.send({ to, text }));
+    if (fire.sent > 0 || fire.failed > 0) {
+      findings.push(`Alertas de queimada: ${fire.sent} enviado(s), ${fire.failed} falha(s).`);
+    }
+  } catch (e) {
+    log.error('fire alerts run failed:', (e as Error).message);
+  }
+
   // Record the run (best-effort; a DB hiccup shouldn't fail the cron).
   try {
     const db = getDb();
@@ -93,6 +111,6 @@ export default async function handler(
 
   res.status(200).json({
     success: true,
-    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost },
+    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost, fire },
   });
 }

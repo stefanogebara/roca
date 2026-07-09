@@ -11,6 +11,7 @@
 
 import type { CalendarTransition } from './tools/calendar';
 import { fetchDailyMinTemps, pickWorstFrostDay, type FrostDay } from './tools/frost';
+import { fetchDailyFires, firesNear, type NearbyFire } from './tools/fires';
 import {
   listSojaFarmersByUf,
   listFarmsWithCoords,
@@ -79,6 +80,27 @@ export function buildFrostAlertText(day: FrostDay): string {
   );
 }
 
+/** One fire alert per farmer per calendar date. */
+export function fireDedupKey(dateIso: string): string {
+  return `fire:${dateIso}`;
+}
+
+/** WhatsApp-ready PT-BR fire-proximity alert. Pure — unit-tested. */
+export function buildFireAlertText(near: NearbyFire[]): string {
+  const n = near.length;
+  const nearest = near[0];
+  const km = nearest.distanceKm.toFixed(1).replace('.', ',');
+  const focos = n === 1 ? '1 foco de queimada' : `${n} focos de queimada`;
+  const onde = nearest.municipio ? ` (região de ${nearest.municipio})` : '';
+  return (
+    `🔥 Atenção: o satélite do INPE registrou ${focos} hoje perto do ponto da sua fazenda — ` +
+    `o mais próximo a ~${km} km${onde}.\n\n` +
+    `Vale checar a direção do vento e os aceiros, e avisar a vizinhança. Em emergência, ` +
+    `Corpo de Bombeiros: 193.\n\n` +
+    `Fonte: INPE/Queimadas (detecção por satélite tem margem de posição de ~1 km).`
+  );
+}
+
 export interface AlertRunResult {
   transitions: number;
   candidates: number;
@@ -125,6 +147,41 @@ export async function runVazioAlerts(
  * A forecast failure skips that farm silently-to-the-farmer but is logged —
  * no alert beats a wrong or duplicated one.
  */
+const FIRE_RADIUS_KM = 10;
+
+/**
+ * Push fire-proximity alerts: one INPE daily-CSV fetch per run, geofenced
+ * against every farm pin. One alert per farmer per day; the claim is released
+ * on a failed send so the same day's run (or a retry) can try again.
+ */
+export async function runFireAlerts(
+  send: (to: string, text: string) => Promise<void>
+): Promise<AlertRunResult> {
+  const farms = await listFarmsWithCoords();
+  const result: AlertRunResult = { transitions: 0, candidates: farms.length, sent: 0, failed: 0 };
+  if (farms.length === 0) return result;
+
+  const { date, fires } = await fetchDailyFires();
+  if (fires.length === 0) return result;
+  const key = fireDedupKey(date);
+
+  for (const f of farms) {
+    const near = firesNear(fires, { lat: f.lat, lon: f.lon }, FIRE_RADIUS_KM);
+    if (near.length === 0) continue;
+    const claimed = await claimFarmerAlert(f.userId, 'fire', key);
+    if (!claimed) continue;
+    try {
+      await withRetry(() => send(f.waId, buildFireAlertText(near)), { attempts: 2 });
+      result.sent++;
+    } catch (e) {
+      result.failed++;
+      log.error(`fire alert to user ${f.userId} failed:`, (e as Error).message);
+      await releaseFarmerAlert(f.userId, key);
+    }
+  }
+  return result;
+}
+
 export async function runFrostAlerts(
   send: (to: string, text: string) => Promise<void>
 ): Promise<AlertRunResult> {
