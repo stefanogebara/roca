@@ -15,16 +15,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (!requireOps(req, res)) return;
   try {
     const db = getDb();
-    const { data } = await db
-      .from('gym_runs')
-      .select('id, ran_at, champion, challenger, tally, recommended, reason, verdicts')
-      .order('ran_at', { ascending: false })
-      .limit(20);
+    const [{ data }, { data: vitoriaRuns }] = await Promise.all([
+      db
+        .from('gym_runs')
+        .select('id, ran_at, champion, challenger, tally, recommended, reason, verdicts')
+        .order('ran_at', { ascending: false })
+        .limit(20),
+      db
+        .from('prospect_gym_runs')
+        .select('id, ran_at, medias, verdicts')
+        .order('ran_at', { ascending: false })
+        .limit(10),
+    ]);
+    const { PROSPECT_PERSONAS } = await import('../_lib/prospect/gym');
     res.status(200).json({
       success: true,
       data: {
         personas: PERSONAS.map((p) => ({ key: p.key, label: p.label, crop: p.crop ?? null })),
         runs: data ?? [],
+        vitoria: {
+          personas: PROSPECT_PERSONAS.map((p) => ({ key: p.key, label: p.label })),
+          runs: vitoriaRuns ?? [],
+        },
       },
     });
   } catch (e) {

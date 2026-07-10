@@ -155,7 +155,7 @@
       <button class="tab" data-tab="prospeccao">Prospecção</button>
       <button class="tab" data-tab="voz">Voz</button>
       <button class="tab" data-tab="digests">Resumos</button>
-      <button class="tab" data-tab="gym">Treino<span class="em-breve">em breve</span></button>
+      <button class="tab" data-tab="gym">Treino</button>
     </nav>
 
     <section class="panel active" id="p-overview"><div class="loading">Carregando…</div></section>
@@ -218,11 +218,44 @@
       if (tab === 'gym') return loadGym();
     }
 
+    // "O que fazer hoje" — the work queue for a non-technical founder. Built
+    // from the same endpoints the tabs use; each card jumps to the right tab.
+    async function todayStrip() {
+      const wrap = el('div', 'card');
+      wrap.append(el('h3', null, '☀️ O que fazer hoje'));
+      const row = el('div', 'funnel');
+      wrap.append(row);
+      try {
+        const [leads, prospects] = await Promise.all([api('leads'), api('prospects')]);
+        const newLeads = leads.filter(l => (l.status || 'novo') === 'novo').length;
+        const repliedP = prospects.filter(x => x.status === 'replied').length;
+        const agentOff = prospects.filter(x => x.status === 'replied' && x.agent_enabled === false).length;
+        const queue = prospects.filter(x => x.status === 'ready' && x.send_status !== 'sent').length;
+        const items = [
+          { n: newLeads, l: 'leads pra encaminhar', hint: 'Produtores pedindo agrônomo — entregue ao parceiro e marque "Encaminhado".', tab: 'leads', urgent: newLeads > 0 },
+          { n: repliedP, l: 'prospects em conversa', hint: agentOff ? agentOff + ' com agente desligado — responda você!' : 'A Vitória 🤖 cuida; entre só se ela escalar.', tab: 'prospeccao', urgent: agentOff > 0 },
+          { n: queue, l: 'na fila de disparo', hint: 'Saem sozinhos: seg–sex 10h/13h/16h, 20 por dia. Fila baixa? Clique em Buscar na web.', tab: 'prospeccao', urgent: queue < 8 },
+        ];
+        for (const it of items) {
+          const b = el('button', 'fstage');
+          const n = el('div', 'n', String(it.n));
+          if (it.urgent) n.style.color = 'var(--amber)';
+          b.append(n, el('div', 'l', it.l));
+          b.title = it.hint;
+          b.addEventListener('click', () => { activateTab(it.tab); loadTab(it.tab); });
+          row.append(b);
+        }
+        wrap.append(el('div', 'countnote', newLeads === 0 && agentOff === 0 ? '✅ Nada urgente — a operação está rodando sozinha.' : '⚠️ Tem coisa esperando você — clique no card laranja.'));
+      } catch { row.append(el('div', 'empty', '—')); }
+      return wrap;
+    }
+
     async function loadOverview() {
       const p = $('#p-overview');
       try {
         const d = await api('overview');
         p.innerHTML = '';
+        p.append(await todayStrip());
         const stats = el('div', 'stats');
         const cards = [
           ['Produtores', d.users], ['Novos (7d)', d.newUsers7d],
@@ -257,6 +290,7 @@
       try {
         const rows = await api('conversations');
         p.innerHTML = '';
+        p.append(el('div', 'countnote', 'Produtores conversando com a Stevi no WhatsApp. Clique num card pra ler a conversa inteira.'));
         if (!rows.length) { p.innerHTML = '<div class="empty">Nenhuma conversa ainda.</div>'; return; }
         for (const c of rows) {
           const item = el('div', 'conv');
@@ -686,6 +720,7 @@
       try {
         const rows = await api('digests');
         p.innerHTML = '';
+        p.append(el('div', 'countnote', 'Resumo automático do dia (gerado às 18h BRT): quem chegou, o que perguntaram, onde a Stevi travou.'));
         if (!rows.length) { p.innerHTML = '<div class="empty">Nenhum resumo diário ainda.</div>'; return; }
         for (const d of rows) {
           const card = el('div', 'card digest');
@@ -696,11 +731,61 @@
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
     }
 
+    function scoreChip(label, v) {
+      const s = el('span', 'spill', label + ' ' + (v ?? '—') + '/5');
+      s.style.background = v >= 4 ? '#2e9e63' : v >= 3 ? '#b7791f' : '#b23b3b';
+      return s;
+    }
+
+    function renderVitoriaGym(p, vit) {
+      const intro = el('div', 'card');
+      intro.append(el('h3', null, '🤖 Treino da Vitória (prospecção)'));
+      intro.append(el('div', 'countnote',
+        'Personagens simulados (gerente ocupado, cético de preço, detector de bot…) conversam com o cérebro REAL da Vitória. ' +
+        'Um juiz dá notas de 1 a 5 em: naturalidade (parece gente), missão (avança a qualificação) e segurança (nunca fala preço, escala pro Stefano). ' +
+        'Rodar: npm run gym:vitoria'));
+      const pw = el('div');
+      (vit.personas || []).forEach(pe => pw.append(Object.assign(el('span','pill'), {textContent: pe.label})));
+      intro.append(pw);
+      p.append(intro);
+
+      if (!(vit.runs || []).length) {
+        p.append(el('div', 'empty', 'Nenhum treino da Vitória ainda.'));
+        return;
+      }
+      for (const r of vit.runs) {
+        const card = el('div', 'card');
+        card.append(el('div', 'when', fmtDate(r.ran_at)));
+        const hd = el('div', 'toolbar');
+        hd.append(scoreChip('naturalidade', r.medias?.naturalidade), scoreChip('missão', r.medias?.missao), scoreChip('segurança', r.medias?.seguranca));
+        card.append(hd);
+        for (const v of (r.verdicts || [])) {
+          const det = el('details');
+          const sum = el('summary');
+          sum.style.cursor = 'pointer';
+          const segBad = v.scores?.seguranca > 0 && v.scores.seguranca < 3;
+          sum.textContent = (segBad ? '⚠️ ' : '') + v.label + ' — nat ' + v.scores?.naturalidade + ' · missão ' + v.scores?.missao + ' · seg ' + v.scores?.seguranca;
+          det.append(sum);
+          if (v.veredicto) det.append(el('div', 'quali', v.veredicto));
+          const tw = el('div', 'thread'); tw.style.marginTop = '8px';
+          for (const t of (v.transcript || [])) {
+            const b = el('div', 'msg ' + (t.role === 'vitoria' ? 'out' : 'in'), t.text);
+            b.append(el('span', 'tag', t.role === 'vitoria' ? 'Vitória' : v.label));
+            tw.append(b);
+          }
+          det.append(tw);
+          card.append(det);
+        }
+        p.append(card);
+      }
+    }
+
     async function loadGym() {
       const p = $('#p-gym'); p.innerHTML = '<div class="loading">Carregando…</div>';
       try {
         const d = await api('gym');
         p.innerHTML = '';
+        if (d.vitoria) renderVitoriaGym(p, d.vitoria);
         const intro = el('div', 'card');
         intro.append(el('h3', null, 'Treino da voz (Gym)'));
         intro.append(Object.assign(el('p','meta'), {textContent: 'Produtores simulados conversam com o cérebro real da Stevi; um juiz de 3 lentes (naturalidade · clareza · segurança, com veto de segurança) compara a voz campeã contra uma desafiante. Rodar uma rodada: '}));
