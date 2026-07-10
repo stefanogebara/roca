@@ -28,7 +28,9 @@ export function shortName(name: string): string {
       .replace(/[—–-]\s*$/, '')
       .replace(/\s{2,}/g, ' ')
       .trim()
-      .split(/\s*[—–]\s*/)[0]
+      // Branch/unit suffixes come dash-separated ("Cooxupé - Matriz Guaxupé");
+      // a bare hyphen only counts when space-padded, so hyphenated names survive.
+      .split(/\s*[—–]\s*|\s+-\s+/)[0]
       .trim() || name.trim()
   ).slice(0, 40);
 }

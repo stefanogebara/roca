@@ -34,9 +34,10 @@ describe('toProspectInput', () => {
 
 describe('personalization', () => {
   it('shortName strips corporate noise', () => {
-    expect(shortName('GBAGRO - Consultoria e Representação Comercial Ltda')).toMatch(/^GBAGRO/);
+    expect(shortName('GBAGRO - Consultoria e Representação Comercial Ltda')).toBe('GBAGRO');
     expect(shortName('Agropecuária União')).toBe('Agropecuária União');
-    expect(shortName('Cooxupé - Matriz Guaxupé')).toContain('Cooxupé');
+    expect(shortName('Cooxupé - Matriz Guaxupé')).toBe('Cooxupé'); // caught live: hyphen branch suffix
+    expect(shortName('Agro.com Agricultura e Pecuária')).toBe('Agro.com Agricultura e Pecuária');
   });
   it('kindHook maps every kind, with a safe default', () => {
     expect(kindHook('consultoria')).toMatch(/consultoria/);
