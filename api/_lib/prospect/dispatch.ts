@@ -22,7 +22,8 @@ import {
   recordSendFailed,
 } from './db';
 import { sendProspectTemplate } from './send';
-import { buildTemplateParams } from './personalize';
+import { buildTemplateParams, renderTemplateText } from './personalize';
+import { logProspectMessage } from './db';
 import { alertFounders } from '../alert';
 import { createLogger } from '../logger';
 
@@ -104,13 +105,9 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
       continue;
     }
     let wamid: string;
+    const params = buildTemplateParams(p, TEMPLATE_PARAMS);
     try {
-      ({ wamid } = await sendProspectTemplate(
-        phone,
-        TEMPLATE_NAME,
-        TEMPLATE_LANG,
-        buildTemplateParams(p, TEMPLATE_PARAMS)
-      ));
+      ({ wamid } = await sendProspectTemplate(phone, TEMPLATE_NAME, TEMPLATE_LANG, params));
     } catch (e) {
       // Send itself failed → nothing went out; record + continue is safe.
       await recordSendFailed(p.id);
@@ -128,6 +125,9 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
       await recordSend(p.id, { wamid, template: TEMPLATE_NAME });
       recipients.push({ id: p.id, name: p.name, phone, result: 'sent' });
       sent++;
+      // Thread completeness: the painel conversation view starts with the
+      // template that actually went out. Best-effort — never fails the batch.
+      await logProspectMessage(p.id, 'out', 'text', renderTemplateText(params)).catch(() => {});
     } catch (e) {
       sent++; // it did send — count it, then abort to avoid a duplicate next run
       recipients.push({ id: p.id, name: p.name, phone, result: 'sent' });

@@ -63,3 +63,20 @@ export function buildTemplateParams(
   if (paramCount >= 3) return [name, kindHook(p.kind), (p.city ?? 'Sul de Minas').slice(0, 40)];
   return [name.slice(0, 60)];
 }
+
+/**
+ * Human-readable rendering of the template that actually went out, for the
+ * painel thread view (Meta doesn't echo template bodies back). Mirrors the
+ * approved template texts — keep in sync when a new template version ships.
+ */
+export function renderTemplateText(params: string[]): string {
+  if (params.length >= 3) {
+    return (
+      `Oi! Aqui é a Vitória, da Stevi 🌱 Falo com a ${params[0]}? Vi que vocês ${params[1]} na região de ${params[2]}. ` +
+      `A Stevi é uma assistente gratuita de WhatsApp que faz triagem agronômica pra produtores de café — ` +
+      `e quando o produtor precisa de receituário, a gente indica um agrônomo parceiro da região. ` +
+      `Faz sentido trocar uma ideia rápida sobre parceria?`
+    );
+  }
+  return `Oi, ${params[0]}! Aqui é a Vitória, da Stevi 🌱 (template de parceria v1)`;
+}
