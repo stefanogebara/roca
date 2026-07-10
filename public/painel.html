@@ -294,9 +294,9 @@
 
     // ── Leads (pedidos de agrônomo) ────────────────────────────────────────
     const L_STATUS = {
-      novo:      { label: 'Novos',      color: '#b7791f', hint: 'produtor pediu agrônomo — encaminhar pro parceiro' },
-      contatado: { label: 'Encaminhados', color: '#3b6fb2', hint: 'lead entregue ao parceiro — aguardando fechamento' },
-      fechado:   { label: 'Fechados',   color: '#2e9e63', hint: 'atendido pelo parceiro 🎉' },
+      novo:      { label: 'Novos', pill: 'novo', color: '#b7791f', hint: 'produtor pediu agrônomo — encaminhar pro parceiro' },
+      contatado: { label: 'Encaminhados', pill: 'encaminhado', color: '#3b6fb2', hint: 'lead entregue ao parceiro — aguardando fechamento' },
+      fechado:   { label: 'Fechados', pill: 'fechado', color: '#2e9e63', hint: 'atendido pelo parceiro 🎉' },
     };
     const lState = { status: null };
     let lCache = [];
@@ -354,7 +354,7 @@
       const left = el('div');
       const who = el('div', 'who');
       who.append(el('span', null, l.phone));
-      const spill = el('span', 'spill', st.label.toLowerCase()); spill.style.background = st.color;
+      const spill = el('span', 'spill', st.pill); spill.style.background = st.color;
       who.append(spill);
       left.append(who);
       const meta = el('div', 'meta');
@@ -401,11 +401,11 @@
     // ── Prospecção ──────────────────────────────────────────────────────────
     // Status model: discovered → ready → contacted → replied (+ discarded).
     const P_STATUS = {
-      discovered: { label: 'Descobertos', color: '#b7791f', hint: 'achados na web ou importados — revise e aprove' },
-      ready:      { label: 'Aprovados',   color: '#2e9e63', hint: 'na fila do disparo automático (seg–sex 10h/13h/16h)' },
-      contacted:  { label: 'Contatados',  color: '#3b6fb2', hint: 'template enviado — aguardando resposta' },
-      replied:    { label: 'Responderam', color: '#14432f', hint: 'em conversa com a Vitória 🤖' },
-      discarded:  { label: 'Descartados', color: '#9aa5a0', hint: 'fora do perfil' },
+      discovered: { label: 'Descobertos', pill: 'descoberto', color: '#b7791f', hint: 'achados na web ou importados — revise e aprove' },
+      ready:      { label: 'Aprovados', pill: 'aprovado', color: '#2e9e63', hint: 'na fila do disparo automático (seg–sex 10h/13h/16h)' },
+      contacted:  { label: 'Contatados', pill: 'contatado', color: '#3b6fb2', hint: 'template enviado — aguardando resposta' },
+      replied:    { label: 'Responderam', pill: 'respondeu', color: '#14432f', hint: 'em conversa com a Vitória 🤖' },
+      discarded:  { label: 'Descartados', pill: 'descartado', color: '#9aa5a0', hint: 'fora do perfil' },
     };
     const pState = { status: null, kind: null, q: '' };
     let pCache = [];
@@ -556,7 +556,7 @@
       const left = el('div');
       const who = el('div', 'who');
       who.append(el('span', null, pr.name));
-      const spill = el('span', 'spill', st.label.toLowerCase()); spill.style.background = st.color;
+      const spill = el('span', 'spill', st.pill); spill.style.background = st.color;
       who.append(spill);
       if (pr.agent_enabled === false) {
         const off = el('span', 'spill', '🤖 agente off'); off.style.background = 'var(--amber)'; who.append(off);
