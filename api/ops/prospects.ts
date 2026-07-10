@@ -76,10 +76,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     if (action === 'template') {
-      // Submit the personalized v2 first-touch template (idempotent) and
-      // report its approval status — avoids the WhatsApp Manager UI round-trip.
-      const { submitV2Template } = await import('../_lib/prospect/template');
-      res.status(200).json({ success: true, data: await submitV2Template() });
+      // Submit a registry template (idempotent) and report its approval
+      // status — avoids the WhatsApp Manager UI round-trip. Defaults to the
+      // v2 intro; pass name for others (e.g. the D+3 bump).
+      const { submitTemplate, V2_NAME } = await import('../_lib/prospect/template');
+      const name = String((body as { name?: unknown }).name ?? V2_NAME);
+      res.status(200).json({ success: true, data: await submitTemplate(name) });
       return;
     }
 

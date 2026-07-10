@@ -14,14 +14,36 @@ const log = createLogger('prospect-template');
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
 export const V2_NAME = 'stevi_parceria_v2';
+export const BUMP_NAME = 'stevi_parceria_bump';
 
-// Must match personalize.ts buildTemplateParams order: {{1}}=name, {{2}}=hook, {{3}}=city.
-const V2_BODY =
-  'Oi! Aqui é a Vitória, da Stevi 🌱 Falo com a {{1}}? Vi que vocês {{2}} na região de {{3}}. ' +
-  'A Stevi é uma assistente gratuita de WhatsApp que faz triagem agronômica pra produtores de café — ' +
-  'e quando o produtor precisa de receituário, a gente indica um agrônomo parceiro da região. ' +
-  'Faz sentido trocar uma ideia rápida sobre parceria?';
-const V2_FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
+const FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
+
+interface TemplateDef {
+  body: string;
+  example: string[];
+}
+
+// Registry of every template this codebase can submit/send. Bodies must stay
+// in sync with personalize.ts renderers (the painel thread view).
+const TEMPLATE_DEFS: Record<string, TemplateDef> = {
+  // Intro — {{1}}=name, {{2}}=kind hook, {{3}}=city (personalize.buildTemplateParams).
+  [V2_NAME]: {
+    body:
+      'Oi! Aqui é a Vitória, da Stevi 🌱 Falo com a {{1}}? Vi que vocês {{2}} na região de {{3}}. ' +
+      'A Stevi é uma assistente gratuita de WhatsApp que faz triagem agronômica pra produtores de café — ' +
+      'e quando o produtor precisa de receituário, a gente indica um agrônomo parceiro da região. ' +
+      'Faz sentido trocar uma ideia rápida sobre parceria?',
+    example: ['Agro Forte', 'atendem produtores no dia a dia', 'Varginha'],
+  },
+  // D+3 bump for never-repliers — {{1}}=name, {{2}}=city.
+  [BUMP_NAME]: {
+    body:
+      'Oi, {{1}}! Vitória da Stevi aqui de novo 🌱 Sei que a rotina é corrida, então só um lembrete rápido: ' +
+      'a gente indica produtores da região de {{2}} que precisam de receituário agronômico — de graça nessa ' +
+      'fase de validação. Se fizer sentido, me dá um alô por aqui. Se não for o momento, tudo bem também!',
+    example: ['Agro Forte', 'Varginha'],
+  },
+};
 
 function token(): string {
   const t = process.env.WHATSAPP_CLOUD_TOKEN;
@@ -73,11 +95,15 @@ export async function getTemplateStatus(name: string): Promise<TemplateStatus | 
 }
 
 /**
- * Submit the v2 template. Idempotent from the caller's view: if it already
- * exists (any status), returns its current status instead of resubmitting.
+ * Submit a registry template by name. Idempotent from the caller's view: if it
+ * already exists (any status), returns its current status instead of resubmitting.
  */
-export async function submitV2Template(): Promise<{ submitted: boolean; status: TemplateStatus }> {
-  const existing = await getTemplateStatus(V2_NAME);
+export async function submitTemplate(
+  name: string
+): Promise<{ submitted: boolean; status: TemplateStatus }> {
+  const def = TEMPLATE_DEFS[name];
+  if (!def) throw new Error(`unknown template: ${name}`);
+  const existing = await getTemplateStatus(name);
   if (existing) return { submitted: false, status: existing };
 
   const waba = await resolveWabaId();
@@ -85,18 +111,12 @@ export async function submitV2Template(): Promise<{ submitted: boolean; status: 
     method: 'POST',
     headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      name: V2_NAME,
+      name,
       language: 'pt_BR',
       category: 'MARKETING',
       components: [
-        {
-          type: 'BODY',
-          text: V2_BODY,
-          example: {
-            body_text: [['Agro Forte', 'atendem produtores no dia a dia', 'Varginha']],
-          },
-        },
-        { type: 'FOOTER', text: V2_FOOTER },
+        { type: 'BODY', text: def.body, example: { body_text: [def.example] } },
+        { type: 'FOOTER', text: FOOTER },
       ],
     }),
   });
@@ -112,6 +132,11 @@ export async function submitV2Template(): Promise<{ submitted: boolean; status: 
   }
   return {
     submitted: true,
-    status: { name: V2_NAME, status: json.status ?? 'PENDING', id: json.id },
+    status: { name, status: json.status ?? 'PENDING', id: json.id },
   };
+}
+
+/** Back-compat wrapper for the ops action. */
+export async function submitV2Template(): Promise<{ submitted: boolean; status: TemplateStatus }> {
+  return submitTemplate(V2_NAME);
 }

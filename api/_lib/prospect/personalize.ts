@@ -64,6 +64,20 @@ export function buildTemplateParams(
   return [name.slice(0, 60)];
 }
 
+/** Params for the D+3 bump template: {{1}}=name, {{2}}=city. */
+export function buildBumpParams(p: Pick<ProspectRow, 'name' | 'city'>): string[] {
+  return [shortName(p.name), (p.city ?? 'Sul de Minas').slice(0, 40)];
+}
+
+/** Painel-thread rendering of the bump — keep in sync with template.ts. */
+export function renderBumpText(params: string[]): string {
+  return (
+    `Oi, ${params[0]}! Vitória da Stevi aqui de novo 🌱 Sei que a rotina é corrida, então só um lembrete rápido: ` +
+    `a gente indica produtores da região de ${params[1]} que precisam de receituário agronômico — de graça nessa ` +
+    `fase de validação. Se fizer sentido, me dá um alô por aqui. Se não for o momento, tudo bem também!`
+  );
+}
+
 /**
  * Human-readable rendering of the template that actually went out, for the
  * painel thread view (Meta doesn't echo template bodies back). Mirrors the

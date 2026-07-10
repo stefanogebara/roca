@@ -22,8 +22,8 @@ import {
   recordSendFailed,
 } from './db';
 import { sendProspectTemplate } from './send';
-import { buildTemplateParams, renderTemplateText } from './personalize';
-import { logProspectMessage } from './db';
+import { buildTemplateParams, renderTemplateText, buildBumpParams, renderBumpText } from './personalize';
+import { logProspectMessage, loadBumpDueProspects, recordBump } from './db';
 import { alertFounders } from '../alert';
 import { createLogger } from '../logger';
 
@@ -144,4 +144,85 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     await alertFounders(`⚠️ Prospecção: ${failed} de ${batch.length} envio(s) falharam.`);
   }
   return { dryRun, skippedOutsideHours: false, aborted: false, eligible: eligible.length, planned: batch.length, sent, failed, recipients };
+}
+
+// ── D+3 bump (multi-touch cadence, Olímpia pattern) ─────────────────────────
+// One follow-up for never-repliers, 3+ days after the intro. Golden rule: the
+// touch only happens if its template is APPROVED at Meta — otherwise the run
+// reports 'template_not_approved' and does nothing (no error, no send).
+
+const BUMP_TEMPLATE = process.env.PROSPECT_BUMP_TEMPLATE_NAME || 'stevi_parceria_bump';
+const BUMP_AFTER_DAYS = Number(process.env.PROSPECT_BUMP_AFTER_DAYS || '3');
+
+export interface BumpReport {
+  skipped: string | null; // reason when nothing ran (outside hours / template / cap)
+  due: number;
+  sent: number;
+  failed: number;
+}
+
+export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise<BumpReport> {
+  const now = new Date();
+  if (!isBusinessHours(now)) return { skipped: 'outside_hours', due: 0, sent: 0, failed: 0 };
+
+  // Golden rule: approved template or no touch.
+  try {
+    const { getTemplateStatus } = await import('./template');
+    const st = await getTemplateStatus(BUMP_TEMPLATE);
+    if (st?.status !== 'APPROVED') {
+      return { skipped: `template_not_approved (${st?.status ?? 'missing'})`, due: 0, sent: 0, failed: 0 };
+    }
+  } catch (e) {
+    return { skipped: `template_check_failed: ${(e as Error).message.slice(0, 80)}`, due: 0, sent: 0, failed: 0 };
+  }
+
+  // Same fail-closed preconditions as intros; bumps share the daily cap.
+  let optouts: Set<string>;
+  let due: Awaited<ReturnType<typeof loadBumpDueProspects>>;
+  let sentToday: number;
+  try {
+    [optouts, due, sentToday] = await Promise.all([
+      loadOptouts(),
+      loadBumpDueProspects(BUMP_AFTER_DAYS),
+      countSentSince(brtDayStartIso(now)),
+    ]);
+  } catch (e) {
+    log.error('bump dispatch aborted — safety precondition unavailable:', (e as Error).message);
+    return { skipped: 'precondition_unavailable', due: 0, sent: 0, failed: 0 };
+  }
+
+  const eligible = due.filter((p) => p.phone && !optouts.has(p.phone));
+  const batch = planBatch(eligible, { dailyCap: opts.dailyCap ?? DAILY_CAP_DEFAULT, sentToday });
+  if (!batch.length) return { skipped: eligible.length ? 'daily_cap_reached' : null, due: eligible.length, sent: 0, failed: 0 };
+
+  let sent = 0;
+  let failed = 0;
+  for (const p of batch) {
+    const params = buildBumpParams(p);
+    let wamid: string;
+    try {
+      ({ wamid } = await sendProspectTemplate(p.phone as string, BUMP_TEMPLATE, TEMPLATE_LANG, params));
+    } catch (e) {
+      failed++;
+      log.error(`bump send failed for ${p.id}:`, (e as Error).message);
+      if (batch.indexOf(p) < batch.length - 1) await sleep(jitteredDelay());
+      continue;
+    }
+    // Sent but unrecorded = re-bump risk next run → stop the batch, page ops.
+    try {
+      await recordBump(p.id, { wamid, template: BUMP_TEMPLATE });
+      sent++;
+      await logProspectMessage(p.id, 'out', 'text', renderBumpText(params)).catch(() => {});
+    } catch (e) {
+      sent++;
+      log.error(`recordBump failed after a live send for ${p.id}:`, (e as Error).message);
+      await alertFounders(
+        `⚠️ Prospecção: bump enviado pra ${p.name} (wamid ${wamid}) mas NÃO consegui gravar. Batch interrompido — confira pra não reenviar.`
+      );
+      break;
+    }
+    if (batch.indexOf(p) < batch.length - 1) await sleep(jitteredDelay());
+  }
+  if (failed > 0) await alertFounders(`⚠️ Prospecção (bump): ${failed} de ${batch.length} envio(s) falharam.`);
+  return { skipped: null, due: eligible.length, sent, failed };
 }

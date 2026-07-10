@@ -24,6 +24,7 @@ export interface ProspectRow {
   send_status: string | null;
   wamid: string | null;
   template_used: string | null;
+  touches: number;
   created_at: string;
   updated_at: string;
 }
@@ -98,10 +99,51 @@ export async function recordSend(
       sent_at: new Date().toISOString(),
       wamid: fields.wamid,
       template_used: fields.template,
+      touches: 1,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
   if (error) throw new Error(`recordSend failed for ${id} (wamid ${fields.wamid}): ${error.message}`);
+}
+
+/**
+ * Prospects due a D+3 bump: intro sent, never replied (status still
+ * 'contacted' — any inbound flips it to 'replied'), exactly one touch so far.
+ */
+export async function loadBumpDueProspects(days = 3, limit = 50): Promise<ProspectRow[]> {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await db
+    .from('prospects')
+    .select('*')
+    .eq('status', 'contacted')
+    .eq('send_status', 'sent')
+    .eq('touches', 1)
+    .not('phone', 'is', null)
+    .lt('sent_at', cutoff)
+    .order('sent_at', { ascending: true })
+    .limit(limit);
+  if (error) {
+    log.error('loadBumpDueProspects failed:', error.message);
+    return [];
+  }
+  return (data ?? []) as ProspectRow[];
+}
+
+/** Record a bump send: second touch, refresh sent_at (feeds the daily cap). */
+export async function recordBump(id: string, fields: { wamid: string; template: string }): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('prospects')
+    .update({
+      touches: 2,
+      sent_at: new Date().toISOString(),
+      wamid: fields.wamid,
+      template_used: fields.template,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(`recordBump failed for ${id} (wamid ${fields.wamid}): ${error.message}`);
 }
 
 /** Mark a prospect's send as failed (surfaced in ops; never silently dropped). */

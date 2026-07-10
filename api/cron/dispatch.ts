@@ -8,7 +8,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { runDispatch } from '../_lib/prospect/dispatch';
+import { runDispatch, runBumpDispatch } from '../_lib/prospect/dispatch';
 import { createLogger } from '../_lib/logger';
 
 const log = createLogger('dispatch-cron');
@@ -31,7 +31,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         (report.skippedOutsideHours ? ' (outside hours)' : '') +
         (report.aborted ? ' (ABORTED)' : '')
     );
-    res.status(200).json({ success: true, data: report });
+    // D+3 bumps run after intros and share the daily cap (countSentSince sees
+    // the intros just sent). Isolated: a bump problem never fails the cron.
+    let bumps = null;
+    try {
+      bumps = await runBumpDispatch();
+      if (bumps.sent > 0 || bumps.failed > 0) {
+        log.info(`bump dispatch: sent=${bumps.sent} failed=${bumps.failed} due=${bumps.due}`);
+      }
+    } catch (e) {
+      log.error('bump dispatch failed:', (e as Error).message);
+    }
+    res.status(200).json({ success: true, data: { ...report, bumps } });
   } catch (e) {
     log.error('dispatch cron failed:', (e as Error).message);
     res.status(500).json({ success: false, error: 'erro interno' });

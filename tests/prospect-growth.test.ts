@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { buildQueries, toProspectInput } from '../api/_lib/prospect/source';
-import { shortName, kindHook, buildTemplateParams } from '../api/_lib/prospect/personalize';
+import {
+  shortName,
+  kindHook,
+  buildTemplateParams,
+  buildBumpParams,
+  renderBumpText,
+  renderTemplateText,
+} from '../api/_lib/prospect/personalize';
 import { computeFunnelStats, playbookBlock } from '../api/_lib/prospect/learn';
 
 describe('sourcing query grid', () => {
@@ -45,6 +52,23 @@ describe('personalization', () => {
     expect(v2).toHaveLength(3);
     expect(v2[0]).toBe('Agro Forte');
     expect(v2[2]).toBe('Varginha');
+  });
+});
+
+describe('bump cadence (D+3)', () => {
+  it('buildBumpParams: short name + city with safe default', () => {
+    expect(buildBumpParams({ name: 'Agro Forte Ltda', city: 'Varginha' })).toEqual(['Agro Forte', 'Varginha']);
+    expect(buildBumpParams({ name: 'Cocatrel', city: null })[1]).toBe('Sul de Minas');
+  });
+  it('renderBumpText interpolates and never mentions price', () => {
+    const t = renderBumpText(['Agro Forte', 'Varginha']);
+    expect(t).toContain('Agro Forte');
+    expect(t).toContain('Varginha');
+    expect(t).not.toMatch(/R\$\s?\d/);
+  });
+  it('renderTemplateText covers both intro arities', () => {
+    expect(renderTemplateText(['A', 'fazem x', 'C'])).toContain('região de C');
+    expect(renderTemplateText(['A'])).toContain('A');
   });
 });
 
