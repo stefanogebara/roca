@@ -10,6 +10,15 @@ import { reason } from './reason';
 import { buildFarmCard } from './farmcard';
 import { buildAgronomoBrief } from './brief';
 import { handleProspectInbound, respondAsProspectAgent } from './prospect/inbound';
+import { normalizePhoneBR } from './prospect/core';
+import {
+  findPartnerByPhone,
+  buildDossierReply,
+  matchPartnerForFarm,
+  setReferralPartner,
+  consentAskText,
+  resolveConsentReply,
+} from './partners';
 import { parseVcards, describeContactCards } from './transport/vcard';
 import { transcribeVoice } from './transcribe';
 import { checkOutbound } from './compliance';
@@ -285,6 +294,27 @@ export async function handleInbound(
     return;
   }
 
+  // Partner replies (agronomists in the referral network): their reply opens
+  // the 24h window → deliver any pending lead dossier free-form. Partners
+  // never reach the farmer pipeline (and never get a farmer profile).
+  {
+    const partnerPhone = normalizePhoneBR(msg.from);
+    const partner = partnerPhone ? await findPartnerByPhone(partnerPhone) : null;
+    if (partner) {
+      const dossier = await buildDossierReply(partner);
+      if (dossier) {
+        await sendOrRecord(adapter, msg.from, { text: dossier }, null, 'partner_dossier');
+        await alertFounders(`🤝 Dossiê de lead entregue pro parceiro ${partner.name}. Acompanhe o fechamento!`);
+      } else {
+        // No pending lead — this is relationship talk; a human answers it.
+        await alertFounders(
+          `💬 Parceiro ${partner.name} mandou mensagem (responda você): "${(msg.text ?? '(mídia)').slice(0, 150)}"`
+        );
+      }
+      return;
+    }
+  }
+
   const user = await upsertUser(msg.from, msg.profileName);
   const userId = user?.id ?? null;
   const firstContact = isFirstContact(user);
@@ -409,6 +439,14 @@ export async function handleInbound(
       ? parseCrops(effective.text)
       : null;
 
+  // Pending share-consent question (partner handoff): a clear yes/no resolves
+  // it; anything else falls through to normal handling and the question stays
+  // open until answered or superseded by another intent.
+  const consentReply =
+    user?.awaiting === 'referral_consent' && effective.kind === 'text' && effective.text && userId
+      ? await resolveConsentReply(userId, effective.text)
+      : null;
+
   if (cropAnswer && cropAnswer.length > 0) {
     if (userId) {
       await setFarmCrops(userId, cropAnswer);
@@ -416,6 +454,10 @@ export async function handleInbound(
     }
     intent = 'onboarding';
     replyText = `Anotado: você trabalha com ${joinCrops(cropAnswer)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`;
+  } else if (consentReply) {
+    intent = 'referral';
+    if (userId) await setAwaiting(userId, null);
+    replyText = consentReply;
   } else if (effective.kind === 'text' && effective.text && isHistoryRequest(effective.text)) {
     // Passive caderno de campo — the season record Stevi keeps for free.
     intent = 'history';
@@ -440,6 +482,7 @@ export async function handleInbound(
   } else if (effective.kind === 'text' && effective.text && isReferralRequest(effective.text)) {
     // Explicit agrônomo referral request — the business-model seed.
     intent = 'referral';
+    replyText = REFERRAL_REPLY;
     if (userId) {
       if (user?.awaiting) await setAwaiting(userId, null);
       const profile = await getFarmProfile(userId);
@@ -449,7 +492,7 @@ export async function handleInbound(
         userId,
         new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       );
-      await createReferralRequest(userId, {
+      const referralId = await createReferralRequest(userId, {
         uf: profile.uf,
         crop: profile.crop,
         topic: effective.text.slice(0, 280),
@@ -467,8 +510,20 @@ export async function handleInbound(
         await sendReferralNotification(notice);
         await pingFoundersWhatsApp((to, text) => adapter.send({ to, text }), notice);
       }
+      // Partner match (farm pin within a partner's coverage): instead of the
+      // generic promise, ask the farmer's explicit consent to share — LGPD:
+      // the referral opt-in alone never hands data to a third party.
+      try {
+        const matched = await matchPartnerForFarm(userId);
+        if (matched && referralId) {
+          await setReferralPartner(referralId, matched.id);
+          await setAwaiting(userId, 'referral_consent');
+          replyText = consentAskText(matched);
+        }
+      } catch (e) {
+        log.error('partner match failed (generic referral reply kept):', (e as Error).message);
+      }
     }
-    replyText = REFERRAL_REPLY;
   } else if (mediaTooLarge) {
     intent = 'general';
     replyText =

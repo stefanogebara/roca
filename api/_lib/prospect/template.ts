@@ -15,12 +15,15 @@ const GRAPH = 'https://graph.facebook.com/v21.0';
 
 export const V2_NAME = 'stevi_parceria_v2';
 export const BUMP_NAME = 'stevi_parceria_bump';
+export const LEAD_NAME = 'stevi_lead_v1';
 
 const FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
 
 interface TemplateDef {
   body: string;
   example: string[];
+  /** Meta category. Cold marketing gets the SAIR footer; utility doesn't. */
+  category?: 'MARKETING' | 'UTILITY';
 }
 
 // Registry of every template this codebase can submit/send. Bodies must stay
@@ -42,6 +45,17 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
       'a gente indica produtores da região de {{2}} que precisam de receituário agronômico — de graça nessa ' +
       'fase de validação. Se fizer sentido, me dá um alô por aqui. Se não for o momento, tudo bem também!',
     example: ['Agro Forte', 'Varginha'],
+  },
+  // Lead delivery to an ACTIVE partner (agreed relationship ⇒ UTILITY, no SAIR
+  // footer) — {{1}}=partner first name, {{2}}=crop, {{3}}=farmer's topic.
+  // The farmer's contact goes only in the follow-up, after the partner replies.
+  [LEAD_NAME]: {
+    category: 'UTILITY',
+    body:
+      'Oi, {{1}}! 🌱 Lead novo da Stevi pra você: produtor com lavoura de {{2}} pediu um agrônomo — ' +
+      'assunto: "{{3}}". Ele autorizou passar o contato e está esperando. ' +
+      'Responde qualquer coisa aqui que eu já te mando o número e o resumo completo da conversa.',
+    example: ['Michel', 'café', 'ferrugem nas folhas'],
   },
 };
 
@@ -107,18 +121,15 @@ export async function submitTemplate(
   if (existing) return { submitted: false, status: existing };
 
   const waba = await resolveWabaId();
+  const category = def.category ?? 'MARKETING';
+  const components: unknown[] = [
+    { type: 'BODY', text: def.body, example: { body_text: [def.example] } },
+  ];
+  if (category === 'MARKETING') components.push({ type: 'FOOTER', text: FOOTER });
   const res = await fetch(`${GRAPH}/${waba}/message_templates`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name,
-      language: 'pt_BR',
-      category: 'MARKETING',
-      components: [
-        { type: 'BODY', text: def.body, example: { body_text: [def.example] } },
-        { type: 'FOOTER', text: FOOTER },
-      ],
-    }),
+    body: JSON.stringify({ name, language: 'pt_BR', category, components }),
   });
   const json = (await res.json()) as {
     id?: string;

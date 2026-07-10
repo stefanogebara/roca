@@ -426,16 +426,24 @@ export async function createReferralRequest(
     topic: string | null;
     consentVersion: string;
   }
-): Promise<void> {
+): Promise<string | null> {
   const db = getDb();
-  const { error } = await db.from('referral_requests').insert({
-    user_id: userId,
-    uf: fields.uf,
-    crop: fields.crop,
-    topic: fields.topic,
-    consent_version: fields.consentVersion,
-  });
-  if (error) log.error('createReferralRequest failed:', error.message);
+  const { data, error } = await db
+    .from('referral_requests')
+    .insert({
+      user_id: userId,
+      uf: fields.uf,
+      crop: fields.crop,
+      topic: fields.topic,
+      consent_version: fields.consentVersion,
+    })
+    .select('id')
+    .single();
+  if (error) {
+    log.error('createReferralRequest failed:', error.message);
+    return null;
+  }
+  return (data as { id: string }).id;
 }
 
 /** Cached Twilio Content SID for a button-set hash, or null. */
