@@ -186,6 +186,16 @@ export async function setProspectStatus(id: string, status: ProspectStatus): Pro
     log.error('setProspectStatus failed:', error.message);
     return false;
   }
+  // Promotion to 'ready' IS the review act: a sourced number ('pending', i.e.
+  // format-validated but scraped) becomes 'valid'. Never resurrects 'invalid'.
+  if (status === 'ready') {
+    const { error: waErr } = await db
+      .from('prospects')
+      .update({ wa_status: 'valid' })
+      .eq('id', id)
+      .eq('wa_status', 'pending');
+    if (waErr) log.error('wa_status promotion failed:', waErr.message);
+  }
   return true;
 }
 
