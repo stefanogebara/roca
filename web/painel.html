@@ -292,49 +292,110 @@
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
     }
 
+    // ── Leads (pedidos de agrônomo) ────────────────────────────────────────
+    const L_STATUS = {
+      novo:      { label: 'Novos',      color: '#b7791f', hint: 'produtor pediu agrônomo — encaminhar pro parceiro' },
+      contatado: { label: 'Encaminhados', color: '#3b6fb2', hint: 'lead entregue ao parceiro — aguardando fechamento' },
+      fechado:   { label: 'Fechados',   color: '#2e9e63', hint: 'atendido pelo parceiro 🎉' },
+    };
+    const lState = { status: null };
+    let lCache = [];
+
     async function loadLeads() {
       const p = $('#p-leads'); p.innerHTML = '<div class="loading">Carregando…</div>';
       try {
-        const rows = await api('leads');
+        lCache = await api('leads');
         p.innerHTML = '';
-        const head = el('div', 'card');
-        head.append(el('h3', null, 'Pedidos de agrônomo'));
-        head.append(el('div', 'empty', rows.length ? (rows.length + ' produtor(es) pediram pra falar com um agrônomo.') : 'Nenhum pedido de agrônomo ainda.'));
-        p.append(head);
-        for (const l of rows) {
-          const item = el('div', 'conv');
-          const left = el('div');
-          left.append(el('div', 'who', l.phone));
-          const meta = el('div', 'meta');
-          if (l.uf) meta.append(Object.assign(el('span','pill'), {textContent: l.uf}));
-          (l.crop||[]).forEach(cr => meta.append(Object.assign(el('span','pill'), {textContent: cr})));
-          left.append(meta);
-          if (l.topic) left.append(el('div', 'meta', '“' + l.topic + '”'));
-          // Status selector — the mini-CRM. Change persists immediately.
-          const sel = el('select');
-          sel.style.cssText = 'padding:4px 8px;border-radius:8px;border:1px solid var(--line,#e3dccb);background:#fff;font:inherit;color:var(--ink,#1a2420);cursor:pointer';
-          for (const s of ['novo','contatado','fechado']) {
-            const o = el('option', null, s); o.value = s;
-            if (s === (l.status||'novo')) o.selected = true;
-            sel.append(o);
-          }
-          sel.addEventListener('click', (e) => e.stopPropagation()); // don't open thread
-          sel.addEventListener('change', async () => {
-            const prev = l.status; sel.disabled = true;
-            try { await api('leads', { method: 'POST', body: JSON.stringify({ id: l.id, status: sel.value }) }); l.status = sel.value; }
-            catch (e) { if (e.message!=='unauthorized') { sel.value = prev||'novo'; alert('Não deu pra salvar o status.'); } }
-            finally { sel.disabled = false; }
-          });
-          const right = el('div', 'right'); right.append(sel, el('div', null, fmtDate(l.at)));
-          item.append(left, right);
-          // Click the lead → open the farmer's full conversation (Conversas view).
-          if (l.userId) {
-            item.style.cursor = 'pointer';
-            item.addEventListener('click', () => { activateTab('conversas'); openThread({ userId: l.userId, phone: l.phone, name: null }); });
-          }
-          p.append(item);
-        }
+        const funnel = el('div', 'funnel'); funnel.id = 'l-funnel';
+        p.append(funnel);
+        p.append(el('div', 'countnote', 'Cada lead é um produtor que pediu receituário/agrônomo. Clique no card pra abrir a conversa completa dele.'));
+        const listWrap = el('div'); listWrap.id = 'lead-list';
+        p.append(listWrap);
+        renderLeads();
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
+    }
+
+    function renderLeads() {
+      const funnel = $('#l-funnel'); if (!funnel) return;
+      funnel.innerHTML = '';
+      const stages = Object.keys(L_STATUS);
+      stages.forEach((s, i) => {
+        const st = L_STATUS[s];
+        const n = lCache.filter(x => (x.status || 'novo') === s).length;
+        const b = el('button', 'fstage' + (lState.status === s ? ' on' : ''));
+        b.title = st.hint;
+        b.append(el('div', 'n', String(n)), el('div', 'l', st.label));
+        const dot = el('span', 'dot'); dot.style.background = st.color; b.append(dot);
+        if (i < stages.length - 1) b.append(el('span', 'arr', '›'));
+        b.addEventListener('click', () => { lState.status = lState.status === s ? null : s; renderLeads(); });
+        funnel.append(b);
+      });
+
+      const wrap = $('#lead-list'); if (!wrap) return;
+      wrap.innerHTML = '';
+      const order = { novo: 0, contatado: 1, fechado: 2 };
+      let rows = [...lCache].sort((a, b) =>
+        (order[a.status || 'novo'] ?? 9) - (order[b.status || 'novo'] ?? 9) ||
+        String(b.at || '').localeCompare(String(a.at || '')));
+      if (lState.status) rows = rows.filter(x => (x.status || 'novo') === lState.status);
+      if (!rows.length) {
+        wrap.append(el('div', 'empty', lCache.length ? 'Nada aqui com esse filtro.' : 'Nenhum pedido de agrônomo ainda — eles aparecem aqui na hora.'));
+        return;
+      }
+      for (const l of rows) wrap.append(leadRow(l));
+    }
+
+    function leadRow(l) {
+      const s = l.status || 'novo';
+      const st = L_STATUS[s] || L_STATUS.novo;
+      const item = el('div', 'conv pcard');
+      item.style.borderLeftColor = st.color;
+
+      const left = el('div');
+      const who = el('div', 'who');
+      who.append(el('span', null, l.phone));
+      const spill = el('span', 'spill', st.label.toLowerCase()); spill.style.background = st.color;
+      who.append(spill);
+      left.append(who);
+      const meta = el('div', 'meta');
+      if (l.uf) meta.append(Object.assign(el('span','pill'), {textContent: l.uf}));
+      (l.crop||[]).forEach(cr => meta.append(Object.assign(el('span','pill'), {textContent: cr})));
+      meta.append(document.createTextNode(fmtDate(l.at)));
+      left.append(meta);
+      if (l.topic) left.append(el('div', 'quali', '“' + l.topic + '”'));
+
+      const right = el('div', 'act');
+      const setStatus = async (status, btn) => {
+        btn.disabled = true;
+        try {
+          await api('leads', { method: 'POST', body: JSON.stringify({ id: l.id, status }) });
+          l.status = status; renderLeads();
+        } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra salvar o status.'); btn.disabled = false; }
+      };
+      if (s === 'novo') {
+        const fwd = el('button', 'btn tiny', '→ Encaminhado');
+        fwd.title = 'Marquei que entreguei esse lead a um parceiro';
+        fwd.addEventListener('click', (e) => { e.stopPropagation(); setStatus('contatado', fwd); });
+        right.append(fwd);
+      } else if (s === 'contatado') {
+        const done = el('button', 'btn tiny', '✓ Fechado');
+        done.addEventListener('click', (e) => { e.stopPropagation(); setStatus('fechado', done); });
+        const back = el('button', 'btn tiny ghost', '↩');
+        back.title = 'Voltar pra novo';
+        back.addEventListener('click', (e) => { e.stopPropagation(); setStatus('novo', back); });
+        right.append(done, back);
+      } else {
+        const back = el('button', 'btn tiny ghost', '↩ Reabrir');
+        back.addEventListener('click', (e) => { e.stopPropagation(); setStatus('contatado', back); });
+        right.append(back);
+      }
+
+      item.append(left, right);
+      if (l.userId) {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => { activateTab('conversas'); openThread({ userId: l.userId, phone: l.phone, name: null }); });
+      }
+      return item;
     }
 
     // ── Prospecção ──────────────────────────────────────────────────────────
