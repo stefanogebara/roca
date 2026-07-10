@@ -79,6 +79,32 @@
     .conv .right { text-align: right; color: var(--muted); font-size: 12px; white-space: nowrap; }
     .pill { display: inline-block; background: #eef4ef; color: var(--green-2); border-radius: 20px; padding: 1px 9px; font-size: 11.5px; margin-right: 4px; }
 
+    /* Prospecção */
+    .funnel { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .fstage { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; cursor: pointer; text-align: left; transition: transform .12s ease, border-color .12s ease; font: inherit; }
+    .fstage:hover { transform: translateY(-1px); border-color: var(--leaf); }
+    .fstage.on { border-color: var(--green-2); outline: 2px solid var(--leaf); }
+    .fstage .n { font-family: 'Instrument Serif', serif; font-size: 30px; line-height: 1; color: var(--green); }
+    .fstage .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 5px; }
+    .fstage .dot { position: absolute; top: 12px; right: 12px; width: 9px; height: 9px; border-radius: 50%; }
+    .fstage .arr { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); color: var(--line); font-size: 13px; z-index: 1; }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .toolbar input[type=text] { flex: 1; min-width: 170px; padding: 9px 12px; }
+    .chip { border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 20px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
+    .chip.on { background: var(--green); border-color: var(--green); color: #fff; }
+    .spill { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 2px 9px; color: #fff; }
+    .pcard { border-left: 4px solid transparent; }
+    .pcard .who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pcard .quali { font-size: 12.5px; color: var(--green-2); margin-top: 4px; }
+    .pcard .act { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+    .btn.tiny { width: auto; padding: 5px 10px; font-size: 12px; margin: 0; border-radius: 8px; }
+    .btn.danger { background: transparent; color: var(--red); border: 1px solid var(--line); }
+    .btn.danger:hover { background: #fbeeee; }
+    .prospect-thread { animation: slidein .18s ease; }
+    @keyframes slidein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    details.imp summary { cursor: pointer; color: var(--green-2); font-weight: 600; font-size: 14px; }
+    .countnote { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+
     /* Thread */
     .thread { display: flex; flex-direction: column; gap: 8px; }
     .msg { max-width: 78%; padding: 9px 12px; border-radius: 14px; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
@@ -311,18 +337,91 @@
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
     }
 
+    // ── Prospecção ──────────────────────────────────────────────────────────
+    // Status model: discovered → ready → contacted → replied (+ discarded).
+    const P_STATUS = {
+      discovered: { label: 'Descobertos', color: '#b7791f', hint: 'achados na web ou importados — revise e aprove' },
+      ready:      { label: 'Aprovados',   color: '#2e9e63', hint: 'na fila do disparo automático (seg–sex 10h/13h/16h)' },
+      contacted:  { label: 'Contatados',  color: '#3b6fb2', hint: 'template enviado — aguardando resposta' },
+      replied:    { label: 'Responderam', color: '#14432f', hint: 'em conversa com a Vitória 🤖' },
+      discarded:  { label: 'Descartados', color: '#9aa5a0', hint: 'fora do perfil' },
+    };
+    const pState = { status: null, kind: null, q: '' };
+    let pCache = [];
+
+    // Effective stage: send_status 'sent' shows as contacted even if the row
+    // status hasn't caught up yet.
+    const pStage = (pr) => (pr.status === 'ready' && pr.send_status === 'sent') ? 'contacted' : pr.status;
+
     async function loadProspeccao() {
       const p = $('#p-prospeccao'); p.innerHTML = '<div class="loading">Carregando…</div>';
       try {
-        const list = await api('prospects');
+        pCache = await api('prospects');
         p.innerHTML = '';
 
-        // Import box.
-        const imp = el('div', 'card');
-        imp.append(el('h3', null, 'Importar prospects (coop, revenda, sindicato, agrônomo)'));
-        imp.append(el('div', 'empty', 'Uma linha por prospect: nome, telefone, cidade, uf, tipo — ex.: "Cooperativa Central, (19) 3822-1234, Campinas, SP, coop". Telefone inválido é marcado e nunca recebe envio.'));
+        // Funnel — clickable stages that filter the list below.
+        const funnel = el('div', 'funnel'); funnel.id = 'p-funnel';
+        p.append(funnel);
+
+        // Toolbar: search + kind chips + actions.
+        const bar = el('div', 'toolbar');
+        const q = el('input'); q.type = 'text'; q.placeholder = '🔎 Buscar por nome, cidade…';
+        q.addEventListener('input', () => { pState.q = q.value.trim().toLowerCase(); renderProspects(); });
+        bar.append(q);
+        for (const k of ['consultoria', 'revenda', 'cooperativa', 'agronomo', 'fazenda']) {
+          const c = el('button', 'chip', k);
+          c.addEventListener('click', () => {
+            pState.kind = pState.kind === k ? null : k;
+            bar.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x.textContent === pState.kind));
+            renderProspects();
+          });
+          bar.append(c);
+        }
+        p.append(bar);
+
+        // Actions row: sourcing + dispatch (the cron does this alone on weekdays;
+        // these buttons exist for "now" moments).
+        const act = el('div', 'toolbar');
+        const srcBtn = el('button', 'btn small ghost', '🌐 Buscar na web');
+        srcBtn.addEventListener('click', async () => {
+          srcBtn.disabled = true; srcBtn.textContent = 'Buscando…';
+          try {
+            const rep = await api('prospects', { method:'POST', body: JSON.stringify({ action:'source' }) });
+            note.textContent = rep.configured
+              ? `Busca: ${rep.found} encontrados · ${rep.imported} novos importados (${rep.withPhone} com telefone).` + (rep.error ? ` Aviso: ${rep.error}` : '')
+              : rep.error;
+            await refreshProspects();
+          } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro na busca: '+e.message; }
+          finally { srcBtn.disabled = false; srcBtn.textContent = '🌐 Buscar na web'; }
+        });
+        const simBtn = el('button', 'btn small ghost', '👁 Simular lote');
+        const goBtn = el('button', 'btn small', '📤 Disparar agora');
+        const runDispatch = async (dryRun) => {
+          if (!dryRun && !confirm('Enviar o template de parceria pro próximo lote de aprovados agora? (respeita opt-out, 20/dia e horário comercial)')) return;
+          note.textContent = 'Processando…';
+          try {
+            const rep = await api('prospects', { method:'POST', body: JSON.stringify({ action:'dispatch', dryRun }) });
+            if (rep.skippedOutsideHours) note.textContent = 'Fora do horário comercial (seg–sex 9–18 BRT) — nenhum envio.';
+            else if (rep.aborted) note.textContent = '⛔ Abortado por segurança: ' + (rep.error||'');
+            else if (dryRun) note.textContent = `Próximo lote (${rep.planned} de ${rep.eligible} elegíveis): ` + (rep.recipients.map(r=>r.name).join(', ') || 'ninguém');
+            else note.textContent = `Enviados: ${rep.sent} · falhas: ${rep.failed} · na fila: ${rep.eligible - rep.sent}`;
+            if (!dryRun) await refreshProspects();
+          } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro: '+e.message; }
+        };
+        simBtn.addEventListener('click', () => runDispatch(true));
+        goBtn.addEventListener('click', () => runDispatch(false));
+        act.append(srcBtn, simBtn, goBtn);
+        p.append(act);
+        const note = el('div', 'countnote', 'Disparo automático ativo: seg–sex às 10h, 13h e 16h (BRT) · lote de 8 · máx. 20/dia · template aprovado stevi_parceria_v2.');
+        p.append(note);
+
+        // Manual import, tucked away — sourcing is the primary intake now.
+        const det = el('details', 'imp');
+        det.append(Object.assign(el('summary'), { textContent: '📋 Importar lista manualmente' }));
+        const impBox = el('div', 'card'); impBox.style.marginTop = '10px';
+        impBox.append(el('div', 'countnote', 'Uma linha por prospect: nome, telefone, cidade, uf, tipo — ex.: "Cooperativa Central, (19) 3822-1234, Campinas, SP, coop".'));
         const ta = el('textarea'); ta.rows = 4;
-        ta.style.cssText = 'width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--line,#e3dccb);font:inherit';
+        ta.style.cssText = 'width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--line);font:inherit';
         const impBtn = el('button', 'btn small', 'Importar');
         impBtn.style.marginTop = '8px';
         impBtn.addEventListener('click', async () => {
@@ -330,145 +429,167 @@
           impBtn.disabled = true;
           try {
             const r = await api('prospects', { method:'POST', body: JSON.stringify({ action:'import', text: ta.value }) });
-            alert(`Importados: ${r.inserted} novos · ${r.parsed} lidos · ${r.invalid} com telefone inválido.`);
-            ta.value = ''; loadProspeccao();
-          } catch (e) { if (e.message!=='unauthorized') alert('Erro ao importar: '+e.message); }
+            note.textContent = `Importados: ${r.inserted} novos · ${r.parsed} lidos · ${r.invalid} com telefone inválido.`;
+            ta.value = ''; await refreshProspects();
+          } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro ao importar: '+e.message; }
           finally { impBtn.disabled = false; }
         });
-        imp.append(ta, impBtn);
-        p.append(imp);
+        impBox.append(ta, impBtn);
+        det.append(impBox);
+        const detWrap = el('div'); detWrap.style.marginBottom = '14px'; detWrap.append(det);
+        p.append(detWrap);
 
-        // Dispatch actions.
-        const act = el('div', 'card');
-        act.append(el('h3', null, 'Disparo (template aprovado · limites de segurança ativos)'));
-        const out = el('div', 'empty', 'Simule primeiro pra ver quem entraria no lote.');
-        const runDispatch = async (dryRun) => {
-          if (!dryRun && !confirm('Enviar o template de parceria pra todos os prospects "ready" elegíveis agora? (respeita opt-out, limite diário e horário comercial)')) return;
-          out.textContent = 'Processando…';
-          try {
-            const rep = await api('prospects', { method:'POST', body: JSON.stringify({ action:'dispatch', dryRun }) });
-            if (rep.skippedOutsideHours) out.textContent = 'Fora do horário comercial (seg–sex 9–18 BRT) — nenhum envio. Simule quando quiser.';
-            else if (rep.aborted) out.textContent = '⛔ Abortado por segurança: ' + (rep.error||'') ;
-            else if (dryRun) out.textContent = `Simulação: ${rep.planned} de ${rep.eligible} elegível(is) entrariam no próximo lote — ` + (rep.recipients.map(r=>r.name).join(', ') || 'ninguém');
-            else out.textContent = `Enviados: ${rep.sent} · falhas: ${rep.failed} · elegíveis restantes: ${rep.eligible - rep.sent}`;
-            loadProspeccaoListOnly();
-          } catch (e) { if (e.message!=='unauthorized') out.textContent = 'Erro: '+e.message; }
-        };
-        const simBtn = el('button', 'btn small ghost', 'Simular (dry-run)');
-        const goBtn = el('button', 'btn small', 'Disparar agora');
-        goBtn.style.marginLeft = '8px';
-        simBtn.addEventListener('click', () => runDispatch(true));
-        goBtn.addEventListener('click', () => runDispatch(false));
-        const btnRow = el('div'); btnRow.style.margin = '8px 0'; btnRow.append(simBtn, goBtn);
-        act.append(btnRow, out);
-        p.append(act);
-
-        // List.
-        const srcBtn = el('button', 'btn small', '🔎 Buscar prospects na web (Google)');
-        srcBtn.addEventListener('click', async () => {
-          srcBtn.disabled = true; srcBtn.textContent = 'Buscando…';
-          try {
-            const rep = await api('prospects', { method:'POST', body: JSON.stringify({ action:'source' }) });
-            alert(rep.configured
-              ? `Busca: ${rep.found} encontrados, ${rep.imported} novos importados (${rep.withPhone} com telefone).` + (rep.error ? `\nAviso: ${rep.error}` : '')
-              : rep.error);
-            loadProspeccao();
-          } catch (e) { if (e.message!=='unauthorized') alert('Erro na busca: '+e.message); }
-          finally { srcBtn.disabled = false; srcBtn.textContent = '🔎 Buscar prospects na web (Google)'; }
-        });
-        imp.append(srcBtn);
         const listWrap = el('div'); listWrap.id = 'prospect-list';
         p.append(listWrap);
-        renderProspects(listWrap, list);
+        renderProspects();
       } catch (e) { if (e.message!=='unauthorized') p.innerHTML = '<div class="empty">Erro: '+e.message+'</div>'; }
     }
 
-    async function loadProspeccaoListOnly() {
-      const wrap = $('#prospect-list'); if (!wrap) return;
-      try { renderProspects(wrap, await api('prospects')); } catch {}
+    async function refreshProspects() {
+      try { pCache = await api('prospects'); renderProspects(); } catch {}
     }
 
-    function renderProspects(wrap, list) {
+    function renderFunnel() {
+      const funnel = $('#p-funnel'); if (!funnel) return;
+      funnel.innerHTML = '';
+      const stages = Object.keys(P_STATUS);
+      stages.forEach((s, i) => {
+        const st = P_STATUS[s];
+        const n = pCache.filter(x => pStage(x) === s).length;
+        const b = el('button', 'fstage' + (pState.status === s ? ' on' : ''));
+        b.title = st.hint;
+        b.append(el('div', 'n', String(n)), el('div', 'l', st.label));
+        const dot = el('span', 'dot'); dot.style.background = st.color; b.append(dot);
+        if (i < stages.length - 2) b.append(el('span', 'arr', '›')); // no arrow into "descartados"
+        b.addEventListener('click', () => { pState.status = pState.status === s ? null : s; renderProspects(); });
+        funnel.append(b);
+      });
+    }
+
+    function renderProspects() {
+      renderFunnel();
+      const wrap = $('#prospect-list'); if (!wrap) return;
       wrap.innerHTML = '';
-      const head = el('div', 'card');
-      const ready = list.filter(x=>x.status==='ready').length, contacted = list.filter(x=>x.send_status==='sent'||x.status==='contacted').length;
-      head.append(el('h3', null, `Prospects (${list.length})`));
-      head.append(el('div', 'empty', `${ready} prontos pra disparo · ${contacted} já contatados`));
-      wrap.append(head);
-      for (const pr of list) {
-        const item = el('div', 'conv');
-        const left = el('div');
-        left.append(el('div', 'who', pr.name + (pr.phone ? ' · ' + pr.phone : ' · (sem número)')));
-        const meta = el('div', 'meta');
-        [pr.kind, pr.city, pr.uf].filter(Boolean).forEach(v => meta.append(Object.assign(el('span','pill'),{textContent:v})));
-        if (pr.wa_status !== 'valid') meta.append(Object.assign(el('span','pill'),{textContent:'nº '+pr.wa_status}));
-        if (pr.send_status) meta.append(Object.assign(el('span','pill'),{textContent:'envio: '+pr.send_status}));
-        if (pr.agent_enabled === false) meta.append(Object.assign(el('span','pill'),{textContent:'🤖 agente OFF'}));
-        left.append(meta);
-        // Qualification the agent extracted from the conversation.
-        if (pr.qualification && Object.values(pr.qualification).some(v => v != null)) {
-          const q = pr.qualification, bits = [];
-          if (q.accepts_leads != null) bits.push(q.accepts_leads ? '✅ aceita leads' : '❌ não aceita leads');
-          if (q.response_time) bits.push('⏱ ' + q.response_time);
-          if (q.format_pref) bits.push('💰 ' + q.format_pref);
-          if (q.coverage && q.coverage.length) bits.push('📍 ' + q.coverage.join(', '));
-          if (q.crops && q.crops.length) bits.push('🌱 ' + q.crops.join(', '));
-          if (bits.length) left.append(el('div', 'empty', bits.join(' · ')));
-        }
-        const sel = el('select');
-        sel.style.cssText = 'padding:4px 8px;border-radius:8px;border:1px solid var(--line,#e3dccb);background:#fff;font:inherit;cursor:pointer';
-        for (const s of ['discovered','ready','discarded']) { const o=el('option',null,s); o.value=s; if(s===pr.status) o.selected=true; sel.append(o); }
-        // Can't mark ready without a valid number.
-        if (pr.wa_status !== 'valid') { const o=[...sel.options].find(o=>o.value==='ready'); if(o) o.disabled=true; }
-        sel.addEventListener('change', async () => {
-          sel.disabled = true;
-          try { await api('prospects', { method:'POST', body: JSON.stringify({ action:'status', id: pr.id, status: sel.value }) }); pr.status = sel.value; }
-          catch (e) { if (e.message!=='unauthorized') { alert('Não deu pra salvar.'); } }
-          finally { sel.disabled = false; }
+
+      const order = { replied: 0, contacted: 1, ready: 2, discovered: 3, discarded: 4 };
+      let rows = [...pCache].sort((a, b) =>
+        (order[pStage(a)] ?? 9) - (order[pStage(b)] ?? 9) ||
+        String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+      if (pState.status) rows = rows.filter(x => pStage(x) === pState.status);
+      if (pState.kind) rows = rows.filter(x => (x.kind || '') === pState.kind);
+      if (pState.q) rows = rows.filter(x => (x.name + ' ' + (x.city||'') + ' ' + (x.phone||'')).toLowerCase().includes(pState.q));
+
+      wrap.append(el('div', 'countnote',
+        rows.length === pCache.length ? `${rows.length} prospects` : `${rows.length} de ${pCache.length} prospects (filtro ativo)`));
+      if (!rows.length) { wrap.append(el('div', 'empty', 'Nada aqui com esse filtro.')); return; }
+
+      for (const pr of rows) wrap.append(prospectRow(pr));
+    }
+
+    function prospectRow(pr) {
+      const stage = pStage(pr);
+      const st = P_STATUS[stage] || P_STATUS.discovered;
+      const item = el('div', 'conv pcard');
+      item.style.borderLeftColor = st.color;
+
+      const left = el('div');
+      const who = el('div', 'who');
+      who.append(el('span', null, pr.name));
+      const spill = el('span', 'spill', st.label.toLowerCase()); spill.style.background = st.color;
+      who.append(spill);
+      if (pr.agent_enabled === false) {
+        const off = el('span', 'spill', '🤖 agente off'); off.style.background = 'var(--amber)'; who.append(off);
+      }
+      left.append(who);
+      const meta = el('div', 'meta');
+      [pr.kind, pr.city, pr.uf].filter(Boolean).forEach(v => meta.append(Object.assign(el('span','pill'),{textContent:v})));
+      meta.append(document.createTextNode(pr.phone ? pr.phone : '(sem número)'));
+      if (pr.wa_status === 'invalid') meta.append(Object.assign(el('span','pill'),{textContent:'nº inválido'}));
+      if (pr.send_status === 'send_failed') meta.append(Object.assign(el('span','pill'),{textContent:'⚠️ envio falhou'}));
+      left.append(meta);
+      if (pr.qualification && Object.values(pr.qualification).some(v => v != null)) {
+        const qd = pr.qualification, bits = [];
+        if (qd.accepts_leads != null) bits.push(qd.accepts_leads ? '✅ aceita leads' : '❌ não aceita leads');
+        if (qd.response_time) bits.push('⏱ ' + qd.response_time);
+        if (qd.format_pref) bits.push('💰 ' + qd.format_pref);
+        if (qd.coverage && qd.coverage.length) bits.push('📍 ' + qd.coverage.join(', '));
+        if (qd.crops && qd.crops.length) bits.push('🌱 ' + qd.crops.join(', '));
+        if (bits.length) left.append(el('div', 'quali', bits.join(' · ')));
+      }
+
+      const right = el('div', 'act');
+      const setStatus = async (status, btn) => {
+        btn.disabled = true;
+        try {
+          await api('prospects', { method:'POST', body: JSON.stringify({ action:'status', id: pr.id, status }) });
+          pr.status = status;
+          if (status === 'ready' && pr.wa_status === 'pending') pr.wa_status = 'valid';
+          renderProspects();
+        } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra salvar.'); btn.disabled = false; }
+      };
+      if (stage === 'discovered') {
+        const ok = el('button', 'btn tiny', '✓ Aprovar');
+        if (!pr.phone || pr.wa_status === 'invalid') { ok.disabled = true; ok.title = 'Sem número válido'; }
+        ok.addEventListener('click', () => setStatus('ready', ok));
+        const no = el('button', 'btn tiny danger', '✕');
+        no.title = 'Descartar';
+        no.addEventListener('click', () => setStatus('discarded', no));
+        right.append(ok, no);
+      } else if (stage === 'ready') {
+        const back = el('button', 'btn tiny danger', '✕ Tirar da fila');
+        back.addEventListener('click', () => setStatus('discovered', back));
+        right.append(back);
+      } else if (stage === 'discarded') {
+        const back = el('button', 'btn tiny danger', '↩ Reativar');
+        back.addEventListener('click', () => setStatus('discovered', back));
+        right.append(back);
+      }
+      if (stage === 'replied' || stage === 'contacted' || pr.send_status) {
+        const chatBtn = el('button', 'btn tiny' + (stage === 'replied' ? '' : ' ghost'), '💬 Conversa');
+        chatBtn.addEventListener('click', () => toggleProspectThread(item, pr));
+        right.append(chatBtn);
+      }
+
+      item.append(left, right);
+      return item;
+    }
+
+    async function toggleProspectThread(item, pr) {
+      let box = item.nextElementSibling;
+      if (box && box.classList.contains('prospect-thread')) { box.remove(); return; }
+      box = el('div', 'card prospect-thread');
+      box.style.cssText = 'margin:4px 0 12px 20px;padding:14px';
+      box.append(el('div', 'loading', 'Carregando conversa…'));
+      item.after(box);
+      try {
+        const thread = await api('prospects', { method:'POST', body: JSON.stringify({ action:'thread', id: pr.id }) });
+        box.innerHTML = '';
+        const hd = el('div', 'toolbar');
+        hd.append(el('b', null, 'Vitória 🤖 ↔ ' + pr.name));
+        const tg = el('button', 'btn tiny ghost', pr.agent_enabled === false ? '▶️ Religar agente' : '⏸ Assumir conversa');
+        tg.addEventListener('click', async () => {
+          const enable = pr.agent_enabled === false;
+          try {
+            await api('prospects', { method:'POST', body: JSON.stringify({ action:'agent', id: pr.id, enabled: enable }) });
+            pr.agent_enabled = enable;
+            tg.textContent = enable ? '⏸ Assumir conversa' : '▶️ Religar agente';
+            renderFunnel();
+          } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra salvar.'); }
         });
-        const right = el('div','right');
-        // Conversation thread (agent ↔ prospect) + human-takeover toggle.
-        if (pr.status === 'replied' || pr.status === 'contacted' || pr.send_status) {
-          const chatBtn = el('button', 'btn small', '💬 conversa');
-          chatBtn.addEventListener('click', async () => {
-            let box = item.nextElementSibling;
-            if (box && box.classList.contains('prospect-thread')) { box.remove(); return; }
-            box = el('div', 'card prospect-thread');
-            box.style.cssText = 'margin:4px 0 12px 16px;padding:12px';
-            box.append(el('div', 'loading', 'Carregando conversa…'));
-            item.after(box);
-            try {
-              const thread = await api('prospects', { method:'POST', body: JSON.stringify({ action:'thread', id: pr.id }) });
-              box.innerHTML = '';
-              const tg = el('button', 'btn small', pr.agent_enabled === false ? '▶️ religar agente' : '⏸ assumir conversa (desliga agente)');
-              tg.addEventListener('click', async () => {
-                const enable = pr.agent_enabled === false;
-                try {
-                  await api('prospects', { method:'POST', body: JSON.stringify({ action:'agent', id: pr.id, enabled: enable }) });
-                  pr.agent_enabled = enable;
-                  tg.textContent = enable ? '⏸ assumir conversa (desliga agente)' : '▶️ religar agente';
-                } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra salvar.'); }
-              });
-              box.append(tg);
-              if (!thread.length) box.append(el('div','empty','Sem mensagens ainda (o primeiro contato foi o template).'));
-              for (const m of thread) {
-                const line = el('div', 'empty');
-                line.style.cssText = m.direction === 'out'
-                  ? 'text-align:right;background:#eef7ee;border-radius:8px;padding:6px 10px;margin:4px 0 4px 40px'
-                  : 'background:#f6f2e8;border-radius:8px;padding:6px 10px;margin:4px 40px 4px 0';
-                const kindTag = m.kind !== 'text' ? '['+m.kind+'] ' : '';
-                line.textContent = kindTag + (m.text ?? '') + '  · ' + fmtDate(m.created_at);
-                box.append(line);
-              }
-            } catch (e) {
-              if (e.message!=='unauthorized') box.innerHTML = '<div class="empty">Erro: '+e.message+'</div>';
-            }
-          });
-          right.append(chatBtn);
+        hd.append(tg);
+        box.append(hd);
+        if (!thread.length) box.append(el('div','empty','Sem mensagens ainda — o primeiro contato foi o template aprovado.'));
+        else {
+          const tw = el('div', 'thread');
+          for (const m of thread) {
+            const b = el('div', 'msg ' + (m.direction === 'out' ? 'out' : 'in'), m.text ?? '('+m.kind+')');
+            b.append(el('span', 'tag', [m.kind !== 'text' ? m.kind : null, m.direction === 'out' ? 'Vitória' : pr.name, fmtDate(m.created_at)].filter(Boolean).join(' · ')));
+            tw.append(b);
+          }
+          box.append(tw);
         }
-        right.append(sel);
-        item.append(left, right);
-        wrap.append(item);
+      } catch (e) {
+        if (e.message!=='unauthorized') box.innerHTML = '<div class="empty">Erro: '+e.message+'</div>';
       }
     }
 
