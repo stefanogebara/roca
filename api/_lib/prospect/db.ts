@@ -84,18 +84,25 @@ export async function countSentSince(sinceIso: string): Promise<number> {
  * Atomically claim a prospect for the intro send (send_status null → 'sending',
  * one SQL statement). Two dispatch runs can overlap — the cron firing while a
  * founder presses "Disparar" in the painel — and both read the same eligible
- * rows; whoever claims a row first owns it, the other MUST skip. Returns false
- * when the row was already claimed. FAILS CLOSED on error (a row we can't claim
- * is a row we don't send). A crash after claiming strands the row at 'sending',
- * which is deliberately never re-eligible: on a fresh number a lost send is
- * recoverable by ops, a double send is not.
+ * rows; whoever claims a row first owns it, the other MUST skip. Re-checks
+ * status='ready' so a founder discarding the prospect mid-run (pacing makes a
+ * run span minutes) also voids the claim. The claim stamps sent_at NOW: the
+ * daily cap counts sent_at, so cap is consumed at claim time and an overlapping
+ * run's recount sees it (recordSend refreshes the timestamp; a failed attempt
+ * keeps counting toward the cap — deliberately conservative pacing). Returns
+ * false when the row was already claimed/changed. FAILS CLOSED on error (a row
+ * we can't claim is a row we don't send). A crash after claiming strands the
+ * row at 'sending' — surfaced in the painel with a "Liberar reenvio" reset —
+ * because a lost send is recoverable and a double send is not.
  */
 export async function claimProspectForSend(id: string): Promise<boolean> {
   const db = getDb();
+  const now = new Date().toISOString();
   const { data, error } = await db
     .from('prospects')
-    .update({ send_status: 'sending', updated_at: new Date().toISOString() })
+    .update({ send_status: 'sending', sent_at: now, updated_at: now })
     .eq('id', id)
+    .eq('status', 'ready')
     .is('send_status', null)
     .select('id');
   if (error) {
@@ -107,15 +114,18 @@ export async function claimProspectForSend(id: string): Promise<boolean> {
 
 /**
  * Atomically claim a prospect for the D+3 bump (touches 1 → 2, conditional on
- * the still-bumpable state). Same overlap scenario as claimProspectForSend.
- * If the send then fails, touches stays 2 and the prospect simply never gets
- * re-bumped — a missed follow-up is the safe failure direction.
+ * the still-bumpable state). Same overlap scenario as claimProspectForSend;
+ * sent_at is stamped at claim time for the same cap-consumption reason (it also
+ * drops the row out of loadBumpDueProspects' window immediately). If the send
+ * then fails, touches stays 2 and the prospect simply never gets re-bumped —
+ * a missed follow-up is the safe failure direction.
  */
 export async function claimProspectForBump(id: string): Promise<boolean> {
   const db = getDb();
+  const now = new Date().toISOString();
   const { data, error } = await db
     .from('prospects')
-    .update({ touches: 2, updated_at: new Date().toISOString() })
+    .update({ touches: 2, sent_at: now, updated_at: now })
     .eq('id', id)
     .eq('status', 'contacted')
     .eq('send_status', 'sent')
@@ -123,6 +133,26 @@ export async function claimProspectForBump(id: string): Promise<boolean> {
     .select('id');
   if (error) {
     log.error('claimProspectForBump failed (treated as not claimed):', error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Ops recovery for a stuck claim ('sending' after a crash) or a failed send:
+ * clears send_status so the prospect re-enters the dispatch queue. Guarded to
+ * those two states only — resetting a 'sent' row would re-blast the number.
+ */
+export async function resetProspectSend(id: string): Promise<boolean> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('prospects')
+    .update({ send_status: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .in('send_status', ['sending', 'failed'])
+    .select('id');
+  if (error) {
+    log.error('resetProspectSend failed:', error.message);
     return false;
   }
   return (data ?? []).length > 0;

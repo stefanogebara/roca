@@ -50,10 +50,11 @@ export function joinCrops(crops: string[]): string {
 }
 
 // Scaffolding that legitimately appears in a pure crop answer ("planto soja e
-// milho", "uns 50 hectares de café", "tenho pasto pro gado", "bom dia! só
-// soja"). Written accent-free — it runs against strip()ed text.
+// milho", "uns 50 hectares de café", "produzo café na minha fazenda", "tenho
+// pasto pro gado", "bom dia! só soja"). Written accent-free — it runs against
+// strip()ed text.
 const ANSWER_FILLER =
-  /\b(planto|plantamos|cultivo|cultivamos|crio|criamos|tenho|temos|mexo|mexemos|trabalho|trabalhamos|lido|lidamos|com|de|do|da|dos|das|no|na|nos|nas|em|e|eh|uns?|umas?|pouco|mais|so|tambem|aqui|meu|minha|meus|minhas|nosso|nossa|pra|pro|para|por|enquanto|hoje|atualmente|sim|oi|ola|bom|boa|dia|tarde|noite|obrigado|obrigada|hectares?|ha|alqueires?|pes?|sacas?|cabecas?|\d+)\b/g;
+  /\b(planto|plantamos|cultivo|cultivamos|produzo|produzimos|colho|colhemos|crio|criamos|tenho|temos|mexo|mexemos|trabalho|trabalhamos|lido|lidamos|lavoura|fazenda|sitio|chacara|roca|terra|com|de|do|da|dos|das|no|na|nos|nas|em|e|eh|um|uns|uma|umas|pouco|mais|so|tambem|aqui|meu|minha|meus|minhas|nosso|nossa|pra|pro|para|por|enquanto|hoje|atualmente|sim|oi|ola|bom|boa|dia|tarde|noite|obrigado|obrigada|hectares?|ha|alqueires?|pes?|sacas?|cabecas?|\d+)\b/g;
 
 /**
  * Whether a message is essentially just naming crops — an answer to "o que

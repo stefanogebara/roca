@@ -48,6 +48,9 @@ describe('isCropsOnlyMessage', () => {
     expect(isCropsOnlyMessage('crio boi')).toBe(true);
     expect(isCropsOnlyMessage('bom dia! planto café')).toBe(true);
     expect(isCropsOnlyMessage('uns 50 hectares de soja')).toBe(true);
+    expect(isCropsOnlyMessage('produzo café')).toBe(true);
+    expect(isCropsOnlyMessage('tenho uma fazenda de café')).toBe(true);
+    expect(isCropsOnlyMessage('na roça é milho e feijão')).toBe(true);
   });
 
   it('rejects questions and statements that only mention a crop', () => {

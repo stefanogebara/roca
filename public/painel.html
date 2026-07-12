@@ -234,7 +234,7 @@
         const newLeads = leads.filter(l => (l.status || 'novo') === 'novo').length;
         const repliedP = prospects.filter(x => x.status === 'replied').length;
         const agentOff = prospects.filter(x => x.status === 'replied' && x.agent_enabled === false).length;
-        const queue = prospects.filter(x => x.status === 'ready' && x.send_status !== 'sent').length;
+        const queue = prospects.filter(x => x.status === 'ready' && !x.send_status).length; // sending/failed rows aren't queued
         const items = [
           { n: newLeads, l: 'leads pra encaminhar', hint: 'Produtores pedindo agrônomo — entregue ao parceiro e marque "Encaminhado".', tab: 'leads', urgent: newLeads > 0 },
           { n: repliedP, l: 'prospects em conversa', hint: agentOff ? agentOff + ' com agente desligado — responda você!' : 'A Vitória 🤖 cuida; entre só se ela escalar.', tab: 'prospeccao', urgent: agentOff > 0 },
@@ -604,7 +604,8 @@
       [pr.kind, pr.city, pr.uf].filter(Boolean).forEach(v => meta.append(Object.assign(el('span','pill'),{textContent:v})));
       meta.append(document.createTextNode(pr.phone ? pr.phone : '(sem número)'));
       if (pr.wa_status === 'invalid') meta.append(Object.assign(el('span','pill'),{textContent:'nº inválido'}));
-      if (pr.send_status === 'send_failed') meta.append(Object.assign(el('span','pill'),{textContent:'⚠️ envio falhou'}));
+      if (pr.send_status === 'failed') meta.append(Object.assign(el('span','pill'),{textContent:'⚠️ envio falhou'}));
+      if (pr.send_status === 'sending') meta.append(Object.assign(el('span','pill'),{textContent:'⏳ envio travado'}));
       left.append(meta);
       if (pr.qualification && Object.values(pr.qualification).some(v => v != null)) {
         const qd = pr.qualification, bits = [];
@@ -642,6 +643,18 @@
         const back = el('button', 'btn tiny danger', '↩ Reativar');
         back.addEventListener('click', () => setStatus('discovered', back));
         right.append(back);
+      }
+      if (pr.send_status === 'failed' || pr.send_status === 'sending') {
+        const rst = el('button', 'btn tiny', '↩ Liberar reenvio');
+        rst.title = 'Zera o envio travado/falho — o prospect volta pra fila do disparo';
+        rst.addEventListener('click', async () => {
+          rst.disabled = true;
+          try {
+            await api('prospects', { method:'POST', body: JSON.stringify({ action:'resetSend', id: pr.id }) });
+            await refreshProspects();
+          } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra liberar.'); rst.disabled = false; }
+        });
+        right.append(rst);
       }
       if (stage === 'replied' || stage === 'contacted' || pr.send_status) {
         const chatBtn = el('button', 'btn tiny' + (stage === 'replied' ? '' : ' ghost'), '💬 Conversa');

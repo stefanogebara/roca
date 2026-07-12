@@ -152,6 +152,16 @@ describe('crop capture while awaiting=crop', () => {
     const sentText = adapter.send.mock.calls[0][0].text as string;
     expect(sentText).toMatch(/^Anotado/);
   });
+
+  it('never captures a negated crop mention', async () => {
+    vi.mocked(db.upsertUser).mockResolvedValue({ ...USER, awaiting: 'crop' });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'não planto soja, parei ano passado' }));
+
+    expect(db.setFarmCrops).not.toHaveBeenCalled();
+    expect(reason).toHaveBeenCalledTimes(1); // routed to the model instead
+  });
 });
 
 describe('captioned photo routing', () => {
@@ -212,16 +222,29 @@ describe('compliance gate vs pest card', () => {
 });
 
 describe('fail-closed when the user row is unavailable', () => {
-  it('sends an apology and does no LLM or claim work', async () => {
+  it('sends one apology, keeps provider-id idempotency, and does no LLM work', async () => {
     vi.mocked(db.upsertUser).mockResolvedValue(null);
     const adapter = makeAdapter();
 
     await handleInbound(adapter, msgFixture({ text: 'posso pulverizar hoje?' }));
 
+    expect(db.claimInbound).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ messageId: 'wamid-in-1' })
+    );
     expect(adapter.send).toHaveBeenCalledTimes(1);
     expect(adapter.send.mock.calls[0][0].text).toMatch(/problema pra processar/);
     expect(reason).not.toHaveBeenCalled();
     expect(routeIntent).not.toHaveBeenCalled();
-    expect(db.claimInbound).not.toHaveBeenCalled();
+  });
+
+  it('drops a provider redelivery silently (no second paid apology)', async () => {
+    vi.mocked(db.upsertUser).mockResolvedValue(null);
+    vi.mocked(db.claimInbound).mockResolvedValue(false);
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture());
+
+    expect(adapter.send).not.toHaveBeenCalled();
   });
 });

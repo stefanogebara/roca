@@ -8,6 +8,7 @@ import {
   setProspectStatus,
   getProspectThread,
   setProspectAgentEnabled,
+  resetProspectSend,
 } from '../_lib/prospect/db';
 import { runDispatch } from '../_lib/prospect/dispatch';
 
@@ -82,6 +83,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const { submitTemplate, V2_NAME } = await import('../_lib/prospect/template');
       const name = String((body as { name?: unknown }).name ?? V2_NAME);
       res.status(200).json({ success: true, data: await submitTemplate(name) });
+      return;
+    }
+
+    if (action === 'resetSend') {
+      // Recovery for a claim stranded at 'sending' (crash mid-dispatch) or a
+      // 'failed' send: re-queues the prospect. Never touches 'sent' rows.
+      const id = String((body as { id?: unknown }).id ?? '');
+      if (!id) {
+        res.status(400).json({ success: false, error: 'id required' });
+        return;
+      }
+      const reset = await resetProspectSend(id);
+      res.status(200).json({ success: true, data: { reset } });
       return;
     }
 

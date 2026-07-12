@@ -12,6 +12,9 @@ import { createLogger } from '../logger';
 
 const log = createLogger('prospect-template');
 const GRAPH = 'https://graph.facebook.com/v21.0';
+// Every Graph call gets a hard deadline: the status check runs inside the
+// dispatch cron's budget and a hung fetch is billable idle CPU.
+const TIMEOUT_MS = 8000;
 
 export const V2_NAME = 'stevi_parceria_v2';
 export const BUMP_NAME = 'stevi_parceria_bump';
@@ -71,7 +74,8 @@ export async function resolveWabaId(): Promise<string> {
   if (override) return override;
   const t = token();
   const res = await fetch(
-    `${GRAPH}/debug_token?input_token=${encodeURIComponent(t)}&access_token=${encodeURIComponent(t)}`
+    `${GRAPH}/debug_token?input_token=${encodeURIComponent(t)}&access_token=${encodeURIComponent(t)}`,
+    { signal: AbortSignal.timeout(TIMEOUT_MS) }
   );
   const json = (await res.json()) as {
     data?: { granular_scopes?: Array<{ scope: string; target_ids?: string[] }> };
@@ -95,7 +99,7 @@ export async function getTemplateStatus(name: string): Promise<TemplateStatus | 
   const waba = await resolveWabaId();
   const res = await fetch(
     `${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(name)}&fields=name,status,id,rejected_reason`,
-    { headers: { Authorization: `Bearer ${token()}` } }
+    { headers: { Authorization: `Bearer ${token()}` }, signal: AbortSignal.timeout(TIMEOUT_MS) }
   );
   const json = (await res.json()) as {
     data?: Array<{ name: string; status: string; id: string; rejected_reason?: string }>;
@@ -130,6 +134,7 @@ export async function submitTemplate(
     method: 'POST',
     headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, language: 'pt_BR', category, components }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const json = (await res.json()) as {
     id?: string;

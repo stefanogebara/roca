@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import {
   mintToken,
@@ -56,13 +56,16 @@ describe('opsAuth token', () => {
 });
 
 describe('token versioning (session revocation)', () => {
+  afterEach(() => {
+    delete process.env.OPS_TOKEN_VERSION; // never leak into later tests, even on assert failure
+  });
+
   it('rejects a token minted under an older OPS_TOKEN_VERSION', () => {
     process.env.OPS_TOKEN_VERSION = 'v1';
     const t = mintToken(1_000_000);
     expect(verifyToken(t, 1_000_000)).toBe(true);
     process.env.OPS_TOKEN_VERSION = 'v2'; // the revocation act: bump the env
     expect(verifyToken(t, 1_000_000)).toBe(false);
-    delete process.env.OPS_TOKEN_VERSION;
   });
 
   it('rejects a legacy token with no version claim (valid signature, pre-versioning payload)', () => {

@@ -161,6 +161,17 @@ describe('runDispatch — atomic claim (double-send race)', () => {
     expect(rep.aborted).toBe(true);
     expect(sendProspectTemplate).not.toHaveBeenCalled();
   });
+
+  it('stops before claiming when the cap was consumed mid-run by a concurrent run', async () => {
+    vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
+    // Precondition count says 0; the in-loop recheck sees the other run's
+    // claims (claims stamp sent_at, so counts include them).
+    vi.mocked(countSentSince).mockResolvedValueOnce(0).mockResolvedValue(20);
+    const rep = await runDispatch({ force: true });
+    expect(claimProspectForSend).not.toHaveBeenCalled();
+    expect(sendProspectTemplate).not.toHaveBeenCalled();
+    expect(rep.sent).toBe(0);
+  });
 });
 
 describe('runBumpDispatch — atomic claim', () => {

@@ -135,6 +135,10 @@ export function isBriefRequest(text: string): boolean {
 // each opt-in so the consent is provable (LGPD accountability).
 const REFERRAL_CONSENT_VERSION = 'referral-v1-2026-07';
 
+// A negated crop mention while we await the crop answer ("não planto soja,
+// parei ano passado") must never be captured as the farm's crop.
+const CROP_NEGATION = /\b(n[ãa]o|nunca|parei|deixei|larguei)\b/i;
+
 const REFERRAL_REPLY =
   'Boa! 🙌 Anotei seu interesse em falar com um agrônomo — e não passo seus dados pra ninguém sem te perguntar antes.\n\n' +
   'Pra adiantar, leve pro agrônomo: fotos da lavoura, a cultura e a fase, e o que você observou (onde começou, como espalhou). Ele faz o diagnóstico e, se precisar, o receituário — o documento técnico que define o produto e a dose certos.\n\n' +
@@ -317,9 +321,19 @@ export async function handleInbound(
 
   const user = await upsertUser(msg.from, msg.profileName);
   if (!user) {
-    // DB unhealthy: without a user row there is no idempotency claim, no rate
-    // limit and no memory — running the LLM path anyway would be an unmetered
-    // cost/abuse hole. Fail closed with the human apology instead.
+    // DB unhealthy: without a user row there is no rate limit and no memory —
+    // running the LLM path anyway would be an unmetered cost/abuse hole. Fail
+    // closed with the human apology instead. Still claim by provider id
+    // (user_id null) so a provider redelivery doesn't buy a second apology.
+    const claimed = await claimInbound(null, {
+      kind: msg.kind,
+      text: msg.text,
+      messageId: msg.messageId,
+    });
+    if (!claimed) {
+      log.info('duplicate inbound on the fail-closed path — dropped:', msg.messageId);
+      return;
+    }
     log.error('upsertUser unavailable — failing closed, no LLM work');
     try {
       await withRetry(() => adapter.send({ to: msg.from, text: FALLBACK_REPLY }));
@@ -447,9 +461,13 @@ export async function handleInbound(
   // recognizable crops, capture them. Only a crops-ONLY reply gets the capture
   // confirmation; a question that merely names a crop ("posso pulverizar na
   // soja?") is captured silently and routes normally — never swallowed. A
-  // no-crop reply clears the wait and falls through.
+  // negated mention ("não planto soja, parei") is never captured — the model
+  // handles it. A no-crop reply clears the wait and falls through.
   const cropAnswer =
-    user?.awaiting === 'crop' && effective.kind === 'text' && effective.text
+    user?.awaiting === 'crop' &&
+    effective.kind === 'text' &&
+    effective.text &&
+    !CROP_NEGATION.test(effective.text)
       ? parseCrops(effective.text)
       : null;
   const cropsOnly =

@@ -8,6 +8,7 @@
 import {
   eligibleToSend,
   planBatch,
+  clampDailyCap,
   isBusinessHours,
   brtDayStartIso,
   DAILY_CAP_DEFAULT,
@@ -115,6 +116,7 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   }
 
   const eligible = ready.filter((p) => eligibleToSend(p, optouts));
+  const cap = clampDailyCap(opts.dailyCap ?? DAILY_CAP_DEFAULT);
   const batch = planBatch(eligible, { dailyCap: opts.dailyCap ?? DAILY_CAP_DEFAULT, sentToday });
 
   const recipients: DispatchReport['recipients'] = [];
@@ -126,6 +128,19 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     if (dryRun) {
       recipients.push({ id: p.id, name: p.name, phone, result: 'planned' });
       continue;
+    }
+    // Concurrent-safe cap recheck: claims stamp sent_at, so a fresh count sees
+    // another overlapping run's claims too. Counting BEFORE claiming means a
+    // cap stop never strands a row at 'sending'. Unverifiable count → stop
+    // (fail closed), same posture as the preconditions.
+    try {
+      if ((await countSentSince(brtDayStartIso(new Date()))) >= cap) {
+        log.info('daily cap reached mid-run — stopping the batch');
+        break;
+      }
+    } catch (e) {
+      log.error('mid-run cap recheck unavailable — stopping the batch:', (e as Error).message);
+      break;
     }
     // Atomic claim — the row-level lock against a concurrent run (cron firing
     // while a founder presses "Disparar"). Losing the claim means the other
@@ -224,12 +239,23 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
   }
 
   const eligible = due.filter((p) => p.phone && !optouts.has(p.phone));
+  const cap = clampDailyCap(opts.dailyCap ?? DAILY_CAP_DEFAULT);
   const batch = planBatch(eligible, { dailyCap: opts.dailyCap ?? DAILY_CAP_DEFAULT, sentToday });
   if (!batch.length) return { skipped: eligible.length ? 'daily_cap_reached' : null, due: eligible.length, sent: 0, failed: 0 };
 
   let sent = 0;
   let failed = 0;
   for (const p of batch) {
+    // Same concurrent-safe cap recheck as intros (bumps share the daily cap).
+    try {
+      if ((await countSentSince(brtDayStartIso(new Date()))) >= cap) {
+        log.info('daily cap reached mid-run — stopping bumps');
+        break;
+      }
+    } catch (e) {
+      log.error('mid-run cap recheck unavailable — stopping bumps:', (e as Error).message);
+      break;
+    }
     // Atomic claim (touches 1→2): only one overlapping run may bump this row.
     // If the send below then fails, touches stays 2 and the prospect is never
     // re-bumped — a missed follow-up is the safe failure direction here.
