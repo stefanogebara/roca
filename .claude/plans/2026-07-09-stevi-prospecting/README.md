@@ -40,6 +40,18 @@ deliberate divergences driven by the product's reality (decided 2026-07-09):
   history. Reuses the leads-CRM patterns.
 - **P4:** farmer opt-in funnel — public `wa.me` link/QR + landing section + simple attribution.
 
+## Display-name decision (2026-07-10)
+Meta declined `Stevi`, `Stevi Agro`, AND `Stevi Agro BR` for the number. Three
+declines ⇒ structural, not wording: a **US +1 number** carrying a BR-branded name
+with no independent verifiable "Stevi" web presence (business verified as
+"TwinMe"). **Decision: stop submitting name variants** (each is a wasted review
+cycle). Sends work with the name declined — the template self-identifies ("Aqui é
+a Stevi"), so recipients see the +1 header but know who it is. **The real fix is a
++55 number** (also fixes farmer trust + geo-mismatch), gated on the user's
+CNPJ/Anatel regulatory bundle — a deliberate later milestone. Setting the display
+name to "TwinMe" (the one value that'd approve) is rejected: an English business
+name messaging about "sua lavoura" confuses more than a bare number.
+
 ## Reuse from the existing codebase
 Cloud API transport + token, `retry.ts`, `alert.ts`/founder ping, `opsAuth` guard, the
 /painel tab + leads-CRM UI patterns, `maskWa`.
