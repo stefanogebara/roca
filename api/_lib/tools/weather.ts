@@ -7,6 +7,10 @@
 import type { HourWeather } from './deltaT';
 
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
+// Hard deadline — this is the hottest external call in the pipeline (spray
+// verdict + farm card); a hung Open-Meteo response must degrade, not ride the
+// webhook's whole 60s budget. Same pattern as soil.ts/geo.ts.
+const TIMEOUT_MS = 6000;
 
 export interface Coordinates {
   lat: number;
@@ -40,7 +44,14 @@ export async function fetchHourlyWeather(
     forecast_days: '2',
   });
 
-  const res = await fetch(`${OPEN_METEO}?${params.toString()}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${OPEN_METEO}?${params.toString()}`, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     throw new Error(`Open-Meteo returned ${res.status}`);
   }

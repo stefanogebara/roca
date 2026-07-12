@@ -45,7 +45,7 @@ import {
 import { formatTurnsBlock } from './memory';
 import { buildHistoryReply } from './caderno';
 import { fetchPrices, formatPricesReply, askedCommodities } from './tools/prices';
-import { parseCrops, joinCrops } from './tools/crops';
+import { parseCrops, joinCrops, isCropsOnlyMessage } from './tools/crops';
 import type { PestCardData } from './cards/pest';
 import { withRetry } from './retry';
 import { alertFounders } from './alert';
@@ -316,7 +316,19 @@ export async function handleInbound(
   }
 
   const user = await upsertUser(msg.from, msg.profileName);
-  const userId = user?.id ?? null;
+  if (!user) {
+    // DB unhealthy: without a user row there is no idempotency claim, no rate
+    // limit and no memory — running the LLM path anyway would be an unmetered
+    // cost/abuse hole. Fail closed with the human apology instead.
+    log.error('upsertUser unavailable — failing closed, no LLM work');
+    try {
+      await withRetry(() => adapter.send({ to: msg.from, text: FALLBACK_REPLY }));
+    } catch (e) {
+      log.error('fail-closed notice send failed:', (e as Error).message);
+    }
+    return;
+  }
+  const userId = user.id;
   const firstContact = isFirstContact(user);
 
   // Idempotency gate: claim the message by provider id before any work. A
@@ -432,12 +444,20 @@ export async function handleInbound(
   let pestCard: PestCardData | undefined;
 
   // If we asked what they grow (right after the farm card) and they replied with
-  // recognizable crops, capture them. A non-crop reply clears the wait and falls
-  // through to normal handling, so the message is never swallowed.
+  // recognizable crops, capture them. Only a crops-ONLY reply gets the capture
+  // confirmation; a question that merely names a crop ("posso pulverizar na
+  // soja?") is captured silently and routes normally — never swallowed. A
+  // no-crop reply clears the wait and falls through.
   const cropAnswer =
     user?.awaiting === 'crop' && effective.kind === 'text' && effective.text
       ? parseCrops(effective.text)
       : null;
+  const cropsOnly =
+    !!cropAnswer && cropAnswer.length > 0 && !!effective.text && isCropsOnlyMessage(effective.text);
+  if (cropAnswer && cropAnswer.length > 0 && !cropsOnly && userId) {
+    await setFarmCrops(userId, cropAnswer);
+    await setAwaiting(userId, null);
+  }
 
   // Pending share-consent question (partner handoff): a clear yes/no resolves
   // it; anything else falls through to normal handling and the question stays
@@ -447,7 +467,7 @@ export async function handleInbound(
       ? await resolveConsentReply(userId, effective.text)
       : null;
 
-  if (cropAnswer && cropAnswer.length > 0) {
+  if (cropAnswer && cropAnswer.length > 0 && cropsOnly) {
     if (userId) {
       await setFarmCrops(userId, cropAnswer);
       await setAwaiting(userId, null);
@@ -540,8 +560,10 @@ export async function handleInbound(
   } else {
     // A pending crop question that got a non-crop reply: stop waiting, answer normally.
     if (user?.awaiting === 'crop' && userId) await setAwaiting(userId, null);
+    // kind guard matters: a photo with a "como está minha lavoura?" caption is
+    // a pest-triage image, not a satellite ask — captions never fast-path.
     intent =
-      effective.text && isFieldHealthRequest(effective.text)
+      effective.kind === 'text' && effective.text && isFieldHealthRequest(effective.text)
         ? 'field_health'
         : await routeIntent(effective);
     try {
@@ -573,7 +595,13 @@ export async function handleInbound(
 
   if (firstContact) finalText += CONSENT_NOTE;
 
-  const mediaUrl = pestCard ? pestCardUrl(pestCard) : await cardUrlFor(intent, effective, userId);
+  // A gate-replaced reply never ships its visual — the pest card carries the
+  // exact product/group data the gate just blocked.
+  const mediaUrl = !gate.safe
+    ? undefined
+    : pestCard
+      ? pestCardUrl(pestCard)
+      : await cardUrlFor(intent, effective, userId);
   const sent = await sendOrRecord(
     adapter,
     msg.from,
