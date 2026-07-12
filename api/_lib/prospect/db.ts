@@ -138,6 +138,61 @@ export async function claimProspectForBump(id: string): Promise<boolean> {
   return (data ?? []).length > 0;
 }
 
+// Give-up window: a contacted prospect whose last touch (intro or D+3 bump —
+// both stamp sent_at) got no reply for this many days is dead, not "waiting".
+// Clamped: a misparsed env must neither detonate (0/NaN would stale everything
+// or throw) nor silently disable the sweep.
+const STALE_DAYS_RAW = Number(process.env.PROSPECT_STALE_AFTER_DAYS || '14');
+const STALE_AFTER_DAYS = Number.isFinite(STALE_DAYS_RAW) && STALE_DAYS_RAW >= 3 ? STALE_DAYS_RAW : 14;
+
+/**
+ * Terminal state for never-repliers: 'contacted' with no reply since the last
+ * touch → 'stale'. Keeps the funnel stats honest and the painel free of
+ * zombies; a founder can still reactivate from the painel (stale → discovered).
+ * A reply arriving later still works — markProspectReplied matches by phone,
+ * not status. Returns how many rows transitioned.
+ */
+export async function markStaleProspects(
+  days = STALE_AFTER_DAYS,
+  now = new Date()
+): Promise<number> {
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString();
+  const { data, error } = await db
+    .from('prospects')
+    .update({ status: 'stale', updated_at: now.toISOString() })
+    .eq('status', 'contacted')
+    .lt('sent_at', cutoff)
+    .select('id');
+  if (error) {
+    log.error('markStaleProspects failed:', error.message);
+    return 0;
+  }
+  return (data ?? []).length;
+}
+
+/**
+ * Founder-clicked return of a stale/discarded prospect to the review queue.
+ * Clears the send tracking (send_status + touches) so an approved row is
+ * genuinely re-sendable — without this a once-contacted row re-enters the
+ * funnel as an un-dispatchable zombie that renders as "contatado". The
+ * deliberate re-outreach decision is gated by the painel confirm.
+ */
+export async function reactivateProspect(id: string): Promise<boolean> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('prospects')
+    .update({ status: 'discovered', send_status: null, touches: 0, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .in('status', ['stale', 'discarded'])
+    .select('id');
+  if (error) {
+    log.error('reactivateProspect failed:', error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
 /**
  * Ops recovery for a stuck claim ('sending' after a crash) or a failed send:
  * clears send_status so the prospect re-enters the dispatch queue. Guarded to

@@ -442,7 +442,9 @@
       discovered: { label: 'Descobertos', pill: 'descoberto', color: '#b7791f', hint: 'achados na web ou importados — revise e aprove' },
       ready:      { label: 'Aprovados', pill: 'aprovado', color: '#2e9e63', hint: 'na fila do disparo automático (seg–sex 10h/13h/16h)' },
       contacted:  { label: 'Contatados', pill: 'contatado', color: '#3b6fb2', hint: 'template enviado — aguardando resposta' },
-      replied:    { label: 'Responderam', pill: 'respondeu', color: '#14432f', hint: 'em conversa com a Vitória 🤖' },
+      replied:    { label: 'Responderam', pill: 'respondeu', color: '#14432f', hint: 'em conversa com a Vitória 🤖 — promova quando fechar' },
+      partner:    { label: 'Parceiros', pill: 'parceiro', color: '#7c5cbf', hint: 'ativos — recebem leads consentidos de produtores da região' },
+      stale:      { label: 'Esfriaram', pill: 'esfriou', color: '#8a7a5c', hint: 'sem resposta após o follow-up — reative ou deixe' },
       discarded:  { label: 'Descartados', pill: 'descartado', color: '#9aa5a0', hint: 'fora do perfil' },
     };
     const pState = { status: null, kind: null, q: '' };
@@ -559,7 +561,7 @@
         b.title = st.hint;
         b.append(el('div', 'n', String(n)), el('div', 'l', st.label));
         const dot = el('span', 'dot'); dot.style.background = st.color; b.append(dot);
-        if (i < stages.length - 2) b.append(el('span', 'arr', '›')); // no arrow into "descartados"
+        if (i < stages.indexOf('partner')) b.append(el('span', 'arr', '›')); // arrows only along the happy path (…→ parceiro)
         b.addEventListener('click', () => { pState.status = pState.status === s ? null : s; renderProspects(); });
         funnel.append(b);
       });
@@ -570,7 +572,7 @@
       const wrap = $('#prospect-list'); if (!wrap) return;
       wrap.innerHTML = '';
 
-      const order = { replied: 0, contacted: 1, ready: 2, discovered: 3, discarded: 4 };
+      const order = { replied: 0, contacted: 1, partner: 2, ready: 3, discovered: 4, stale: 5, discarded: 6 };
       let rows = [...pCache].sort((a, b) =>
         (order[pStage(a)] ?? 9) - (order[pStage(b)] ?? 9) ||
         String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
@@ -639,10 +641,31 @@
         const back = el('button', 'btn tiny danger', '✕ Tirar da fila');
         back.addEventListener('click', () => setStatus('discovered', back));
         right.append(back);
-      } else if (stage === 'discarded') {
+      } else if (stage === 'discarded' || stage === 'stale') {
         const back = el('button', 'btn tiny danger', '↩ Reativar');
-        back.addEventListener('click', () => setStatus('discovered', back));
+        back.title = 'Volta pra revisão e zera o histórico de envio — aprovado depois, pode receber NOVO disparo';
+        back.addEventListener('click', async () => {
+          if (!confirm(`Reativar ${pr.name}? O histórico de envio é zerado — depois de aprovado, ele pode receber um novo disparo.`)) return;
+          back.disabled = true;
+          try {
+            await api('prospects', { method:'POST', body: JSON.stringify({ action:'reactivate', id: pr.id }) });
+            await refreshProspects();
+          } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra reativar.'); back.disabled = false; }
+        });
         right.append(back);
+      } else if (stage === 'replied') {
+        const promote = el('button', 'btn tiny', '🤝 Promover a parceiro');
+        promote.title = 'Cria o parceiro ativo (passa a receber leads consentidos) e encerra a prospecção deste contato';
+        promote.addEventListener('click', async () => {
+          if (!confirm(`Promover ${pr.name} a parceiro ativo? Ele passa a receber leads de produtores da região.`)) return;
+          promote.disabled = true;
+          try {
+            const d = await api('prospects', { method:'POST', body: JSON.stringify({ action:'promote', id: pr.id }) });
+            if (d && d.geocoded === false) alert('Parceiro criado, mas não achei as coordenadas da cidade — o match geográfico fica inativo até definir lat/lon (promover de novo tenta outra vez).');
+            await refreshProspects();
+          } catch (e) { if (e.message!=='unauthorized') alert('Não deu pra promover: ' + e.message); promote.disabled = false; }
+        });
+        right.append(promote);
       }
       if (pr.send_status === 'failed' || pr.send_status === 'sending') {
         const rst = el('button', 'btn tiny', '↩ Liberar reenvio');

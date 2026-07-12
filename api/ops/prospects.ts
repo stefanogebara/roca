@@ -9,6 +9,7 @@ import {
   getProspectThread,
   setProspectAgentEnabled,
   resetProspectSend,
+  reactivateProspect,
 } from '../_lib/prospect/db';
 import { runDispatch } from '../_lib/prospect/dispatch';
 
@@ -83,6 +84,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const { submitTemplate, V2_NAME } = await import('../_lib/prospect/template');
       const name = String((body as { name?: unknown }).name ?? V2_NAME);
       res.status(200).json({ success: true, data: await submitTemplate(name) });
+      return;
+    }
+
+    if (action === 'reactivate') {
+      // Stale/discarded → back to review WITH send tracking cleared, so a
+      // later approval can actually dispatch again. A bare status flip would
+      // leave send_status='sent' and create an un-sendable zombie.
+      const id = String((body as { id?: unknown }).id ?? '');
+      if (!id) {
+        res.status(400).json({ success: false, error: 'id required' });
+        return;
+      }
+      const ok = await reactivateProspect(id);
+      res
+        .status(ok ? 200 : 400)
+        .json(ok ? { success: true } : { success: false, error: 'só estagnados/descartados podem ser reativados' });
+      return;
+    }
+
+    if (action === 'promote') {
+      // The founder-clicked qualification gate: replied prospect → active
+      // partners row (geocoded coverage centroid) + terminal 'partner' status.
+      const id = String((body as { id?: unknown }).id ?? '');
+      if (!id) {
+        res.status(400).json({ success: false, error: 'id required' });
+        return;
+      }
+      const { promoteProspectToPartner } = await import('../_lib/prospect/promote');
+      const result = await promoteProspectToPartner(id);
+      if (!result.ok) {
+        res.status(400).json({ success: false, error: result.error ?? 'promoção falhou' });
+        return;
+      }
+      res.status(200).json({ success: true, data: result });
       return;
     }
 

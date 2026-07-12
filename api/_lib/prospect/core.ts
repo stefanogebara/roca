@@ -25,6 +25,8 @@ export type ProspectStatus =
   | 'ready'
   | 'contacted'
   | 'replied'
+  | 'partner' // promoted — an active partners row exists (terminal, happy)
+  | 'stale' // contacted + bumped, never replied past the give-up window (terminal, reactivatable)
   | 'discarded';
 
 export interface ProspectLike {

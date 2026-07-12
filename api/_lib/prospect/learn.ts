@@ -18,29 +18,45 @@ export interface FunnelStats {
   total: number;
   contacted: number;
   replied: number;
+  /** Converted: prospects promoted to active partners (terminal, happy). */
+  partners: number;
   optedOut: number;
   replyRateByKind: Record<string, string>;
 }
+
+// Statuses that imply a first touch went out. 'partner' matters here because
+// promotion overwrites both status and send_status — without it the funnel
+// would "lose" its best outcomes from the reply rate.
+const POST_CONTACT = new Set(['contacted', 'replied', 'partner', 'stale']);
+const REPLIED = new Set(['replied', 'partner']);
 
 /** Pure rollup of the prospect funnel. */
 export function computeFunnelStats(
   prospects: Array<{ kind: string | null; status: string; send_status: string | null }>,
   optouts: number
 ): FunnelStats {
-  const contacted = prospects.filter((p) => p.send_status === 'sent' || p.status === 'contacted' || p.status === 'replied');
-  const replied = prospects.filter((p) => p.status === 'replied');
+  const contacted = prospects.filter((p) => p.send_status === 'sent' || POST_CONTACT.has(p.status));
+  const replied = prospects.filter((p) => REPLIED.has(p.status));
+  const partners = prospects.filter((p) => p.status === 'partner');
   const byKind: Record<string, { c: number; r: number }> = {};
   for (const p of contacted) {
     const k = p.kind ?? 'outro';
     byKind[k] = byKind[k] ?? { c: 0, r: 0 };
     byKind[k].c++;
-    if (p.status === 'replied') byKind[k].r++;
+    if (REPLIED.has(p.status)) byKind[k].r++;
   }
   const replyRateByKind: Record<string, string> = {};
   for (const [k, v] of Object.entries(byKind)) {
     replyRateByKind[k] = `${v.r}/${v.c}`;
   }
-  return { total: prospects.length, contacted: contacted.length, replied: replied.length, optedOut: optouts, replyRateByKind };
+  return {
+    total: prospects.length,
+    contacted: contacted.length,
+    replied: replied.length,
+    partners: partners.length,
+    optedOut: optouts,
+    replyRateByKind,
+  };
 }
 
 const MAX_LEARNINGS = 6;

@@ -95,6 +95,19 @@ export default async function handler(
     log.error('fire alerts run failed:', (e as Error).message);
   }
 
+  // Prospect hygiene: never-repliers past the give-up window become 'stale' —
+  // a terminal, reactivatable state, so 'contacted' stops accumulating zombies
+  // and funnel stats stay honest. Isolated fail-soft like the other stages.
+  try {
+    const { markStaleProspects } = await import('../_lib/prospect/db');
+    const staled = await markStaleProspects();
+    if (staled > 0) {
+      findings.push(`Prospecção: ${staled} prospect(s) sem resposta esfriaram → estagnados.`);
+    }
+  } catch (e) {
+    log.error('stale prospects run failed:', (e as Error).message);
+  }
+
   // Weekly (Mondays BRT): mine prospect conversations for market learnings —
   // feeds Vitória's playbook block and the painel funnel stats.
   let learning: { learnings: string[] } | null = null;

@@ -90,6 +90,22 @@ describe('learning loop', () => {
     expect(s.replyRateByKind.revenda).toBe('1/2');
   });
 
+  it('a promoted partner still counts as contacted+replied (and as converted)', () => {
+    // Promotion flips status to 'partner' and the reply overwrote send_status —
+    // the funnel must not "lose" its best outcome.
+    const s = computeFunnelStats(
+      [
+        { kind: 'consultoria', status: 'partner', send_status: 'replied' },
+        { kind: 'consultoria', status: 'stale', send_status: 'sent' },
+      ],
+      0
+    );
+    expect(s.contacted).toBe(2);
+    expect(s.replied).toBe(1);
+    expect(s.partners).toBe(1);
+    expect(s.replyRateByKind.consultoria).toBe('1/2');
+  });
+
   it('playbookBlock is bounded and marked informational', () => {
     const b = playbookBlock(['x'.repeat(300), 'objeção comum: já tem agrônomo da coop', 'a', 'b', 'c', 'd', 'e', 'f']);
     expect(b).toMatch(/informativo/i);
