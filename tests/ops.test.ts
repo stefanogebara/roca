@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
 import {
   mintToken,
   verifyToken,
   safeEqual,
   passwordOk,
   loginThrottled,
+  clearSessionCookie,
   LOGIN_MAX_FAILS_PER_IP,
   LOGIN_MAX_FAILS_GLOBAL,
 } from '../api/_lib/opsAuth';
@@ -50,6 +52,38 @@ describe('opsAuth token', () => {
     process.env.OPS_SESSION_SECRET = 'rotated-secret';
     expect(verifyToken(t, 1_000_000)).toBe(false);
     process.env.OPS_SESSION_SECRET = 'test-signing-secret'; // restore
+  });
+});
+
+describe('token versioning (session revocation)', () => {
+  it('rejects a token minted under an older OPS_TOKEN_VERSION', () => {
+    process.env.OPS_TOKEN_VERSION = 'v1';
+    const t = mintToken(1_000_000);
+    expect(verifyToken(t, 1_000_000)).toBe(true);
+    process.env.OPS_TOKEN_VERSION = 'v2'; // the revocation act: bump the env
+    expect(verifyToken(t, 1_000_000)).toBe(false);
+    delete process.env.OPS_TOKEN_VERSION;
+  });
+
+  it('rejects a legacy token with no version claim (valid signature, pre-versioning payload)', () => {
+    const b64url = (b: Buffer) =>
+      b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const payload = b64url(Buffer.from(JSON.stringify({ sub: 'ops', exp: 2_000_000 })));
+    const sig = b64url(createHmac('sha256', 'test-signing-secret').update(payload).digest());
+    expect(verifyToken(`${payload}.${sig}`, 1_000_000)).toBe(false);
+  });
+});
+
+describe('clearSessionCookie (server-side logout)', () => {
+  it('expires the HttpOnly cookie — client JS cannot, so this endpoint must', () => {
+    const setHeader = vi.fn();
+    clearSessionCookie({ setHeader } as never);
+    const value = setHeader.mock.calls[0][1] as string;
+    expect(setHeader.mock.calls[0][0]).toBe('Set-Cookie');
+    expect(value).toContain('stevi_ops=;');
+    expect(value).toContain('Max-Age=0');
+    expect(value).toContain('HttpOnly');
+    expect(value).toContain('Path=/');
   });
 });
 

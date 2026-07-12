@@ -192,7 +192,11 @@
         else $('#loginErr').textContent = j.error || 'senha incorreta';
       } catch { $('#loginErr').textContent = 'erro de conexão'; }
     });
-    $('#logout').addEventListener('click', () => { document.cookie = 'stevi_ops=; Max-Age=0; Path=/'; showLogin(); });
+    $('#logout').addEventListener('click', async () => {
+      // The cookie is HttpOnly — only the server can expire it.
+      try { await fetch('/api/ops/logout', { method: 'POST', credentials: 'same-origin' }); } catch { /* show login anyway; the session still dies at TTL */ }
+      showLogin();
+    });
 
     const loaded = {};
     $('#tabs').addEventListener('click', (e) => {

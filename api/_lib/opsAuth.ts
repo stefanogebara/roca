@@ -11,14 +11,35 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac, timingSafeEqual, createHash } from 'node:crypto';
+import { createLogger } from './logger';
+
+const log = createLogger('ops-auth');
 
 const COOKIE = 'stevi_ops';
 const TTL_MS = 12 * 60 * 60 * 1000; // 12h sessions
 
+let warnedFallback = false;
+
 function signingKey(): string {
-  const key = process.env.OPS_SESSION_SECRET || process.env.CRON_SECRET;
-  if (!key) throw new Error('OPS_SESSION_SECRET (or CRON_SECRET) not configured');
-  return key;
+  const dedicated = process.env.OPS_SESSION_SECRET;
+  if (dedicated) return dedicated;
+  const fallback = process.env.CRON_SECRET;
+  if (!fallback) throw new Error('OPS_SESSION_SECRET (or CRON_SECRET) not configured');
+  if (!warnedFallback) {
+    warnedFallback = true;
+    log.error(
+      'OPS_SESSION_SECRET not set — signing painel sessions with CRON_SECRET. ' +
+        'Set a dedicated secret: rotating one for security should never disturb the other.'
+    );
+  }
+  return fallback;
+}
+
+/** Session generation. Bump OPS_TOKEN_VERSION to any new value to revoke every
+ * outstanding painel session at once (cheaper than rotating the signing key,
+ * and it can't disturb anything else). */
+function tokenVersion(): string {
+  return process.env.OPS_TOKEN_VERSION || '1';
 }
 
 function b64url(buf: Buffer): string {
@@ -55,12 +76,15 @@ export function loginThrottled(ipFails: number | null, globalFails: number | nul
 
 /** Mint a signed session token: base64url(payloadJson).hmac. `now` injectable. */
 export function mintToken(now: number = Date.now()): string {
-  const payload = b64url(Buffer.from(JSON.stringify({ sub: 'ops', exp: now + TTL_MS })));
+  const payload = b64url(
+    Buffer.from(JSON.stringify({ sub: 'ops', v: tokenVersion(), exp: now + TTL_MS }))
+  );
   const sig = b64url(createHmac('sha256', signingKey()).update(payload).digest());
   return `${payload}.${sig}`;
 }
 
-/** Verify a session token: signature valid AND not expired. `now` injectable. */
+/** Verify a session token: signature valid, not expired, AND minted under the
+ * current OPS_TOKEN_VERSION (the revocation lever). `now` injectable. */
 export function verifyToken(token: string | undefined, now: number = Date.now()): boolean {
   if (!token || !token.includes('.')) return false;
   const [payload, sig] = token.split('.', 2);
@@ -69,8 +93,10 @@ export function verifyToken(token: string | undefined, now: number = Date.now())
     return false;
   }
   try {
-    const { exp } = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
-    return typeof exp === 'number' && now < exp;
+    const { exp, v } = JSON.parse(
+      Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+    );
+    return typeof exp === 'number' && now < exp && v === tokenVersion();
   } catch {
     return false;
   }
@@ -82,6 +108,15 @@ export function setSessionCookie(res: VercelResponse, token: string): void {
   res.setHeader(
     'Set-Cookie',
     `${COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`
+  );
+}
+
+/** Expire the session cookie (server-side logout). The cookie is HttpOnly, so
+ * client JS cannot delete it — before this existed, "Sair" was a no-op. */
+export function clearSessionCookie(res: VercelResponse): void {
+  res.setHeader(
+    'Set-Cookie',
+    `${COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`
   );
 }
 
