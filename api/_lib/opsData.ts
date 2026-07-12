@@ -64,7 +64,9 @@ export async function opsOverview(): Promise<OpsOverview> {
   const byIntent: Record<string, number> = {};
   let failures7d = 0;
   for (const r of rows) {
-    if (r.direction === 'in' && r.intent) byIntent[r.intent] = (byIntent[r.intent] ?? 0) + 1;
+    // Intent is recorded on the outbound reply (one per conversation turn), so
+    // count any intent-bearing row — that's the "what farmers asked" mix.
+    if (r.intent && r.intent !== 'rate_limited') byIntent[r.intent] = (byIntent[r.intent] ?? 0) + 1;
     if (r.direction === 'out' && r.raw && FAILURE_RE.test(r.raw)) failures7d++;
   }
 
