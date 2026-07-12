@@ -23,8 +23,8 @@ alter table public.referral_requests add column if not exists share_consent_at t
 alter table public.referral_requests add column if not exists partner_notified_at timestamptz;
 alter table public.referral_requests add column if not exists delivered_at timestamptz;
 
--- First partner: Michel Silva (Gaia Tech), validated 2026-07-09; coverage
--- confirmed 2026-07-10 as "Espera Feliz e região" (Caparaó / Zona da Mata MG).
-insert into public.partners (name, phone, coverage_label, lat, lon, radius_km, crops)
-values ('Michel Silva (Gaia Tech)', '+5532998003160', 'Espera Feliz e região (Caparaó/Zona da Mata)', -20.6504, -41.9086, 60, array['café'])
-on conflict (phone) do nothing;
+-- Partners are seeded operationally (SQL editor / future ops action), never in
+-- schema history: a migration is forever in git, and partner rows carry a real
+-- person's name + personal phone. (This file originally seeded the first
+-- partner; the seed was removed after being applied — the prod row is
+-- operational data now, and fresh environments start with an empty table.)

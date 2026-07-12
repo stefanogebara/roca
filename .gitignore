@@ -10,6 +10,13 @@ tsc-out.txt
 # Raw Agrofit dump (368 MB) — we commit the extracted slice, not the source.
 knowledge/agrofit/*.csv
 
+# Scraped prospect batches: third-party names + phones (LGPD) — operational
+# data for scripts/prospect-import.mjs, never repo history.
+knowledge/prospects/
+
+# Supabase CLI scratch (leaks project ref + pooler URL fingerprints).
+supabase/.temp/
+
 # Landing-page dev artifacts (browser-verification screenshots + OG template)
 web/_shots/
 
