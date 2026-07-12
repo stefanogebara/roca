@@ -74,7 +74,9 @@ export function isDeletionRequest(text: string): boolean {
 const CONSENT_NOTE =
   '\n\n_Pra te dar conselhos melhores eu guardo sua localização e o histórico da conversa. É só o necessário, e você pode pedir "apaga meus dados" quando quiser. Mais tarde posso te conectar com um agrônomo de verdade se precisar._';
 
-const FALLBACK_REPLY =
+// Exported for the canary: an elevated rate of this exact reply is the
+// signature of a dead model slug / provider outage.
+export const FALLBACK_REPLY =
   'Tive um problema pra processar isso agora. Tenta de novo daqui a pouco, ou manda de outro jeito.';
 
 // Explicit request to be connected to an agrônomo (the referral opt-in). Kept

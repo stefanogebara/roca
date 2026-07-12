@@ -95,6 +95,24 @@ export default async function handler(
     log.error('fire alerts run failed:', (e as Error).message);
   }
 
+  // Daily canary: probes the things that break silently (paused templates,
+  // dead model slugs, tool APIs, public surfaces, elevated fallback rate).
+  // Alerts founders only on transitions; standing state lands in findings.
+  let canary: { failing: number; broke: number; recovered: number } | null = null;
+  try {
+    const { runCanary } = await import('../_lib/canary');
+    const run = await runCanary();
+    canary = { failing: run.failing, broke: run.broke.length, recovered: run.recovered.length };
+    if (run.failing > 0) {
+      findings.push(
+        `Canário: ${run.failing} checagem(ns) falhando — ` +
+          run.results.filter((c) => !c.ok).map((c) => c.check).join(', ')
+      );
+    }
+  } catch (e) {
+    log.error('canary run failed:', (e as Error).message);
+  }
+
   // Prospect hygiene: never-repliers past the give-up window become 'stale' —
   // a terminal, reactivatable state, so 'contacted' stops accumulating zombies
   // and funnel stats stay honest. Isolated fail-soft like the other stages.
@@ -150,6 +168,6 @@ export default async function handler(
 
   res.status(200).json({
     success: true,
-    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost, fire, purged },
+    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost, fire, canary, purged },
   });
 }

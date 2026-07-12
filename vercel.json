@@ -7,7 +7,7 @@
       "includeFiles": "api/_lib/data/*.json"
     },
     "api/cron/monitor.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/cron/digest.ts": {
       "maxDuration": 30
