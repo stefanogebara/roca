@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node scripts/build-web.mjs",
   "functions": {
     "api/webhook.ts": {
       "maxDuration": 60,
