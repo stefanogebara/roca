@@ -18,6 +18,8 @@ import {
   loadReadyProspects,
   loadOptouts,
   countSentSince,
+  claimProspectForSend,
+  claimProspectForBump,
   recordSend,
   recordSendFailed,
 } from './db';
@@ -59,7 +61,8 @@ export interface DispatchReport {
   planned: number;
   sent: number;
   failed: number;
-  recipients: Array<{ id: string; name: string; phone: string; result: 'planned' | 'sent' | 'failed' }>;
+  /** 'skipped' = another concurrent run claimed the row first (not a failure). */
+  recipients: Array<{ id: string; name: string; phone: string; result: 'planned' | 'sent' | 'failed' | 'skipped' }>;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -71,6 +74,26 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   if (!dryRun && !opts.force && !isBusinessHours(now)) {
     log.info('dispatch skipped — outside business hours');
     return { dryRun, skippedOutsideHours: true, aborted: false, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [] };
+  }
+
+  // Golden rule (same as bumps): business-initiated sends need an APPROVED
+  // template. Meta can pause/reject a template at any time; without this
+  // pre-flight every send in the batch throws and each prospect gets burned
+  // as send_status='failed'. FAILS CLOSED when the status can't be checked.
+  if (!dryRun) {
+    let error: string | null = null;
+    try {
+      const { getTemplateStatus } = await import('./template');
+      const st = await getTemplateStatus(TEMPLATE_NAME);
+      if (st?.status !== 'APPROVED') error = `template_not_approved (${st?.status ?? 'missing'})`;
+    } catch (e) {
+      error = `template_check_failed: ${(e as Error).message.slice(0, 80)}`;
+    }
+    if (error) {
+      log.error('dispatch aborted —', error);
+      await alertFounders(`⛔ Prospecção abortada: template "${TEMPLATE_NAME}" não passou na checagem (${error}). Nenhum envio feito.`);
+      return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [] };
+    }
   }
 
   // Preconditions FAIL CLOSED: if opt-outs or the daily count can't be verified,
@@ -102,6 +125,15 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     const phone = p.phone as string; // eligibleToSend guarantees non-null
     if (dryRun) {
       recipients.push({ id: p.id, name: p.name, phone, result: 'planned' });
+      continue;
+    }
+    // Atomic claim — the row-level lock against a concurrent run (cron firing
+    // while a founder presses "Disparar"). Losing the claim means the other
+    // run owns this prospect: skip without pacing (nothing left our side).
+    const claimed = await claimProspectForSend(p.id);
+    if (!claimed) {
+      recipients.push({ id: p.id, name: p.name, phone, result: 'skipped' });
+      log.info(`dispatch skipped ${p.id} — claimed by a concurrent run`);
       continue;
     }
     let wamid: string;
@@ -198,6 +230,14 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
   let sent = 0;
   let failed = 0;
   for (const p of batch) {
+    // Atomic claim (touches 1→2): only one overlapping run may bump this row.
+    // If the send below then fails, touches stays 2 and the prospect is never
+    // re-bumped — a missed follow-up is the safe failure direction here.
+    const claimed = await claimProspectForBump(p.id);
+    if (!claimed) {
+      log.info(`bump skipped ${p.id} — claimed by a concurrent run`);
+      continue;
+    }
     const params = buildBumpParams(p);
     let wamid: string;
     try {

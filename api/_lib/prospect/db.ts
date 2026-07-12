@@ -81,6 +81,54 @@ export async function countSentSince(sinceIso: string): Promise<number> {
 }
 
 /**
+ * Atomically claim a prospect for the intro send (send_status null → 'sending',
+ * one SQL statement). Two dispatch runs can overlap — the cron firing while a
+ * founder presses "Disparar" in the painel — and both read the same eligible
+ * rows; whoever claims a row first owns it, the other MUST skip. Returns false
+ * when the row was already claimed. FAILS CLOSED on error (a row we can't claim
+ * is a row we don't send). A crash after claiming strands the row at 'sending',
+ * which is deliberately never re-eligible: on a fresh number a lost send is
+ * recoverable by ops, a double send is not.
+ */
+export async function claimProspectForSend(id: string): Promise<boolean> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('prospects')
+    .update({ send_status: 'sending', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .is('send_status', null)
+    .select('id');
+  if (error) {
+    log.error('claimProspectForSend failed (treated as not claimed):', error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Atomically claim a prospect for the D+3 bump (touches 1 → 2, conditional on
+ * the still-bumpable state). Same overlap scenario as claimProspectForSend.
+ * If the send then fails, touches stays 2 and the prospect simply never gets
+ * re-bumped — a missed follow-up is the safe failure direction.
+ */
+export async function claimProspectForBump(id: string): Promise<boolean> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('prospects')
+    .update({ touches: 2, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'contacted')
+    .eq('send_status', 'sent')
+    .eq('touches', 1)
+    .select('id');
+  if (error) {
+    log.error('claimProspectForBump failed (treated as not claimed):', error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
+/**
  * Mark a prospect contacted after a successful template send. THROWS on failure:
  * the message already went out, so an unrecorded send is a duplicate-send hazard
  * next run — the caller must stop the batch and page ops to reconcile the wamid,
