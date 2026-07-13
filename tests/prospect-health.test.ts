@@ -82,6 +82,22 @@ describe('computeHealth', () => {
     expect(h.deliveredRate).toBe(0);
     expect(h.optoutRate).toBe(0);
   });
+
+  it('sends from BEFORE status tracking went live are not graded — they can never become delivered', () => {
+    // Launch trap caught pre-Monday: 20 legacy 'sent' rows (no callbacks ever
+    // arrived for them) would read as 0% delivery and pause dispatch on
+    // phantom evidence.
+    const legacy = { sent_at: '2026-07-10T12:00:00Z', send_status: 'sent' }; // pre-floor
+    const fresh = { sent_at: hoursAgo(30), send_status: 'delivered' };
+    const h = computeHealth(
+      [legacy, legacy, legacy, fresh],
+      0,
+      NOW,
+      '2026-07-13T03:00:00Z' // tracking floor
+    );
+    expect(h.windowSends).toBe(1);
+    expect(h.deliveredRate).toBe(1);
+  });
 });
 
 const healthy = (over: Partial<ReturnType<typeof computeHealth>> = {}) => ({

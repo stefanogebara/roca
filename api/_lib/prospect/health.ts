@@ -95,6 +95,11 @@ export const HEALTH = {
   /** Delivery usually lands in seconds; give stragglers this long before a
    * still-'sent' row counts as undelivered. */
   graceHours: 2,
+  /** Sends from BEFORE the status webhooks went live can never progress past
+   * 'sent' (Meta doesn't re-deliver old callbacks) — grading them would read
+   * as 0% delivery and pause dispatch on phantom evidence. Only sends after
+   * this instant count. Overridable via PROSPECT_HEALTH_SINCE. */
+  trackingSinceIso: '2026-07-13T03:00:00Z',
   minWindowSends: 20,
   degradedBelowDelivered: 0.8,
   degradedAboveFail: 0.1,
@@ -125,17 +130,21 @@ export interface SendHealth {
   optoutRate: number;
 }
 
-/** Pure rollup of the trailing window (sends older than the grace period). */
+/** Pure rollup of the trailing window (sends older than the grace period and
+ * newer than the status-tracking floor). */
 export function computeHealth(
   sends: Array<{ sent_at: string | null; send_status: string | null }>,
   optoutsInWindow: number,
-  now: Date
+  now: Date,
+  trackingSince: string = process.env.PROSPECT_HEALTH_SINCE || HEALTH.trackingSinceIso
 ): SendHealth {
   const graceCutoff = now.getTime() - HEALTH.graceHours * 3_600_000;
+  const floor = new Date(trackingSince).getTime();
   const counted = sends.filter(
     (s) =>
       s.sent_at &&
       new Date(s.sent_at).getTime() < graceCutoff &&
+      new Date(s.sent_at).getTime() >= floor &&
       s.send_status != null &&
       COUNTED_SET.has(s.send_status)
   );
