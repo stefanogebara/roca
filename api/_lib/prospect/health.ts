@@ -206,6 +206,53 @@ export function gradeCap(health: SendHealth, lifetimeSends: number): CapGrade {
   return { cap: DAILY_CAP_DEFAULT, grade: 'healthy', reasons: [`${lifetimeSends} envios de vida`] };
 }
 
+// ── Pause latch ──────────────────────────────────────────────────────────────
+
+export const LATCH = { windowDays: 21, maxPauses: 2 } as const;
+
+/** Pure: latched when this many pauses landed inside the window. Oscillation
+ * (pause → data decays → warm → re-damage → pause) means the number has a
+ * problem the ramp can't fix — a human must decide, not the decay clock. */
+export function isLatchedFrom(pausedAts: string[], now: Date): boolean {
+  const windowStart = now.getTime() - LATCH.windowDays * 86_400_000;
+  return pausedAts.filter((p) => new Date(p).getTime() >= windowStart).length >= LATCH.maxPauses;
+}
+
+/** Record a health pause EPISODE (best-effort — recording must never block
+ * the abort that's already happening). The cron fires 3×/day: ticks within
+ * 48h of the last event are the same episode, not a new one — otherwise one
+ * paused day would engage the latch by itself. */
+export async function recordDispatchPause(reasons: string[]): Promise<void> {
+  try {
+    const db = getDb();
+    const { data } = await db
+      .from('dispatch_pauses')
+      .select('paused_at')
+      .order('paused_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const last = (data as { paused_at: string } | null)?.paused_at;
+    if (last && Date.now() - new Date(last).getTime() < 48 * 3_600_000) return;
+    const { error } = await db.from('dispatch_pauses').insert({ reasons });
+    if (error) log.error('dispatch pause record failed:', error.message);
+  } catch (e) {
+    log.error('dispatch pause record failed:', (e as Error).message);
+  }
+}
+
+/** Whether the latch is engaged. THROWS on read failure — an unverifiable
+ * latch must abort the run (fail closed), same posture as the preconditions. */
+export async function isDispatchLatched(now = new Date()): Promise<boolean> {
+  const db = getDb();
+  const windowStart = new Date(now.getTime() - LATCH.windowDays * 86_400_000).toISOString();
+  const { data, error } = await db
+    .from('dispatch_pauses')
+    .select('paused_at')
+    .gte('paused_at', windowStart);
+  if (error) throw new Error(`latch unavailable: ${error.message}`);
+  return isLatchedFrom(((data ?? []) as Array<{ paused_at: string }>).map((r) => r.paused_at), now);
+}
+
 /**
  * Manual override: env wins over the grade (clamped to the ceiling).
  * ZERO IS VALID — it's the emergency stop (forces the paused path), and a

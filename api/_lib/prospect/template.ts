@@ -19,6 +19,7 @@ const TIMEOUT_MS = 8000;
 export const V2_NAME = 'stevi_parceria_v2';
 export const BUMP_NAME = 'stevi_parceria_bump';
 export const LEAD_NAME = 'stevi_lead_v1';
+export const COOP_NAME = 'stevi_parceria_coop_v1';
 
 const FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
 
@@ -48,6 +49,19 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
       'a gente indica produtores da região de {{2}} que precisam de receituário agronômico — de graça nessa ' +
       'fase de validação. Se fizer sentido, me dá um alô por aqui. Se não for o momento, tudo bem também!',
     example: ['Agro Forte', 'Varginha'],
+  },
+  // Distribution pitch for coops/revendas — {{1}}=name, {{2}}=kind phrase
+  // ("a cooperativa"/"a revenda"). The lead-gen pitch reads as a competitive
+  // threat to the two kinds whose business IS the receituário moment
+  // (red-team F3): this one routes farmers back to THEIR técnicos instead.
+  [COOP_NAME]: {
+    body:
+      'Oi! Aqui é a Vitória, da Stevi 🌱 Falo com a {{1}}? A Stevi é uma assistente gratuita de WhatsApp ' +
+      'que faz triagem agronômica pra cafeicultores — foto de praga, janela de pulverização, alerta de geada. ' +
+      'Pra {{2}}, ela funciona como um filtro: atende o produtor na hora e encaminha os casos técnicos ' +
+      'pros SEUS agrônomos e técnicos — não substitui ninguém, devolve o produtor pra vocês com o caso já ' +
+      'organizado. Faz sentido uma conversa rápida?',
+    example: ['Cooxupé - Núcleo Machado', 'a cooperativa'],
   },
   // Lead delivery to an ACTIVE partner (agreed relationship ⇒ UTILITY, no SAIR
   // footer) — {{1}}=partner first name, {{2}}=crop, {{3}}=farmer's topic.

@@ -137,6 +137,42 @@ function externalProbes(): Array<Promise<CanaryCheck>> {
   ];
 }
 
+/**
+ * The number's Meta quality rating — the actual ban precursor. Blocks/reports
+ * never show up as opt-outs or delivery failures (a blocker doesn't reply
+ * SAIR), so the thermometer can read healthy while Meta's score dies. This is
+ * the earliest alarm available. Env-gated like the template checks.
+ */
+async function numberQualityCheck(): Promise<CanaryCheck[]> {
+  const token = process.env.WHATSAPP_CLOUD_TOKEN;
+  const phoneId = process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+  if (!token || !phoneId) return [];
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${phoneId}?fields=quality_rating,messaging_limit_tier,name_status`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) }
+    );
+    const data = (await res.json()) as {
+      quality_rating?: string;
+      messaging_limit_tier?: string;
+      name_status?: string;
+      error?: { message?: string };
+    };
+    if (data.error) {
+      return [{ check: 'qualidade do número (Meta)', ok: false, detail: (data.error.message ?? 'erro').slice(0, 80) }];
+    }
+    const rating = (data.quality_rating ?? 'UNKNOWN').toUpperCase();
+    // GREEN is healthy; UNKNOWN means Meta hasn't scored yet (fresh number) —
+    // not an alarm. YELLOW/RED/FLAGGED/RESTRICTED are exactly the alarm.
+    const ok = rating === 'GREEN' || rating === 'UNKNOWN';
+    const bits = [rating];
+    if (data.messaging_limit_tier) bits.push(`tier ${data.messaging_limit_tier}`);
+    return [{ check: 'qualidade do número (Meta)', ok, detail: ok ? bits.join(' · ') : bits.join(' · ') }];
+  } catch (e) {
+    return [{ check: 'qualidade do número (Meta)', ok: false, detail: (e as Error).message.slice(0, 60) }];
+  }
+}
+
 async function templateChecks(): Promise<CanaryCheck[]> {
   // Env-gated: without the Cloud token the check can never pass — omit rather
   // than alarm forever in a sandbox-only environment.
@@ -231,6 +267,7 @@ export async function runCanary(): Promise<CanaryRun> {
     await Promise.all([
       Promise.all(externalProbes()),
       templateChecks(),
+      numberQualityCheck(),
       Promise.all(modelChecks()),
       fallbackRateCheck().then((c) => [c]),
     ])

@@ -26,7 +26,27 @@ import {
 import { sendProspectTemplate } from './send';
 import { buildTemplateParams, renderTemplateText, buildBumpParams, renderBumpText } from './personalize';
 import { logProspectMessage, loadBumpDueProspects, recordBump } from './db';
-import { gradeCap, loadSendHealth, envCapOverride, type CapGrade } from './health';
+import {
+  gradeCap,
+  loadSendHealth,
+  envCapOverride,
+  isDispatchLatched,
+  recordDispatchPause,
+  type CapGrade,
+} from './health';
+
+// Campaign kind gating: the current intro template pitches lead-generation,
+// which reads as a competitive threat to coops/revendas (their business IS
+// the receituário moment — red-team F3). Until the distribution-pitch
+// template is approved, only right-fit kinds receive sends. Widen with
+// PROSPECT_SEND_KINDS (csv of kinds, or 'all').
+function kindAllowed(kind: string): boolean {
+  const kinds = (process.env.PROSPECT_SEND_KINDS || 'agronomo,consultoria')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return kinds.includes('all') || kinds.includes(kind);
+}
 import { alertFounders } from '../alert';
 import { createLogger } from '../logger';
 
@@ -110,15 +130,29 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   let capInfo: CapGrade;
   try {
     const manual = opts.dailyCap ?? envCapOverride();
-    const [o, r, s, healthRes] = await Promise.all([
+    const [o, r, s, healthRes, latched] = await Promise.all([
       loadOptouts(),
       loadReadyProspects(),
       countSentSince(brtDayStartIso(now)),
       manual == null ? loadSendHealth(now) : Promise.resolve(null),
+      isDispatchLatched(now),
     ]);
     optouts = o;
     ready = r;
     sentToday = s;
+    // The LATCH outranks everything, including manual overrides: two health
+    // pauses inside 21 days means a human must decide (clear dispatch_pauses)
+    // before another send leaves — oscillation is not a retry loop.
+    if (latched) {
+      const error = 'paused_latched (2 pausas de saúde em 21 dias — limpe dispatch_pauses para religar)';
+      log.error('dispatch latched off:', error);
+      if (!dryRun) {
+        await alertFounders(
+          '⛔ Prospecção TRAVADA: 2 pausas de saúde do número em 21 dias. Religar é decisão humana — investigue e limpe a tabela dispatch_pauses.'
+        );
+      }
+      return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [], cap: 0, capGrade: 'latched' };
+    }
     // The cap is EARNED: manual override wins, otherwise the number's trailing
     // health grades it (warming 20 → healthy ladder up to 60 → degraded 10 →
     // paused 0). See prospect/health.ts.
@@ -138,6 +172,9 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     // founders) and the manual PROSPECT_DAILY_CAP=0 emergency stop (the
     // founder pulled it — no page needed).
     const manualStop = capInfo.grade === 'manual';
+    // A real (non-manual) pause is an EPISODE — two episodes in 21 days
+    // engage the latch checked in the preconditions above.
+    if (!dryRun && !manualStop) await recordDispatchPause(capInfo.reasons);
     const error = manualStop
       ? 'paused_by_override (PROSPECT_DAILY_CAP=0)'
       : `number_health_paused (${capInfo.reasons.join('; ')})`;
@@ -150,7 +187,7 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [], cap: 0, capGrade: capInfo.grade };
   }
 
-  const eligible = ready.filter((p) => eligibleToSend(p, optouts));
+  const eligible = ready.filter((p) => eligibleToSend(p, optouts) && kindAllowed(p.kind));
   const cap = capInfo.cap;
   const batch = planBatch(eligible, { dailyCap: cap, sentToday });
 
@@ -304,7 +341,9 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
     return { skipped: reason, due: 0, sent: 0, failed: 0 };
   }
 
-  const eligible = due.filter((p) => p.phone && !optouts.has(p.phone));
+  // Kind gating applies to bumps too — the bump template carries the same
+  // lead-gen pitch that's wrong for coops/revendas.
+  const eligible = due.filter((p) => p.phone && !optouts.has(p.phone) && kindAllowed(p.kind));
   const cap = capInfo.cap;
   const batch = planBatch(eligible, { dailyCap: cap, sentToday });
   if (!batch.length) return { skipped: eligible.length ? 'daily_cap_reached' : null, due: eligible.length, sent: 0, failed: 0 };

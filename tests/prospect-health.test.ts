@@ -11,6 +11,7 @@ import {
   computeHealth,
   gradeCap,
   envCapOverride,
+  isLatchedFrom,
   HEALTH,
 } from '../api/_lib/prospect/health';
 import { parseCloudStatuses } from '../api/_lib/transport/cloud';
@@ -144,6 +145,19 @@ describe('gradeCap (the ladder)', () => {
   it('reasons name what triggered a downgrade', () => {
     const g = gradeCap(healthy({ deliveredRate: 0.6, optoutRate: 0.09 }), 400);
     expect(g.reasons.join(' ')).toMatch(/entrega/i);
+  });
+});
+
+describe('isLatchedFrom (pause oscillation latch)', () => {
+  const d = (daysAgo: number) => new Date(NOW.getTime() - daysAgo * 86_400_000).toISOString();
+
+  it('two pause episodes inside 21 days engage the latch', () => {
+    expect(isLatchedFrom([d(10), d(2)], NOW)).toBe(true);
+  });
+  it('one pause, or old pauses outside the window, do not', () => {
+    expect(isLatchedFrom([d(2)], NOW)).toBe(false);
+    expect(isLatchedFrom([d(30), d(2)], NOW)).toBe(false);
+    expect(isLatchedFrom([], NOW)).toBe(false);
   });
 });
 

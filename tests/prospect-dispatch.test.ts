@@ -30,11 +30,20 @@ vi.mock('../api/_lib/alert', () => ({ alertFounders: vi.fn() }));
 // read is mocked.
 vi.mock('../api/_lib/prospect/health', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/_lib/prospect/health')>();
-  return { ...actual, loadSendHealth: vi.fn() };
+  return {
+    ...actual,
+    loadSendHealth: vi.fn(),
+    isDispatchLatched: vi.fn(),
+    recordDispatchPause: vi.fn(),
+  };
 });
 
 import { runDispatch, runBumpDispatch } from '../api/_lib/prospect/dispatch';
-import { loadSendHealth } from '../api/_lib/prospect/health';
+import {
+  loadSendHealth,
+  isDispatchLatched,
+  recordDispatchPause,
+} from '../api/_lib/prospect/health';
 import {
   loadReadyProspects,
   loadOptouts,
@@ -55,13 +64,14 @@ import { alertFounders } from '../api/_lib/alert';
 const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => ({
   id: 'p1',
   name: 'Agro Forte',
-  kind: 'revenda',
+  kind: 'agronomo',
   city: 'Varginha',
   uf: 'MG',
   phone: '+5535999990000',
   wa_status: 'valid',
   source: 'manual',
   status: 'ready',
+  // Fixture kind sits inside the default PROSPECT_SEND_KINDS gate.
   notes: null,
   sent_at: null,
   send_status: null,
@@ -89,9 +99,12 @@ const WARM_HEALTH = {
 beforeEach(() => {
   vi.clearAllMocks();
   // A host-environment override would silently flip every test to the manual
-  // path — the suite must own this variable.
+  // path — the suite must own these variables.
   delete process.env.PROSPECT_DAILY_CAP;
+  delete process.env.PROSPECT_SEND_KINDS;
   vi.mocked(loadSendHealth).mockResolvedValue(WARM_HEALTH);
+  vi.mocked(isDispatchLatched).mockResolvedValue(false);
+  vi.mocked(recordDispatchPause).mockResolvedValue(undefined);
   vi.mocked(getTemplateStatus).mockResolvedValue({ name: 'x', status: 'APPROVED' });
   vi.mocked(loadOptouts).mockResolvedValue(new Set());
   vi.mocked(countSentSince).mockResolvedValue(0);
@@ -258,6 +271,55 @@ describe('runDispatch — graded cap ramp', () => {
     const rep = await runDispatch({ force: true });
     expect(rep.cap).toBe(60);
     expect(rep.capGrade).toBe('healthy');
+  });
+
+  it('a real pause records an episode; the manual stop does not', async () => {
+    vi.mocked(loadSendHealth).mockResolvedValue({
+      health: { windowSends: 40, delivered: 16, failed: 2, deliveredRate: 0.4, failRate: 0.05, optoutRate: 0.02 },
+      lifetimeSends: 400,
+    });
+    await runDispatch({ force: true });
+    expect(recordDispatchPause).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    vi.mocked(isDispatchLatched).mockResolvedValue(false);
+    await runDispatch({ force: true, dailyCap: 0 });
+    expect(recordDispatchPause).not.toHaveBeenCalled();
+  });
+
+  it('the latch outranks everything — even a manual cap cannot send through it', async () => {
+    vi.mocked(isDispatchLatched).mockResolvedValue(true);
+    vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
+    const rep = await runDispatch({ force: true, dailyCap: 20 });
+    expect(rep.aborted).toBe(true);
+    expect(rep.error).toMatch(/paused_latched/);
+    expect(rep.capGrade).toBe('latched');
+    expect(sendProspectTemplate).not.toHaveBeenCalled();
+    expect(alertFounders).toHaveBeenCalledWith(expect.stringContaining('TRAVADA'));
+  });
+});
+
+describe('runDispatch — campaign kind gating', () => {
+  it('coops/revendas never receive the lead-gen template under the default gate', async () => {
+    vi.mocked(loadReadyProspects).mockResolvedValue([
+      prospect({ id: 'p1', kind: 'agronomo', phone: '+5535999990001' }),
+      prospect({ id: 'p2', kind: 'cooperativa', phone: '+5535999990002' }),
+      prospect({ id: 'p3', kind: 'revenda', phone: '+5535999990003' }),
+      prospect({ id: 'p4', kind: 'consultoria', phone: '+5535999990004' }),
+    ]);
+    const rep = await runDispatch({ force: true });
+    expect(rep.eligible).toBe(2); // agronomo + consultoria only
+    const sentTo = vi.mocked(sendProspectTemplate).mock.calls.map((c) => c[0]);
+    expect(sentTo).toEqual(['+5535999990001', '+5535999990004']);
+  });
+
+  it("PROSPECT_SEND_KINDS='all' opens the gate", async () => {
+    process.env.PROSPECT_SEND_KINDS = 'all';
+    vi.mocked(loadReadyProspects).mockResolvedValue([
+      prospect({ id: 'p2', kind: 'cooperativa', phone: '+5535999990002' }),
+    ]);
+    const rep = await runDispatch({ force: true });
+    expect(rep.sent).toBe(1);
   });
 });
 
