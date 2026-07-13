@@ -141,14 +141,52 @@ async function handleFieldHealth(userId: string | null): Promise<string> {
   return lines.join('\n');
 }
 
+// Condition vocabulary a farmer states when asking "can I spray in THIS
+// weather?". These questions deserve an answer about the condition itself —
+// the fixed pin-ask ignoring "tá ventando 20 km/h" was the golden set's first
+// catch (case spray-vento). Accent variants included; text arrives raw.
+const SPRAY_CONDITION_RE =
+  /\b(vent(o|ando|ania)|chuv\w*|chovendo|chover|garoa|sol|calor|quente|frio|geada|[úu]mid\w*|seco|orvalho|sereno|madrugada|noite|cedo|tarde|nublado)\b|°\s?c|km\/h/i;
+
+/** Whether a spray question states its own weather/timing condition. */
+export function mentionsSprayConditions(text: string | null | undefined): boolean {
+  return !!text && SPRAY_CONDITION_RE.test(text);
+}
+
+const SPRAY_PIN_ASK =
+  'Pra te dizer se dá pra pulverizar, preciso saber onde fica sua lavoura. Manda sua localização aqui pelo WhatsApp (clipe 📎 → Localização) que eu calculo o Delta T, vento e chuva pra você.';
+
 async function handleSpray(
   msg: InboundMessage,
-  userId: string | null
+  userId: string | null,
+  packOverride?: string | null
 ): Promise<string> {
   let coords = msg.location;
   if (!coords && userId) coords = await getFarmLocation(userId);
   if (!coords) {
-    return 'Pra te dizer se dá pra pulverizar, preciso saber onde fica sua lavoura. Manda sua localização aqui pelo WhatsApp (clipe 📎 → Localização) que eu calculo o Delta T, vento e chuva pra você.';
+    // A stated condition gets ANSWERED from spray principles before the pin
+    // invitation; only the bare ask takes the cheap deterministic path.
+    // Fail-soft: any model trouble degrades to the pin-ask, never an error.
+    if (mentionsSprayConditions(msg.text)) {
+      try {
+        return await chat({
+          model: MODELS.reasoning(),
+          maxTokens: 400,
+          system:
+            (await steviSystemPrompt(packOverride ?? null)) +
+            '\n\nO produtor descreveu uma condição de clima/horário e quer saber se dá pra pulverizar. ' +
+            'Responda à condição DESCRITA usando princípios de aplicação (Delta-T bom entre 2 e 8 °C, ' +
+            'vento fraco abaixo de ~10 km/h, sem chuva próxima; deriva com vento forte, evaporação no calor, ' +
+            'orvalho/madrugada e escorrimento). NUNCA invente previsão do tempo pro local dele — você não sabe onde é. ' +
+            'Sem produto, sem dose. Feche convidando a mandar a localização (clipe 📎 → Localização) pra você ' +
+            'calcular a janela exata. Curto, tamanho WhatsApp.',
+          user: msg.text ?? '',
+        });
+      } catch (e) {
+        log.error('condition-aware spray reply failed (pin-ask fallback):', (e as Error).message);
+      }
+    }
+    return SPRAY_PIN_ASK;
   }
   try {
     const hours = await fetchHourlyWeather(coords, 12);
@@ -344,7 +382,7 @@ export async function reason(
   }
 
   if (intent === 'spray_window') {
-    return handleSpray(msg, deps.userId);
+    return handleSpray(msg, deps.userId, deps.packOverride);
   }
 
   if (intent === 'field_health') {
