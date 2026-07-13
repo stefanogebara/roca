@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gym": "tsx scripts/gym-run.ts",
-    "gym:vitoria": "tsx scripts/prospect-gym-run.ts"
+    "gym:vitoria": "tsx scripts/prospect-gym-run.ts",
+    "golden": "tsx scripts/golden-run.ts"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",

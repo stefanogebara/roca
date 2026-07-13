@@ -8,6 +8,7 @@
  */
 
 import { getDb } from './db';
+import { cohortStats, partnerScorecard, type CohortStats, type PartnerScore, type CohortMsg } from './cohort';
 import { createLogger } from './logger';
 
 const log = createLogger('digest');
@@ -30,6 +31,11 @@ export interface DigestStats {
   returningUsers: number;
   failures: number;
   sampleQuestions: string[];
+  /** Weekly cohort block (WAU trend, D7 retention, habit-by-intent). Optional
+   * so existing fixtures stay valid. */
+  cohort?: CohortStats;
+  /** Lead-pipeline rollup — the partner side of the business. */
+  partners?: PartnerScore;
 }
 
 // Outbound replies that mean Stevi couldn't help — real gaps worth the founder's
@@ -100,7 +106,19 @@ export async function computeDigestStats(since: string, until: string): Promise<
     returningUsers = count ?? 0;
   }
 
-  const [{ count: newUsers }, { count: referrals }, { count: openLeads }] = await Promise.all([
+  // Weekly cohort inputs: 14 days of messages + 14 days of signups feed the
+  // pure cohort math (WAU trend needs two weeks; the D7 cohort is the 7-14d
+  // signup band). Bounded reads; at current volume these are tiny.
+  const now = new Date(until);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 86_400_000).toISOString();
+  const [
+    { count: newUsers },
+    { count: referrals },
+    { count: openLeads },
+    cohortMsgs,
+    cohortUsers,
+    leadRows,
+  ] = await Promise.all([
     db
       .from('users')
       .select('id', { count: 'exact', head: true })
@@ -116,7 +134,61 @@ export async function computeDigestStats(since: string, until: string): Promise<
       .from('referral_requests')
       .select('id', { count: 'exact', head: true })
       .or('status.eq.novo,status.eq.new,status.is.null'),
+    // Ordered newest-first: if a window ever exceeds the cap (or PostgREST's
+    // server-side max-rows clamps below it), we lose the OLDEST rows — a
+    // defined bias — instead of an arbitrary subset skewing WAU/D7 randomly.
+    db
+      .from('messages')
+      .select('user_id, created_at, direction, intent')
+      .gte('created_at', twoWeeksAgo)
+      .lt('created_at', until)
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    db
+      .from('users')
+      .select('id, created_at')
+      .gte('created_at', twoWeeksAgo)
+      .order('created_at', { ascending: false })
+      .limit(2000),
+    db
+      .from('referral_requests')
+      .select('status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(2000),
   ]);
+
+  // Truncation detection: hitting the cap (ours or PostgREST's 1000 default)
+  // means the cohort numbers describe a sample, not the population — say so.
+  for (const [label, res, cap] of [
+    ['messages', cohortMsgs, 5000],
+    ['users', cohortUsers, 2000],
+    ['referral_requests', leadRows, 2000],
+  ] as const) {
+    const n = res.data?.length ?? 0;
+    if (n >= 1000 && (n >= cap || n === 1000)) {
+      log.error(`cohort feed "${label}" hit a row cap (${n}) — weekly metrics may be truncated`);
+    }
+  }
+
+  let cohort: CohortStats | undefined;
+  let partners: PartnerScore | undefined;
+  if (!cohortMsgs.error && !cohortUsers.error) {
+    cohort = cohortStats(
+      (cohortUsers.data ?? []) as Array<{ id: string; created_at: string }>,
+      (cohortMsgs.data ?? []) as CohortMsg[],
+      now
+    );
+  } else {
+    log.error('cohort inputs query failed:', cohortMsgs.error?.message ?? cohortUsers.error?.message);
+  }
+  if (!leadRows.error) {
+    partners = partnerScorecard(
+      (leadRows.data ?? []) as Array<{ status: string | null; created_at: string }>,
+      now
+    );
+  } else {
+    log.error('partner scorecard query failed:', leadRows.error.message);
+  }
 
   return {
     since,
@@ -131,6 +203,8 @@ export async function computeDigestStats(since: string, until: string): Promise<
     returningUsers,
     failures,
     sampleQuestions,
+    cohort,
+    partners,
   };
 }
 
@@ -163,6 +237,27 @@ export function formatDigest(s: DigestStats): string {
   lines.push(`🔁 Voltaram: ${s.returningUsers} de ${s.uniqueUsers} ativos já conheciam a Stevi`);
   lines.push(`🎯 Intenções: ${topEntries(s.byIntent)}`);
   lines.push(`📎 Tipos: ${topEntries(s.byKind)}`);
+  if (s.cohort) {
+    const c = s.cohort;
+    const trend = c.wau > c.wauPrev ? '↑' : c.wau < c.wauPrev ? '↓' : '=';
+    const d7 =
+      c.d7.rate == null
+        ? 'sem coorte ainda'
+        : `${c.d7.retained}/${c.d7.size} (${Math.round(c.d7.rate * 100)}%)`;
+    lines.push(`📈 Semana: ${c.wau} ativos (${trend} de ${c.wauPrev}) · retenção D7: ${d7}`);
+    if (c.habits.length > 0) {
+      const top = c.habits
+        .slice(0, 4)
+        .map((h) => `${h.intent} ${h.users}→${h.repeaters} voltaram`)
+        .join(' · ');
+      lines.push(`🔥 Hábito (7d): ${top}`);
+    }
+  }
+  if (s.partners) {
+    const p = s.partners;
+    const close = p.closeRate == null ? '—' : `${Math.round(p.closeRate * 100)}%`;
+    lines.push(`🤝 Leads: ${p.leads7d} na semana · ${p.open} a contatar · fechamento: ${close}`);
+  }
   if (s.referrals > 0) lines.push(`🤝 Pedidos de agrônomo: ${s.referrals}`);
   lines.push(`${s.failures > 0 ? '⚠️' : '✅'} Falhas (não ajudou): ${s.failures}`);
   if (s.sampleQuestions.length > 0) {

@@ -49,6 +49,35 @@ describe('formatDigest', () => {
     expect(formatDigest({ ...base, failures: 0 })).toMatch(/✅ Falhas.*0/);
   });
 
+  it('renders the weekly cohort block when present (WAU trend, D7, habits)', () => {
+    const t = formatDigest({
+      ...base,
+      cohort: {
+        wau: 12,
+        wauPrev: 9,
+        d7: { size: 7, retained: 3, rate: 3 / 7 },
+        habits: [
+          { intent: 'prices', users: 5, repeaters: 3 },
+          { intent: 'spray_window', users: 4, repeaters: 2 },
+        ],
+      },
+      partners: { open: 2, leads7d: 3, closed: 1, closeRate: 0.5 },
+    });
+    expect(t).toMatch(/📈 Semana: 12 ativos \(↑ de 9\)/);
+    expect(t).toMatch(/retenção D7: 3\/7 \(43%\)/);
+    expect(t).toMatch(/🔥 Hábito.*prices 5→3 voltaram/);
+    expect(t).toMatch(/🤝 Leads: 3 na semana · 2 a contatar · fechamento: 50%/);
+  });
+
+  it('an empty D7 cohort reads as "sem coorte ainda", never 0%', () => {
+    const t = formatDigest({
+      ...base,
+      cohort: { wau: 1, wauPrev: 1, d7: { size: 0, retained: 0, rate: null }, habits: [] },
+    });
+    expect(t).toMatch(/sem coorte ainda/);
+    expect(t).toMatch(/\(= de 1\)/);
+  });
+
   it('handles a quiet day gracefully', () => {
     const quiet: DigestStats = {
       ...base,

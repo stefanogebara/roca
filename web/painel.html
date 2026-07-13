@@ -822,11 +822,39 @@
       }
     }
 
+    function renderGolden(p, runs) {
+      const card = el('div', 'card');
+      card.append(el('h3', null, '🎯 Golden set (precisão)'));
+      card.append(Object.assign(el('p','meta'), {textContent:
+        'Perguntas reais de produtor com critérios auditáveis (nunca dose, grounding presente, roteamento certo). ' +
+        'O cérebro real responde, um juiz confere critério a critério. Rodar: '}));
+      card.append(Object.assign(el('code','mono'), {textContent: 'npm run golden  ·  npm run golden -- --pack <versão>'}));
+      if (!runs.length) {
+        card.append(el('div', 'empty', 'Nenhuma rodada ainda.'));
+      } else {
+        for (const r of runs) {
+          const row = el('div', 'meta');
+          const pct = Math.round((r.rate ?? 0) * 100);
+          const pill = el('span', 'pill', `${pct}%`);
+          pill.style.background = pct >= 90 ? '#2e9e63' : pct >= 75 ? '#b7791f' : '#b3452e';
+          pill.style.color = '#fff';
+          row.append(pill, document.createTextNode(
+            ` ${String(r.ran_at).slice(0,10)} · ${r.passed}/${r.total}` +
+            (r.pack_version ? ` · pack v${r.pack_version}` : ' · prompt base') +
+            ((r.failures||[]).length ? ` · reprovados: ${(r.failures||[]).map(f=>f.id).join(', ').slice(0,120)}` : '')
+          ));
+          card.append(row);
+        }
+      }
+      p.append(card);
+    }
+
     async function loadGym() {
       const p = $('#p-gym'); p.innerHTML = '<div class="loading">Carregando…</div>';
       try {
         const d = await api('gym');
         p.innerHTML = '';
+        if (d.golden) renderGolden(p, d.golden);
         if (d.vitoria) renderVitoriaGym(p, d.vitoria);
         const intro = el('div', 'card');
         intro.append(el('h3', null, 'Treino da voz (Gym)'));

@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (!requireOps(req, res)) return;
   try {
     const db = getDb();
-    const [{ data }, { data: vitoriaRuns }] = await Promise.all([
+    const [{ data }, { data: vitoriaRuns }, { data: goldenRuns }] = await Promise.all([
       db
         .from('gym_runs')
         .select('id, ran_at, champion, challenger, tally, recommended, reason, verdicts')
@@ -26,6 +26,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .select('id, ran_at, medias, verdicts')
         .order('ran_at', { ascending: false })
         .limit(10),
+      db
+        .from('golden_runs')
+        .select('id, ran_at, pack_version, total, passed, rate, failures')
+        .order('ran_at', { ascending: false })
+        .limit(10),
     ]);
     const { PROSPECT_PERSONAS } = await import('../_lib/prospect/gym');
     res.status(200).json({
@@ -33,6 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       data: {
         personas: PERSONAS.map((p) => ({ key: p.key, label: p.label, crop: p.crop ?? null })),
         runs: data ?? [],
+        golden: goldenRuns ?? [],
         vitoria: {
           personas: PROSPECT_PERSONAS.map((p) => ({ key: p.key, label: p.label })),
           runs: vitoriaRuns ?? [],
