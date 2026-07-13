@@ -9,6 +9,9 @@ describe('isHistoryRequest', () => {
       'Meu caderno',
       'o que já conversamos?',
       'o que a gente falou até agora',
+      // "a gente" conjugates third-singular — the most natural phrasing.
+      // Caught by the golden baseline: routed to smalltalk before the fix.
+      'o que a gente já conversou?',
       'quero ver meu historico',
     ]) {
       expect(isHistoryRequest(t), t).toBe(true);

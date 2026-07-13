@@ -103,8 +103,11 @@ export function isFieldHealthRequest(text: string): boolean {
 
 // "Meu histórico" / "meu caderno" — the passive caderno de campo read-out.
 // Anchored to possessives/conversation so "histórico de chuva" doesn't match.
+// "a gente" conjugates third-singular, so conversou/falou must pair with
+// conversamos/falamos — the golden baseline caught 'o que a gente já
+// conversou?' falling through to the LLM router.
 const HISTORY_INTENT =
-  /\b(meu|nosso)\s+(hist[óo]rico|caderno)\b|\bo\s+que\s+(a\s+gente\s+|n[óo]s\s+)?(j[áa]\s+)?(conversamos|falamos|falou)\b/i;
+  /\b(meu|nosso)\s+(hist[óo]rico|caderno)\b|\bo\s+que\s+(a\s+gente\s+|n[óo]s\s+)?(j[áa]\s+)?(convers(amos|ou)|fal(amos|ou))\b/i;
 
 /** Whether a message asks for the farmer's own history/caderno. */
 export function isHistoryRequest(text: string): boolean {
