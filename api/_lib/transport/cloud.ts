@@ -48,6 +48,51 @@ function classifyMime(mime: string | undefined): InboundKind {
   return 'unsupported';
 }
 
+const STATUS_VALUES = new Set(['sent', 'delivered', 'read', 'failed']);
+
+/**
+ * Extract message-status callbacks (sent/delivered/read/failed) from a Cloud
+ * webhook body. Statuses arrive in the same envelope as messages but under
+ * value.statuses[], possibly batched across entries/changes. Pure; returns []
+ * for message payloads, junk, and unknown status values.
+ */
+export function parseCloudStatuses(
+  rawBody: Buffer | string
+): Array<{ wamid: string; status: 'sent' | 'delivered' | 'read' | 'failed'; errorDetail: string | null }> {
+  try {
+    const data = JSON.parse(rawBody.toString()) as {
+      entry?: Array<{
+        changes?: Array<{
+          value?: {
+            statuses?: Array<{
+              id?: string;
+              status?: string;
+              errors?: Array<{ code?: number; title?: string; message?: string }>;
+            }>;
+          };
+        }>;
+      }>;
+    };
+    const out: Array<{ wamid: string; status: 'sent' | 'delivered' | 'read' | 'failed'; errorDetail: string | null }> = [];
+    for (const entry of data.entry ?? []) {
+      for (const change of entry.changes ?? []) {
+        for (const st of change.value?.statuses ?? []) {
+          if (!st.id || !st.status || !STATUS_VALUES.has(st.status)) continue;
+          const err = (st.errors ?? [])[0];
+          out.push({
+            wamid: st.id,
+            status: st.status as 'sent' | 'delivered' | 'read' | 'failed',
+            errorDetail: err ? `${err.code ?? ''} ${err.title ?? err.message ?? ''}`.trim() || null : null,
+          });
+        }
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Verify Meta's webhook subscription challenge (GET). Returns the challenge to
  * echo when the verify token matches, else null.

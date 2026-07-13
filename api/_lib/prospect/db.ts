@@ -128,7 +128,7 @@ export async function claimProspectForBump(id: string): Promise<boolean> {
     .update({ touches: 2, sent_at: now, updated_at: now })
     .eq('id', id)
     .eq('status', 'contacted')
-    .eq('send_status', 'sent')
+    .in('send_status', ['sent', 'delivered', 'read'])
     .eq('touches', 1)
     .select('id');
   if (error) {
@@ -182,7 +182,8 @@ export async function reactivateProspect(id: string): Promise<boolean> {
   const db = getDb();
   const { data, error } = await db
     .from('prospects')
-    .update({ status: 'discovered', send_status: null, touches: 0, updated_at: new Date().toISOString() })
+    // wamid clears for the same late-callback reason as resetProspectSend.
+    .update({ status: 'discovered', send_status: null, wamid: null, touches: 0, updated_at: new Date().toISOString() })
     .eq('id', id)
     .in('status', ['stale', 'discarded'])
     .select('id');
@@ -202,7 +203,10 @@ export async function resetProspectSend(id: string): Promise<boolean> {
   const db = getDb();
   const { data, error } = await db
     .from('prospects')
-    .update({ send_status: null, updated_at: new Date().toISOString() })
+    // wamid clears too: a late Meta redelivery for the OLD send must never
+    // match the row while a fresh send is in flight ('sending' accepts
+    // callbacks by design — the heal path).
+    .update({ send_status: null, wamid: null, updated_at: new Date().toISOString() })
     .eq('id', id)
     .in('send_status', ['sending', 'failed'])
     .select('id');
@@ -250,7 +254,9 @@ export async function loadBumpDueProspects(days = 3, limit = 50): Promise<Prospe
     .from('prospects')
     .select('*')
     .eq('status', 'contacted')
-    .eq('send_status', 'sent')
+    // Status webhooks progress 'sent' → 'delivered'/'read'; all three are
+    // "intro landed, no reply yet" for bump purposes.
+    .in('send_status', ['sent', 'delivered', 'read'])
     .eq('touches', 1)
     .not('phone', 'is', null)
     .lt('sent_at', cutoff)
@@ -263,7 +269,14 @@ export async function loadBumpDueProspects(days = 3, limit = 50): Promise<Prospe
   return (data ?? []) as ProspectRow[];
 }
 
-/** Record a bump send: second touch, refresh sent_at (feeds the daily cap). */
+/**
+ * Record a bump send: second touch, refresh sent_at (feeds the daily cap).
+ * send_status RESETS to 'sent': the row's send-state describes the LATEST
+ * message (matching the wamid written here), so the bump's own status
+ * callbacks — including a per-user-frequency-cap 'failed' — progress it
+ * normally. Leaving the intro's 'delivered'/'read' would make a failed bump
+ * invisible AND count it as a delivered send in the health window.
+ */
 export async function recordBump(id: string, fields: { wamid: string; template: string }): Promise<void> {
   const db = getDb();
   const { error } = await db
@@ -271,6 +284,7 @@ export async function recordBump(id: string, fields: { wamid: string; template: 
     .update({
       touches: 2,
       sent_at: new Date().toISOString(),
+      send_status: 'sent',
       wamid: fields.wamid,
       template_used: fields.template,
       updated_at: new Date().toISOString(),

@@ -452,7 +452,7 @@
 
     // Effective stage: send_status 'sent' shows as contacted even if the row
     // status hasn't caught up yet.
-    const pStage = (pr) => (pr.status === 'ready' && pr.send_status === 'sent') ? 'contacted' : pr.status;
+    const pStage = (pr) => (pr.status === 'ready' && ['sent','delivered','read'].includes(pr.send_status)) ? 'contacted' : pr.status;
 
     async function loadProspeccao() {
       const p = $('#p-prospeccao'); p.innerHTML = '<div class="loading">Carregando…</div>';
@@ -505,7 +505,7 @@
             if (rep.skippedOutsideHours) note.textContent = 'Fora do horário comercial (seg–sex 9–18 BRT) — nenhum envio.';
             else if (rep.aborted) note.textContent = '⛔ Abortado por segurança: ' + (rep.error||'');
             else if (dryRun) note.textContent = `Próximo lote (${rep.planned} de ${rep.eligible} elegíveis): ` + (rep.recipients.map(r=>r.name).join(', ') || 'ninguém');
-            else note.textContent = `Enviados: ${rep.sent} · falhas: ${rep.failed} · na fila: ${rep.eligible - rep.sent}`;
+            else note.textContent = `Enviados: ${rep.sent} · falhas: ${rep.failed} · na fila: ${rep.eligible - rep.sent}` + (rep.capGrade ? ` · cap hoje: ${rep.cap} (${rep.capGrade})` : '');
             if (!dryRun) await refreshProspects();
           } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro: '+e.message; }
         };
@@ -608,6 +608,8 @@
       if (pr.wa_status === 'invalid') meta.append(Object.assign(el('span','pill'),{textContent:'nº inválido'}));
       if (pr.send_status === 'failed') meta.append(Object.assign(el('span','pill'),{textContent:'⚠️ envio falhou'}));
       if (pr.send_status === 'sending') meta.append(Object.assign(el('span','pill'),{textContent:'⏳ envio travado'}));
+      if (pr.send_status === 'delivered') meta.append(Object.assign(el('span','pill'),{textContent:'📬 entregue'}));
+      if (pr.send_status === 'read') meta.append(Object.assign(el('span','pill'),{textContent:'👁 lido'}));
       left.append(meta);
       if (pr.qualification && Object.values(pr.qualification).some(v => v != null)) {
         const qd = pr.qualification, bits = [];

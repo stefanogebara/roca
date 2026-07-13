@@ -29,13 +29,18 @@ export interface FunnelStats {
 // would "lose" its best outcomes from the reply rate.
 const POST_CONTACT = new Set(['contacted', 'replied', 'partner', 'stale']);
 const REPLIED = new Set(['replied', 'partner']);
+// Status webhooks progress send_status past 'sent' — all of these mean a
+// first touch went out.
+const SENT_LIKE = new Set(['sent', 'delivered', 'read']);
 
 /** Pure rollup of the prospect funnel. */
 export function computeFunnelStats(
   prospects: Array<{ kind: string | null; status: string; send_status: string | null }>,
   optouts: number
 ): FunnelStats {
-  const contacted = prospects.filter((p) => p.send_status === 'sent' || POST_CONTACT.has(p.status));
+  const contacted = prospects.filter(
+    (p) => (p.send_status != null && SENT_LIKE.has(p.send_status)) || POST_CONTACT.has(p.status)
+  );
   const replied = prospects.filter((p) => REPLIED.has(p.status));
   const partners = prospects.filter((p) => p.status === 'partner');
   const byKind: Record<string, { c: number; r: number }> = {};

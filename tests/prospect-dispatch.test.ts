@@ -26,8 +26,15 @@ vi.mock('../api/_lib/prospect/db', () => ({
 vi.mock('../api/_lib/prospect/send', () => ({ sendProspectTemplate: vi.fn() }));
 vi.mock('../api/_lib/prospect/template', () => ({ getTemplateStatus: vi.fn() }));
 vi.mock('../api/_lib/alert', () => ({ alertFounders: vi.fn() }));
+// gradeCap/envCapOverride stay REAL (the ladder is under test); only the db
+// read is mocked.
+vi.mock('../api/_lib/prospect/health', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/_lib/prospect/health')>();
+  return { ...actual, loadSendHealth: vi.fn() };
+});
 
 import { runDispatch, runBumpDispatch } from '../api/_lib/prospect/dispatch';
+import { loadSendHealth } from '../api/_lib/prospect/health';
 import {
   loadReadyProspects,
   loadOptouts,
@@ -71,8 +78,20 @@ const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => ({
 vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-07-14T15:00:00-03:00') });
 afterAll(() => vi.useRealTimers());
 
+// Healthy-but-young number: grade 'healthy' but lifetime 10 sits below every
+// ladder tier, so the cap stays at the base 20 and pre-ramp tests keep their
+// behavior.
+const WARM_HEALTH = {
+  health: { windowSends: 40, delivered: 39, failed: 0, deliveredRate: 0.975, failRate: 0, optoutRate: 0.02 },
+  lifetimeSends: 10,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // A host-environment override would silently flip every test to the manual
+  // path — the suite must own this variable.
+  delete process.env.PROSPECT_DAILY_CAP;
+  vi.mocked(loadSendHealth).mockResolvedValue(WARM_HEALTH);
   vi.mocked(getTemplateStatus).mockResolvedValue({ name: 'x', status: 'APPROVED' });
   vi.mocked(loadOptouts).mockResolvedValue(new Set());
   vi.mocked(countSentSince).mockResolvedValue(0);
@@ -174,6 +193,74 @@ describe('runDispatch — atomic claim (double-send race)', () => {
   });
 });
 
+describe('runDispatch — graded cap ramp', () => {
+  it('pauses (aborts + alerts) when the number health is severe', async () => {
+    vi.mocked(loadSendHealth).mockResolvedValue({
+      health: { windowSends: 40, delivered: 16, failed: 2, deliveredRate: 0.4, failRate: 0.05, optoutRate: 0.02 },
+      lifetimeSends: 400,
+    });
+    vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
+    const rep = await runDispatch({ force: true });
+    expect(rep.aborted).toBe(true);
+    expect(rep.error).toMatch(/number_health_paused/);
+    expect(rep.cap).toBe(0);
+    expect(sendProspectTemplate).not.toHaveBeenCalled();
+    expect(alertFounders).toHaveBeenCalledWith(expect.stringContaining('PAUSADA'));
+  });
+
+  it('a paused dry run reports the state without paging the founders', async () => {
+    vi.mocked(loadSendHealth).mockResolvedValue({
+      health: { windowSends: 40, delivered: 16, failed: 2, deliveredRate: 0.4, failRate: 0.05, optoutRate: 0.02 },
+      lifetimeSends: 400,
+    });
+    const rep = await runDispatch({ dryRun: true });
+    expect(rep.aborted).toBe(true);
+    expect(alertFounders).not.toHaveBeenCalled();
+  });
+
+  it('a degraded number trickles: graded cap 10 bounds the batch', async () => {
+    vi.mocked(loadSendHealth).mockResolvedValue({
+      health: { windowSends: 40, delivered: 30, failed: 0, deliveredRate: 0.75, failRate: 0, optoutRate: 0.02 },
+      lifetimeSends: 400,
+    });
+    vi.mocked(countSentSince).mockResolvedValue(9); // 9 of the 10 already used today
+    vi.mocked(loadReadyProspects).mockResolvedValue([
+      prospect({ id: 'p1', phone: '+5535999990001' }),
+      prospect({ id: 'p2', phone: '+5535999990002' }),
+    ]);
+    const rep = await runDispatch({ force: true });
+    expect(rep.capGrade).toBe('degraded');
+    expect(rep.cap).toBe(10);
+    expect(rep.planned).toBe(1); // only the remaining slot
+    expect(sendProspectTemplate).toHaveBeenCalledTimes(1);
+  });
+
+  it('a manual cap wins and skips the health read entirely', async () => {
+    vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
+    const rep = await runDispatch({ force: true, dailyCap: 5 });
+    expect(loadSendHealth).not.toHaveBeenCalled();
+    expect(rep.capGrade).toBe('manual');
+    expect(rep.cap).toBe(5);
+  });
+
+  it('the manual emergency stop (cap 0) pauses without paging the founder who pulled it', async () => {
+    vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
+    const rep = await runDispatch({ force: true, dailyCap: 0 });
+    expect(rep.aborted).toBe(true);
+    expect(rep.error).toMatch(/paused_by_override/);
+    expect(sendProspectTemplate).not.toHaveBeenCalled();
+    expect(alertFounders).not.toHaveBeenCalled();
+  });
+
+  it('healthy volume climbs the ladder (lifetime 400 → cap 60)', async () => {
+    vi.mocked(loadSendHealth).mockResolvedValue({ ...WARM_HEALTH, lifetimeSends: 400 });
+    vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
+    const rep = await runDispatch({ force: true });
+    expect(rep.cap).toBe(60);
+    expect(rep.capGrade).toBe('healthy');
+  });
+});
+
 describe('runBumpDispatch — atomic claim', () => {
   const due = () =>
     prospect({ status: 'contacted', send_status: 'sent', touches: 1, sent_at: '2026-07-10T12:00:00Z' });
@@ -193,5 +280,17 @@ describe('runBumpDispatch — atomic claim', () => {
     expect(sendProspectTemplate).toHaveBeenCalledTimes(1);
     expect(recordBump).toHaveBeenCalledWith('p1', { wamid: 'wamid-1', template: expect.any(String) });
     expect(rep.sent).toBe(1);
+  });
+
+  it('bumps share the health pause (quiet skip — the intro run already paged)', async () => {
+    vi.mocked(loadSendHealth).mockResolvedValue({
+      health: { windowSends: 40, delivered: 16, failed: 2, deliveredRate: 0.4, failRate: 0.05, optoutRate: 0.02 },
+      lifetimeSends: 400,
+    });
+    vi.mocked(loadBumpDueProspects).mockResolvedValue([due()]);
+    const rep = await runBumpDispatch();
+    expect(rep.skipped).toMatch(/number_health_paused/);
+    expect(sendProspectTemplate).not.toHaveBeenCalled();
+    expect(alertFounders).not.toHaveBeenCalled();
   });
 });

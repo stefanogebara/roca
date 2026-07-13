@@ -11,7 +11,6 @@ import {
   clampDailyCap,
   isBusinessHours,
   brtDayStartIso,
-  DAILY_CAP_DEFAULT,
   BATCH_SIZE,
   BATCH_DELAY_MS,
 } from './core';
@@ -27,6 +26,7 @@ import {
 import { sendProspectTemplate } from './send';
 import { buildTemplateParams, renderTemplateText, buildBumpParams, renderBumpText } from './personalize';
 import { logProspectMessage, loadBumpDueProspects, recordBump } from './db';
+import { gradeCap, loadSendHealth, envCapOverride, type CapGrade } from './health';
 import { alertFounders } from '../alert';
 import { createLogger } from '../logger';
 
@@ -64,6 +64,10 @@ export interface DispatchReport {
   failed: number;
   /** 'skipped' = another concurrent run claimed the row first (not a failure). */
   recipients: Array<{ id: string; name: string; phone: string; result: 'planned' | 'sent' | 'failed' | 'skipped' }>;
+  /** Today's effective cap + how it was earned (graded ramp / manual). Absent
+   * on aborts that happen before the cap is resolved. */
+  cap?: number;
+  capGrade?: string;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -97,27 +101,58 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     }
   }
 
-  // Preconditions FAIL CLOSED: if opt-outs or the daily count can't be verified,
-  // abort the whole run rather than risk over-sending / hitting an opted-out number.
+  // Preconditions FAIL CLOSED: if opt-outs, the daily count or the number's
+  // health can't be verified, abort the whole run rather than risk
+  // over-sending / hitting an opted-out number / ramping on blind data.
   let optouts: Set<string>;
   let ready: Awaited<ReturnType<typeof loadReadyProspects>>;
   let sentToday: number;
+  let capInfo: CapGrade;
   try {
-    [optouts, ready, sentToday] = await Promise.all([
+    const manual = opts.dailyCap ?? envCapOverride();
+    const [o, r, s, healthRes] = await Promise.all([
       loadOptouts(),
       loadReadyProspects(),
       countSentSince(brtDayStartIso(now)),
+      manual == null ? loadSendHealth(now) : Promise.resolve(null),
     ]);
+    optouts = o;
+    ready = r;
+    sentToday = s;
+    // The cap is EARNED: manual override wins, otherwise the number's trailing
+    // health grades it (warming 20 → healthy ladder up to 60 → degraded 10 →
+    // paused 0). See prospect/health.ts.
+    capInfo =
+      manual != null
+        ? { cap: clampDailyCap(manual), grade: 'manual', reasons: [] }
+        : gradeCap(healthRes!.health, healthRes!.lifetimeSends);
   } catch (e) {
     const error = (e as Error).message;
     log.error('dispatch aborted — safety precondition unavailable:', error);
-    if (!dryRun) await alertFounders(`⛔ Prospecção abortada: não deu pra verificar opt-outs/limite (${error.slice(0, 120)}). Nenhum envio feito.`);
+    if (!dryRun) await alertFounders(`⛔ Prospecção abortada: não deu pra verificar opt-outs/limite/saúde (${error.slice(0, 120)}). Nenhum envio feito.`);
     return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [] };
   }
 
+  if (capInfo.cap === 0) {
+    // Two stop levers share the path: the health thermometer (page the
+    // founders) and the manual PROSPECT_DAILY_CAP=0 emergency stop (the
+    // founder pulled it — no page needed).
+    const manualStop = capInfo.grade === 'manual';
+    const error = manualStop
+      ? 'paused_by_override (PROSPECT_DAILY_CAP=0)'
+      : `number_health_paused (${capInfo.reasons.join('; ')})`;
+    log.error('dispatch paused:', error);
+    if (!dryRun && !manualStop) {
+      await alertFounders(
+        `⛔ Prospecção PAUSADA pela saúde do número: ${capInfo.reasons.join('; ')}. Nenhum envio até os indicadores voltarem.`
+      );
+    }
+    return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [], cap: 0, capGrade: capInfo.grade };
+  }
+
   const eligible = ready.filter((p) => eligibleToSend(p, optouts));
-  const cap = clampDailyCap(opts.dailyCap ?? DAILY_CAP_DEFAULT);
-  const batch = planBatch(eligible, { dailyCap: opts.dailyCap ?? DAILY_CAP_DEFAULT, sentToday });
+  const cap = capInfo.cap;
+  const batch = planBatch(eligible, { dailyCap: cap, sentToday });
 
   const recipients: DispatchReport['recipients'] = [];
   let sent = 0;
@@ -190,7 +225,18 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   if (failed > 0) {
     await alertFounders(`⚠️ Prospecção: ${failed} de ${batch.length} envio(s) falharam.`);
   }
-  return { dryRun, skippedOutsideHours: false, aborted: false, eligible: eligible.length, planned: batch.length, sent, failed, recipients };
+  return {
+    dryRun,
+    skippedOutsideHours: false,
+    aborted: false,
+    eligible: eligible.length,
+    planned: batch.length,
+    sent,
+    failed,
+    recipients,
+    cap,
+    capGrade: capInfo.grade,
+  };
 }
 
 // ── D+3 bump (multi-touch cadence, Olímpia pattern) ─────────────────────────
@@ -223,24 +269,44 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
     return { skipped: `template_check_failed: ${(e as Error).message.slice(0, 80)}`, due: 0, sent: 0, failed: 0 };
   }
 
-  // Same fail-closed preconditions as intros; bumps share the daily cap.
+  // Same fail-closed preconditions as intros; bumps share the daily cap AND
+  // the graded number-health ramp (the intro run in the same cron pass already
+  // alerted if paused — bumps just skip quietly).
   let optouts: Set<string>;
   let due: Awaited<ReturnType<typeof loadBumpDueProspects>>;
   let sentToday: number;
+  let capInfo: CapGrade;
   try {
-    [optouts, due, sentToday] = await Promise.all([
+    const manual = opts.dailyCap ?? envCapOverride();
+    const [o, d, s, healthRes] = await Promise.all([
       loadOptouts(),
       loadBumpDueProspects(BUMP_AFTER_DAYS),
       countSentSince(brtDayStartIso(now)),
+      manual == null ? loadSendHealth(now) : Promise.resolve(null),
     ]);
+    optouts = o;
+    due = d;
+    sentToday = s;
+    capInfo =
+      manual != null
+        ? { cap: clampDailyCap(manual), grade: 'manual', reasons: [] }
+        : gradeCap(healthRes!.health, healthRes!.lifetimeSends);
   } catch (e) {
     log.error('bump dispatch aborted — safety precondition unavailable:', (e as Error).message);
     return { skipped: 'precondition_unavailable', due: 0, sent: 0, failed: 0 };
   }
 
+  if (capInfo.cap === 0) {
+    const reason =
+      capInfo.grade === 'manual'
+        ? 'paused_by_override (PROSPECT_DAILY_CAP=0)'
+        : `number_health_paused (${capInfo.reasons.join('; ')})`;
+    return { skipped: reason, due: 0, sent: 0, failed: 0 };
+  }
+
   const eligible = due.filter((p) => p.phone && !optouts.has(p.phone));
-  const cap = clampDailyCap(opts.dailyCap ?? DAILY_CAP_DEFAULT);
-  const batch = planBatch(eligible, { dailyCap: opts.dailyCap ?? DAILY_CAP_DEFAULT, sentToday });
+  const cap = capInfo.cap;
+  const batch = planBatch(eligible, { dailyCap: cap, sentToday });
   if (!batch.length) return { skipped: eligible.length ? 'daily_cap_reached' : null, due: eligible.length, sent: 0, failed: 0 };
 
   let sent = 0;

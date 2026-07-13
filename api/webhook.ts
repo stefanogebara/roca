@@ -12,7 +12,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { TwilioAdapter } from './_lib/transport/twilio';
-import { CloudApiAdapter, verifyCloudChallenge } from './_lib/transport/cloud';
+import { CloudApiAdapter, verifyCloudChallenge, parseCloudStatuses } from './_lib/transport/cloud';
 import { handleInbound } from './_lib/pipeline';
 import type { TransportAdapter, TransportRequest } from './_lib/transport/types';
 import { createLogger } from './_lib/logger';
@@ -95,6 +95,19 @@ export default async function handler(
     }
 
     const msg = await adapter.parseInbound(treq);
+
+    // Cloud status callbacks (sent/delivered/read/failed) feed the prospect
+    // send-status machine and the number-health thermometer that grades the
+    // dispatch cap. Meta batches: one POST can carry messages AND statuses —
+    // harvest them on every verified cloud post, not only message-less ones.
+    if (adapter.provider === 'cloud') {
+      const statuses = parseCloudStatuses(rawBody);
+      if (statuses.length) {
+        const { applyProspectStatuses } = await import('./_lib/prospect/health');
+        await applyProspectStatuses(statuses);
+      }
+    }
+
     if (!msg) {
       ack();
       return;
