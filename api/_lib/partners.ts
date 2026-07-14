@@ -18,9 +18,77 @@
 
 import { getDb } from './db';
 import { haversineKm } from './tools/fires';
+import { alertFounders } from './alert';
 import { createLogger } from './logger';
 
 const log = createLogger('partners');
+
+// ── Lead SLA ─────────────────────────────────────────────────────────────────
+
+const SLA_HOURS = 24;
+
+/**
+ * A lead is STALE when the partner was pinged, never opened the 24h window
+ * (no dossier delivered), and the founder hasn't been alerted yet. Pure —
+ * the alert stamp is the once-only dedup.
+ */
+export function isLeadStale(
+  lead: {
+    partner_notified_at: string | null;
+    delivered_at: string | null;
+    sla_alerted_at: string | null;
+  },
+  now: Date,
+  hours = SLA_HOURS
+): boolean {
+  if (!lead.partner_notified_at || lead.delivered_at || lead.sla_alerted_at) return false;
+  return now.getTime() - new Date(lead.partner_notified_at).getTime() >= hours * 3_600_000;
+}
+
+/**
+ * Page the founder once per lead that's been sitting with a silent partner
+ * past the SLA — a consented farmer is WAITING behind every one of these,
+ * and lead rot is the fastest way to burn both sides of the marketplace.
+ * Returns how many alerts fired. Runs from the daily monitor.
+ */
+export async function alertStaleLeads(now = new Date()): Promise<number> {
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - SLA_HOURS * 3_600_000).toISOString();
+  const { data, error } = await db
+    .from('referral_requests')
+    .select('id, uf, topic, partner_notified_at')
+    .not('partner_notified_at', 'is', null)
+    .is('delivered_at', null)
+    .is('sla_alerted_at', null)
+    .lt('partner_notified_at', cutoff);
+  if (error) {
+    log.error('stale-lead query failed:', error.message);
+    return 0;
+  }
+  let alerted = 0;
+  for (const lead of (data ?? []) as Array<{
+    id: string;
+    uf: string | null;
+    topic: string | null;
+    partner_notified_at: string;
+  }>) {
+    const hours = Math.round(
+      (now.getTime() - new Date(lead.partner_notified_at).getTime()) / 3_600_000
+    );
+    await alertFounders(
+      `⏰ Lead parado: parceiro avisado há ${hours}h e não respondeu — produtor${lead.uf ? ` de ${lead.uf}` : ''} esperando` +
+        (lead.topic ? ` ("${lead.topic.slice(0, 60)}")` : '') +
+        '. Cobra o parceiro ou reatribui.'
+    );
+    const upd = await db
+      .from('referral_requests')
+      .update({ sla_alerted_at: now.toISOString() })
+      .eq('id', lead.id);
+    if (upd.error) log.error('sla stamp failed:', upd.error.message);
+    alerted++;
+  }
+  return alerted;
+}
 
 export interface PartnerRow {
   id: string;

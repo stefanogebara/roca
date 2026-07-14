@@ -15,7 +15,9 @@ import { ndviSvg } from './_lib/cards/ndviCard';
 import { farmSvg } from './_lib/cards/farm';
 import { pestSvg } from './_lib/cards/pest';
 import { pricesSvg } from './_lib/cards/prices';
+import { frostSvg } from './_lib/cards/frost';
 import type { CommodityQuote } from './_lib/tools/prices';
+import type { FrostDay } from './_lib/tools/frost';
 import { fetchHourlyWeather } from './_lib/tools/weather';
 import { assessHour, sprayWindow } from './_lib/tools/deltaT';
 import {
@@ -84,6 +86,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const usd = num(req.query.usd);
       const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       svg = pricesSvg(quotes, usd, today);
+      maxAge = 900;
+    } else if (type === 'frost') {
+      // Risky days packed in the query (date:minC:risk|...) by the alert run.
+      const days: FrostDay[] = String(req.query.d ?? '')
+        .split('|')
+        .map((part) => {
+          const [date, minC, risk] = part.split(':');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) return null;
+          if (!Number.isFinite(Number(minC))) return null;
+          if (risk !== 'geada' && risk !== 'risco') return null;
+          return { date, minC: Number(minC), risk };
+        })
+        .filter((d): d is FrostDay => d != null)
+        .slice(0, 4);
+      if (!days.length) {
+        res.status(400).send('d required');
+        return;
+      }
+      svg = frostSvg(days);
       maxAge = 900;
     } else if (type === 'ndvi') {
       const ndvi = num(req.query.ndvi);

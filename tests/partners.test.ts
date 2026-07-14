@@ -1,5 +1,43 @@
 import { describe, it, expect } from 'vitest';
-import { partnerCovers, isConsentYes, isConsentNo, partnerFirstName, consentAskText } from '../api/_lib/partners';
+import {
+  partnerCovers,
+  isConsentYes,
+  isConsentNo,
+  partnerFirstName,
+  consentAskText,
+  isLeadStale,
+} from '../api/_lib/partners';
+
+const SLA_NOW = new Date('2026-07-20T12:00:00Z');
+const slaHoursAgo = (h: number) => new Date(SLA_NOW.getTime() - h * 3_600_000).toISOString();
+
+describe('isLeadStale (24h SLA — a consented farmer is waiting)', () => {
+  it('stale when the partner was pinged ≥24h ago with no dossier delivered', () => {
+    expect(
+      isLeadStale({ partner_notified_at: slaHoursAgo(30), delivered_at: null, sla_alerted_at: null }, SLA_NOW)
+    ).toBe(true);
+  });
+  it('not stale inside the window, after delivery, or once already alerted', () => {
+    expect(
+      isLeadStale({ partner_notified_at: slaHoursAgo(10), delivered_at: null, sla_alerted_at: null }, SLA_NOW)
+    ).toBe(false);
+    expect(
+      isLeadStale(
+        { partner_notified_at: slaHoursAgo(30), delivered_at: slaHoursAgo(20), sla_alerted_at: null },
+        SLA_NOW
+      )
+    ).toBe(false);
+    expect(
+      isLeadStale(
+        { partner_notified_at: slaHoursAgo(30), delivered_at: null, sla_alerted_at: slaHoursAgo(2) },
+        SLA_NOW
+      )
+    ).toBe(false);
+    expect(
+      isLeadStale({ partner_notified_at: null, delivered_at: null, sla_alerted_at: null }, SLA_NOW)
+    ).toBe(false);
+  });
+});
 
 // Michel's real coverage centroid (Espera Feliz, Caparaó MG).
 const michel = { lat: -20.6504, lon: -41.9086, radius_km: 60, crops: ['café'], active: true };

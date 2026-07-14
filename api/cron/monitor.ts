@@ -74,7 +74,7 @@ export default async function handler(
     }
     // Frost (geada) alerts — daily min forecast per farm pin, July–Aug matters
     // most for MG coffee. Same dedup discipline as vazio.
-    frost = await runFrostAlerts((to, text) => adapter.send({ to, text }));
+    frost = await runFrostAlerts((to, text, mediaUrl) => adapter.send({ to, text, mediaUrl }));
     if (frost.sent > 0 || frost.failed > 0) {
       findings.push(`Alertas de geada: ${frost.sent} enviado(s), ${frost.failed} falha(s).`);
     }
@@ -124,6 +124,16 @@ export default async function handler(
     }
   } catch (e) {
     log.error('stale prospects run failed:', (e as Error).message);
+  }
+
+  // Lead SLA: a partner who went silent past 24h on a handed-off lead means a
+  // consented farmer is waiting — page the founder once per lead.
+  try {
+    const { alertStaleLeads } = await import('../_lib/partners');
+    const staleLeads = await alertStaleLeads(now);
+    if (staleLeads > 0) findings.push(`Leads: ${staleLeads} parado(s) >24h com o parceiro — founder alertado.`);
+  } catch (e) {
+    log.error('lead SLA check failed:', (e as Error).message);
   }
 
   // Weekly (Mondays BRT): mine prospect conversations for market learnings —

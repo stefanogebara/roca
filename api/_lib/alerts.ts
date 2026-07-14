@@ -10,7 +10,12 @@
  */
 
 import type { CalendarTransition } from './tools/calendar';
-import { fetchDailyMinTemps, pickWorstFrostDay, type FrostDay } from './tools/frost';
+import {
+  fetchDailyMinTemps,
+  classifyFrostRisk,
+  type DayMin,
+  type FrostDay,
+} from './tools/frost';
 import { fetchDailyFires, firesNear, type NearbyFire } from './tools/fires';
 import {
   listSojaFarmersByUf,
@@ -182,32 +187,61 @@ export async function runFireAlerts(
   return result;
 }
 
+// Where the public card images are served from (WhatsApp fetches these).
+const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://roca-black.vercel.app';
+
+/** All forecast days that carry frost risk, classified. */
+function riskyFrostDays(days: DayMin[]): FrostDay[] {
+  return days
+    .map((d) => {
+      const risk = classifyFrostRisk(d.minC);
+      return risk ? { ...d, risk } : null;
+    })
+    .filter((d): d is FrostDay => d != null);
+}
+
+/** Public URL for the frost card — days packed into the query string. A frost
+ * warning is the most forwarded content of a MG winter; it ships as an image
+ * carrying Stevi's name. Exported for tests. */
+export function frostCardUrl(days: FrostDay[]): string | undefined {
+  if (!days.length) return undefined;
+  const d = days
+    .slice(0, 4)
+    .map((x) => `${x.date}:${x.minC}:${x.risk}`)
+    .join('|');
+  return `${PUBLIC_BASE}/api/card?${new URLSearchParams({ type: 'frost', d }).toString()}`;
+}
+
 export async function runFrostAlerts(
-  send: (to: string, text: string) => Promise<void>
+  send: (to: string, text: string, mediaUrl?: string) => Promise<void>
 ): Promise<AlertRunResult> {
   const farms = await listFarmsWithCoords();
   const result: AlertRunResult = { transitions: 0, candidates: farms.length, sent: 0, failed: 0 };
-  const forecastCache = new Map<string, FrostDay | null>();
+  const forecastCache = new Map<string, FrostDay[]>();
 
   for (const f of farms) {
     const cell = `${f.lat.toFixed(2)},${f.lon.toFixed(2)}`;
-    let worst = forecastCache.get(cell);
-    if (worst === undefined) {
+    let risky = forecastCache.get(cell);
+    if (risky === undefined) {
       try {
-        worst = pickWorstFrostDay(await fetchDailyMinTemps({ lat: f.lat, lon: f.lon }));
+        risky = riskyFrostDays(await fetchDailyMinTemps({ lat: f.lat, lon: f.lon }));
       } catch (e) {
         log.error(`frost forecast for ${cell} failed:`, (e as Error).message);
-        worst = null;
+        risky = [];
       }
-      forecastCache.set(cell, worst);
+      forecastCache.set(cell, risky);
     }
-    if (!worst) continue;
+    if (!risky.length) continue;
+    const worst = risky.reduce((a, b) => (b.minC < a.minC ? b : a), risky[0]);
 
     const key = frostDedupKey(worst);
     const claimed = await claimFarmerAlert(f.userId, `frost_${worst.risk}`, key);
     if (!claimed) continue;
     try {
-      await withRetry(() => send(f.waId, buildFrostAlertText(worst)), { attempts: 2 });
+      const days = risky;
+      await withRetry(() => send(f.waId, buildFrostAlertText(worst), frostCardUrl(days)), {
+        attempts: 2,
+      });
       result.sent++;
     } catch (e) {
       result.failed++;
