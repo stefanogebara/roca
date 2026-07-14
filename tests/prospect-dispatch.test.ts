@@ -307,10 +307,13 @@ describe('runDispatch — campaign kind gating', () => {
       prospect({ id: 'p3', kind: 'revenda', phone: '+5535999990003' }),
       prospect({ id: 'p4', kind: 'consultoria', phone: '+5535999990004' }),
     ]);
+    // Cap leaves ONE slot: proves eligibility ordering AND avoids the real
+    // inter-send pacing sleep (jitter can exceed the vitest timeout).
+    vi.mocked(countSentSince).mockResolvedValue(19);
     const rep = await runDispatch({ force: true });
     expect(rep.eligible).toBe(2); // agronomo + consultoria only
     const sentTo = vi.mocked(sendProspectTemplate).mock.calls.map((c) => c[0]);
-    expect(sentTo).toEqual(['+5535999990001', '+5535999990004']);
+    expect(sentTo).toEqual(['+5535999990001']); // first eligible; coop/revenda never
   });
 
   it("PROSPECT_SEND_KINDS='all' opens the gate", async () => {

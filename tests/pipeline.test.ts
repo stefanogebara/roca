@@ -19,6 +19,8 @@ vi.mock('../api/_lib/db', async (importOriginal) => {
   return {
     ...actual,
     upsertUser: vi.fn(),
+    setUserSource: vi.fn(),
+    markReferralPrompted: vi.fn(),
     logMessage: vi.fn(),
     claimInbound: vi.fn(),
     updateInboundTranscript: vi.fn(),
@@ -78,6 +80,8 @@ const USER = {
   state: null,
   consent_lgpd_at: '2026-01-01T00:00:00Z', // not first contact → no consent note
   awaiting: null as string | null,
+  source: null as string | null,
+  referral_prompted_at: null as string | null,
 };
 
 const msgFixture = (over: Partial<InboundMessage> = {}): InboundMessage => ({
@@ -218,6 +222,58 @@ describe('compliance gate vs pest card', () => {
 
     const sent = adapter.send.mock.calls[0][0];
     expect(sent.mediaUrl).toContain('type=pest');
+  });
+});
+
+describe('growth loops', () => {
+  it('captures the source token from a vouched first message', async () => {
+    vi.mocked(db.upsertUser).mockResolvedValue({ ...USER, consent_lgpd_at: null }); // first contact
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'Oi! Vim pelo José da Cooxupé' }));
+
+    expect(db.setUserSource).toHaveBeenCalledWith('u1', expect.stringContaining('josé'));
+  });
+
+  it('ordinary first messages set no source', async () => {
+    vi.mocked(db.upsertUser).mockResolvedValue({ ...USER, consent_lgpd_at: null });
+    const adapter = makeAdapter();
+    await handleInbound(adapter, msgFixture({ text: 'oi' }));
+    expect(db.setUserSource).not.toHaveBeenCalled();
+  });
+
+  it('appends the self-attributing referral nudge after a delivered pest-card victory', async () => {
+    vi.mocked(routeIntent).mockResolvedValue('pest_triage');
+    vi.mocked(reason).mockImplementation(async (_m, _i, deps) => {
+      deps.onPestCard?.({ pest: 'ferrugem', confidence: 'alta', crop: 'café', evidence: 'x', products: 3, groups: ['C3'] });
+      return 'triagem honesta';
+    });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'que praga é essa no café' }));
+
+    const sent = adapter.send.mock.calls[0][0].text as string;
+    expect(sent).toContain('wa.me/');
+    expect(sent).toContain(encodeURIComponent('Vim pelo(a) João'));
+    expect(db.markReferralPrompted).toHaveBeenCalledWith('u1');
+  });
+
+  it('the nudge respects the 14-day cooldown', async () => {
+    vi.mocked(routeIntent).mockResolvedValue('pest_triage');
+    vi.mocked(db.upsertUser).mockResolvedValue({
+      ...USER,
+      referral_prompted_at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    });
+    vi.mocked(reason).mockImplementation(async (_m, _i, deps) => {
+      deps.onPestCard?.({ pest: 'ferrugem', confidence: 'alta', crop: 'café', evidence: 'x', products: 3, groups: ['C3'] });
+      return 'triagem honesta';
+    });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'que praga é essa no café' }));
+
+    expect((adapter.send.mock.calls[0][0].text as string)).not.toContain('wa.me/');
+    expect(db.markReferralPrompted).not.toHaveBeenCalled();
   });
 });
 

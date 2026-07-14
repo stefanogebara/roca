@@ -146,7 +146,7 @@ export async function computeDigestStats(since: string, until: string): Promise<
       .limit(5000),
     db
       .from('users')
-      .select('id, created_at')
+      .select('id, created_at, source')
       .gte('created_at', twoWeeksAgo)
       .order('created_at', { ascending: false })
       .limit(2000),
@@ -174,7 +174,7 @@ export async function computeDigestStats(since: string, until: string): Promise<
   let partners: PartnerScore | undefined;
   if (!cohortMsgs.error && !cohortUsers.error) {
     cohort = cohortStats(
-      (cohortUsers.data ?? []) as Array<{ id: string; created_at: string }>,
+      (cohortUsers.data ?? []) as Array<{ id: string; created_at: string; source: string | null }>,
       (cohortMsgs.data ?? []) as CohortMsg[],
       now
     );
@@ -240,11 +240,22 @@ export function formatDigest(s: DigestStats): string {
   if (s.cohort) {
     const c = s.cohort;
     const trend = c.wau > c.wauPrev ? '↑' : c.wau < c.wauPrev ? '↓' : '=';
+    // The gate variable: vouched vs organic retention, shown as soon as any
+    // vouched member exists in the cohort.
+    const split =
+      c.d7Vouched.size > 0
+        ? ` — vouchados ${c.d7Vouched.retained}/${c.d7Vouched.size} · orgânicos ${c.d7Organic.retained}/${c.d7Organic.size}`
+        : '';
     const d7 =
       c.d7.rate == null
         ? 'sem coorte ainda'
-        : `${c.d7.retained}/${c.d7.size} (${Math.round(c.d7.rate * 100)}%)`;
+        : `${c.d7.retained}/${c.d7.size} (${Math.round(c.d7.rate * 100)}%)${split}`;
     lines.push(`📈 Semana: ${c.wau} ativos (${trend} de ${c.wauPrev}) · retenção D7: ${d7}`);
+    if (c.newSources.length > 0) {
+      lines.push(
+        `🧭 Origem (novos 7d): ${c.newSources.slice(0, 5).map((x) => `${x.source} ${x.count}`).join(' · ')}`
+      );
+    }
     if (c.habits.length > 0) {
       const top = c.habits
         .slice(0, 4)

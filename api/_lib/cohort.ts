@@ -25,10 +25,22 @@ export interface CohortMsg {
   intent: string | null;
 }
 
+export interface D7Slice {
+  size: number;
+  retained: number;
+  rate: number | null;
+}
+
 export interface CohortStats {
   wau: number;
   wauPrev: number;
-  d7: { size: number; retained: number; rate: number | null };
+  d7: D7Slice;
+  /** The flight plan's gate variable: retention of farmers who arrived with a
+   * source token (vouchados) vs. everyone else. */
+  d7Vouched: D7Slice;
+  d7Organic: D7Slice;
+  /** New signups by source in the last 7 days ('orgânico' for none). */
+  newSources: Array<{ source: string; count: number }>;
   /** Top intents by weekly users, with how many used them on ≥2 distinct days. */
   habits: Array<{ intent: string; users: number; repeaters: number }>;
 }
@@ -43,7 +55,7 @@ export interface CohortStats {
  *   a repeater used the intent on ≥2 DIFFERENT days.
  */
 export function cohortStats(
-  users: Array<{ id: string; created_at: string }>,
+  users: Array<{ id: string; created_at: string; source?: string | null }>,
   messages: CohortMsg[],
   now: Date
 ): CohortStats {
@@ -63,21 +75,32 @@ export function cohortStats(
     const created = new Date(u.created_at).getTime();
     return created >= t - 2 * WEEK_MS && created < t - WEEK_MS;
   });
-  let retained = 0;
-  for (const u of cohort) {
+  const cameBack = (u: { id: string; created_at: string }): boolean => {
     const created = new Date(u.created_at).getTime();
-    const cameBack = inbound.some((m) => {
+    return inbound.some((m) => {
       if (m.user_id !== u.id) return false;
       const ts = new Date(m.created_at).getTime();
       return ts >= created + DAY_MS && ts <= created + WEEK_MS;
     });
-    if (cameBack) retained++;
-  }
-  const d7 = {
-    size: cohort.length,
-    retained,
-    rate: cohort.length ? retained / cohort.length : null,
   };
+  const slice = (members: typeof cohort): D7Slice => {
+    const retained = members.filter(cameBack).length;
+    return { size: members.length, retained, rate: members.length ? retained / members.length : null };
+  };
+  const d7 = slice(cohort);
+  const d7Vouched = slice(cohort.filter((u) => u.source));
+  const d7Organic = slice(cohort.filter((u) => !u.source));
+
+  const bySource = new Map<string, number>();
+  for (const u of users) {
+    const created = new Date(u.created_at).getTime();
+    if (created < t - WEEK_MS || created >= t) continue;
+    const s = u.source || 'orgânico';
+    bySource.set(s, (bySource.get(s) ?? 0) + 1);
+  }
+  const newSources = [...bySource.entries()]
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count);
 
   const turns = messages.filter(
     (m) =>
@@ -110,7 +133,7 @@ export function cohortStats(
     }))
     .sort((a, b) => b.users - a.users);
 
-  return { wau, wauPrev, d7, habits };
+  return { wau, wauPrev, d7, d7Vouched, d7Organic, newSources, habits };
 }
 
 export interface PartnerScore {

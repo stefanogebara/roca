@@ -28,6 +28,10 @@ export interface UserRow {
   state: string | null;
   consent_lgpd_at: string | null;
   awaiting: string | null;
+  /** Acquisition attribution ("vim pelo josé") — first-wins, set once. */
+  source: string | null;
+  /** Last referral-nudge timestamp (≥14d cooldown in growth.ts). */
+  referral_prompted_at: string | null;
 }
 
 /** Upsert a user by WhatsApp id, returning the row. */
@@ -46,6 +50,31 @@ export async function upsertUser(
     return null;
   }
   return data as UserRow;
+}
+
+/**
+ * Record acquisition attribution — FIRST WINS: only fills a null column, so a
+ * later message mentioning someone never rewrites where the farmer actually
+ * came from (the vouchado/orgânico cohort split depends on this being stable).
+ */
+export async function setUserSource(userId: string, source: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('users')
+    .update({ source: source.slice(0, 40) })
+    .eq('id', userId)
+    .is('source', null);
+  if (error) log.error('setUserSource failed:', error.message);
+}
+
+/** Stamp the referral nudge so the 14-day cooldown holds. */
+export async function markReferralPrompted(userId: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('users')
+    .update({ referral_prompted_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) log.error('markReferralPrompted failed:', error.message);
 }
 
 /** Persist the latest known farm location; returns the farm id for caching. */

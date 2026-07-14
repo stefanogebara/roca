@@ -14,6 +14,8 @@ import { spraySvg } from './_lib/cards/spray';
 import { ndviSvg } from './_lib/cards/ndviCard';
 import { farmSvg } from './_lib/cards/farm';
 import { pestSvg } from './_lib/cards/pest';
+import { pricesSvg } from './_lib/cards/prices';
+import type { CommodityQuote } from './_lib/tools/prices';
 import { fetchHourlyWeather } from './_lib/tools/weather';
 import { assessHour, sprayWindow } from './_lib/tools/deltaT';
 import {
@@ -52,6 +54,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const { bestUpcoming } = sprayWindow(hours);
       svg = spraySvg(assessed, bestUpcoming);
       maxAge = 900; // weather shifts hourly
+    } else if (type === 'prices') {
+      // Quotes arrive packed in the query (key:saca:weekPct|...) — the reply
+      // already fetched them; the card never re-hits Yahoo.
+      const KEYS = new Set(['cafe', 'soja', 'milho']);
+      const quotes: CommodityQuote[] = String(req.query.q ?? '')
+        .split('|')
+        .map((part) => {
+          const [key, saca, pct] = part.split(':');
+          if (!KEYS.has(key) || !Number.isFinite(Number(saca))) return null;
+          const LABELS: Record<string, string> = {
+            cafe: 'Café arábica (NY)',
+            soja: 'Soja (Chicago)',
+            milho: 'Milho (Chicago)',
+          };
+          return {
+            key: key as CommodityQuote['key'],
+            label: LABELS[key],
+            sacaBrl: Number(saca),
+            weekChangePct: pct && Number.isFinite(Number(pct)) ? Number(pct) : null,
+          };
+        })
+        .filter((q): q is CommodityQuote => q != null)
+        .slice(0, 3);
+      if (!quotes.length) {
+        res.status(400).send('q required');
+        return;
+      }
+      const usd = num(req.query.usd);
+      const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      svg = pricesSvg(quotes, usd, today);
+      maxAge = 900;
     } else if (type === 'ndvi') {
       const ndvi = num(req.query.ndvi);
       const date = String(req.query.date ?? '');

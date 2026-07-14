@@ -25,6 +25,8 @@ import { checkOutbound } from './compliance';
 import { describeImage, type ChatImage } from './llm';
 import {
   upsertUser,
+  setUserSource,
+  markReferralPrompted,
   logMessage,
   claimInbound,
   updateInboundTranscript,
@@ -46,6 +48,8 @@ import { formatTurnsBlock } from './memory';
 import { buildHistoryReply } from './caderno';
 import { fetchPrices, formatPricesReply, askedCommodities } from './tools/prices';
 import { parseCrops, joinCrops, isCropsOnlyMessage } from './tools/crops';
+import { parseSourceToken, shouldPromptReferral, referralNudge } from './growth';
+import type { CommodityQuote } from './tools/prices';
 import type { PestCardData } from './cards/pest';
 import { withRetry } from './retry';
 import { alertFounders } from './alert';
@@ -200,6 +204,19 @@ async function cardUrlFor(
     log.error('cardUrlFor failed:', (e as Error).message);
   }
   return undefined;
+}
+
+/** Public URL for the price card — quotes packed into the query string so the
+ * card endpoint re-renders without re-fetching Yahoo. Exported for tests. */
+export function priceCardUrl(quotes: CommodityQuote[], usdBrl: number | null): string | undefined {
+  if (!quotes.length) return undefined;
+  const q = quotes
+    .slice(0, 3)
+    .map((c) => `${c.key}:${c.sacaBrl.toFixed(2)}:${c.weekChangePct?.toFixed(1) ?? ''}`)
+    .join('|');
+  const params = new URLSearchParams({ type: 'prices', q });
+  if (usdBrl != null) params.set('usd', usdBrl.toFixed(2));
+  return `${PUBLIC_BASE}/api/card?${params.toString()}`;
 }
 
 /** Public URL for the pest-triage card, built from the vision identification. */
@@ -362,6 +379,14 @@ export async function handleInbound(
     return;
   }
 
+  // Acquisition attribution: a vouched farmer's first message carries who sent
+  // them ("Oi! Vim pelo José" / #tec-jose). First-wins at the DB layer — the
+  // vouchado/orgânico cohort split is the flight plan's gate metric.
+  if (firstContact && msg.text) {
+    const src = parseSourceToken(msg.text);
+    if (src) await setUserSource(userId, src);
+  }
+
   // Prospect replies: honour an opt-out ("sair") immediately and permanently
   // before any other handling. A non-opt-out prospect reply is routed to the
   // partnerships conversation agent after media normalization (below).
@@ -461,6 +486,9 @@ export async function handleInbound(
   let intent: Intent;
   let replyText: string;
   let pestCard: PestCardData | undefined;
+  // Set by branches that carry their own visual (prices) — pest keeps its
+  // dedicated path below.
+  let extraCardUrl: string | undefined;
 
   // If we asked what they grow (right after the farm card) and they replied with
   // recognizable crops, capture them. Only a crops-ONLY reply gets the capture
@@ -517,6 +545,9 @@ export async function handleInbound(
     const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
     const { quotes, usdBrl } = await fetchPrices(asked.length > 0 ? asked : profile.crop);
     replyText = formatPricesReply(quotes, usdBrl);
+    // The shareable card — prices are the most-forwarded content in rural
+    // groups, so the reply ships as an image farmers can pass on.
+    extraCardUrl = priceCardUrl(quotes, usdBrl);
   } else if (effective.kind === 'text' && effective.text && isBriefRequest(effective.text)) {
     // Assemble the agrônomo briefing from the farmer's profile + recent messages.
     intent = 'brief';
@@ -624,7 +655,24 @@ export async function handleInbound(
     ? undefined
     : pestCard
       ? pestCardUrl(pestCard)
-      : await cardUrlFor(intent, effective, userId);
+      : (extraCardUrl ?? (await cardUrlFor(intent, effective, userId)));
+
+  // Referral nudge after a DELIVERED victory moment (visual verdict in hand):
+  // the produtor→produtor chain the flight plan watches for. The link is
+  // pre-filled with this farmer's name, so the next farmer arrives already
+  // attributed. Sparing: ≥14d cooldown, never first contact, never gated.
+  const nudge = shouldPromptReferral(
+    {
+      intent,
+      hasVisual: !!mediaUrl,
+      firstContact,
+      gateSafe: gate.safe,
+      lastPromptedAt: user.referral_prompted_at ?? null,
+    },
+    new Date()
+  );
+  if (nudge) finalText += referralNudge(user.name);
+
   const sent = await sendOrRecord(
     adapter,
     msg.from,
@@ -635,6 +683,7 @@ export async function handleInbound(
   if (!sent) return;
   // Consent counts as "notified" only if the notice was actually delivered.
   if (firstContact && userId) await markConsentNotified(userId);
+  if (nudge) await markReferralPrompted(userId);
   await logMessage(userId, 'out', {
     kind: 'text',
     text: finalText,

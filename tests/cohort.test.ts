@@ -64,6 +64,32 @@ describe('cohortStats', () => {
     expect(s.d7.rate).toBeNull();
   });
 
+  it('splits D7 by attribution — the vouchado vs orgânico gate variable', () => {
+    const users = [
+      { id: 'v1', created_at: daysAgo(10), source: 'tec-jose' }, // vouched, returns
+      { id: 'v2', created_at: daysAgo(10), source: 'armazém' }, // vouched, silent
+      { id: 'o1', created_at: daysAgo(10), source: null }, // organic, returns
+    ];
+    const msgs = [inbound('v1', daysAgo(8)), inbound('o1', daysAgo(8))];
+    const s = cohortStats(users, msgs, NOW);
+    expect(s.d7Vouched).toEqual({ size: 2, retained: 1, rate: 0.5 });
+    expect(s.d7Organic).toEqual({ size: 1, retained: 1, rate: 1 });
+  });
+
+  it('counts new signups by source, organic bucketed explicitly', () => {
+    const users = [
+      { id: 'a', created_at: daysAgo(1), source: 'tec-jose' },
+      { id: 'b', created_at: daysAgo(2), source: 'tec-jose' },
+      { id: 'c', created_at: daysAgo(3), source: null },
+      { id: 'd', created_at: daysAgo(20), source: 'tec-jose' }, // outside 7d
+    ];
+    const s = cohortStats(users, [], NOW);
+    expect(s.newSources).toEqual([
+      { source: 'tec-jose', count: 2 },
+      { source: 'orgânico', count: 1 },
+    ]);
+  });
+
   it('habit-by-intent: repeaters used the intent on ≥2 DIFFERENT days this week', () => {
     const msgs = [
       turn('a', daysAgo(1), 'prices'),
