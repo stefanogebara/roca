@@ -104,8 +104,10 @@ cartão .vcf "Stevi - Assistente do Cafeicultor" + link wa.me com token
       fantasma na 2ª-feira)
 - [ ] `ALERT_WEBHOOK_URL` (canal independente do WhatsApp) — 5 min do fundador
 - [ ] stevi.agr.br comprado (fundador) + página verificador (Claude, depois)
-- [ ] Tokens de origem + prompt de indicação + cartão de preço/geada (S1, Claude)
-- [ ] Colunas outcome/lead_grade + SLA 24h de lead parado (S1, Claude)
+- [x] Tokens de origem + prompt de indicação + cartão de preço/geada (S1, Claude)
+- [x] Colunas outcome/lead_grade + SLA 24h de lead parado (S1, Claude)
+- [x] Cartão de contato .vcf "Stevi" do kit do técnico — endpoint `/api/vcard`
+      (número via PUBLIC_WA_NUMBER; voice-note do técnico continua com o fundador)
 
 ## Divisão de trabalho
 
