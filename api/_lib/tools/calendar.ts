@@ -21,20 +21,20 @@ export interface VazioWindow {
 export const VAZIO_SOJA_2026: Record<string, VazioWindow> = {
   AC: { start: '2026-06-22', end: '2026-09-20', regional: false },
   AM: { start: '2026-06-10', end: '2026-09-10', regional: false },
-  BA: { start: '2026-06-14', end: '2026-10-07', regional: true },
+  BA: { start: '2026-06-14', end: '2027-03-14', regional: true }, // Região III: 14 dez → 14 mar 2027
   DF: { start: '2026-07-01', end: '2026-09-30', regional: false },
   GO: { start: '2026-06-27', end: '2026-09-24', regional: false },
-  MA: { start: '2026-07-03', end: '2026-10-31', regional: true },
+  MA: { start: '2026-07-03', end: '2026-11-30', regional: true }, // Região III: 02 set → 30 nov 2026
   MG: { start: '2026-07-01', end: '2026-09-30', regional: false },
   MT: { start: '2026-06-08', end: '2026-09-06', regional: false },
   MS: { start: '2026-06-15', end: '2026-09-15', regional: false },
   PR: { start: '2026-06-02', end: '2026-09-19', regional: true },
-  PI: { start: '2026-07-01', end: '2026-10-31', regional: true },
+  PI: { start: '2026-07-01', end: '2026-11-30', regional: true }, // Região I: 01 set → 30 nov 2026
   RJ: { start: '2026-06-15', end: '2026-09-28', regional: false },
   RS: { start: '2026-07-03', end: '2026-09-30', regional: false },
   RO: { start: '2026-06-10', end: '2026-09-10', regional: false },
-  SC: { start: '2026-06-01', end: '2026-09-15', regional: true },
-  SP: { start: '2026-06-13', end: '2026-10-12', regional: true },
+  SC: { start: '2026-06-13', end: '2026-10-12', regional: true }, // RII 13 jun → RI 12 out 2026
+  SP: { start: '2026-06-01', end: '2026-09-15', regional: true }, // RI 01 jun → RIII 15 set 2026
   TO: { start: '2026-07-01', end: '2026-09-30', regional: false },
 };
 

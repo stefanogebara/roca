@@ -44,6 +44,32 @@ describe('vazioStatus', () => {
     expect(s.line).toBeNull();
   });
 
+  // The envelope for a regional state must span EVERY região's window — a
+  // truncated envelope silently drops growers whose região runs later.
+  describe('regional envelopes span every região (portaria 1.579/2026)', () => {
+    it('BA stays in vazio into 2027 — Região III runs 14 dez 2026 → 14 mar 2027', () => {
+      // Was truncated to 2026-10-07 (Região I end) → a BA Região III grower got silence.
+      expect(vazioStatus('BA', new Date('2027-02-15T12:00:00Z')).active).toBe(true);
+      expect(vazioStatus('BA', new Date('2027-03-14T12:00:00Z')).active).toBe(true);
+      expect(vazioStatus('BA', new Date('2027-03-15T12:00:00Z')).active).toBe(false);
+    });
+
+    it('MA and PI envelopes reach 30 nov 2026 (Região III / Região I)', () => {
+      expect(vazioStatus('MA', new Date('2026-11-15T12:00:00Z')).active).toBe(true);
+      expect(vazioStatus('PI', new Date('2026-11-15T12:00:00Z')).active).toBe(true);
+      expect(vazioStatus('MA', new Date('2026-12-01T12:00:00Z')).active).toBe(false);
+    });
+
+    it('SC and SP are not swapped — SC to 12 out, SP to 15 set', () => {
+      // 1 out 2026: SC still closed (ends 12 out), SP already reopened (ended 15 set).
+      expect(vazioStatus('SC', new Date('2026-10-01T12:00:00Z')).active).toBe(true);
+      expect(vazioStatus('SP', new Date('2026-10-01T12:00:00Z')).active).toBe(false);
+      // 5 jun 2026: SP Região I already closed (starts 1 jun); SC not yet (starts 13 jun).
+      expect(vazioStatus('SP', new Date('2026-06-05T12:00:00Z')).active).toBe(true);
+      expect(vazioStatus('SC', new Date('2026-06-05T12:00:00Z')).active).toBe(false);
+    });
+  });
+
   it('null UF stays silent', () => {
     const s = vazioStatus(null, new Date('2026-07-07T12:00:00Z'));
     expect(s.known).toBe(false);
@@ -82,7 +108,7 @@ describe('isCalendarStale', () => {
   it('is fresh during the 2026/27 season', () => {
     expect(isCalendarStale(new Date('2026-07-07T12:00:00Z'))).toBe(false);
   });
-  it('goes stale well past the last window', () => {
-    expect(isCalendarStale(new Date('2027-03-01T12:00:00Z'))).toBe(true);
+  it('goes stale well past the last window (BA now runs to 14 mar 2027)', () => {
+    expect(isCalendarStale(new Date('2027-06-01T12:00:00Z'))).toBe(true);
   });
 });
