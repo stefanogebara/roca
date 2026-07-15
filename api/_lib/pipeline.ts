@@ -537,6 +537,8 @@ export async function handleInbound(
   // The applications report as a PDF, delivered as a second message
   // (save/print/forward) after the in-chat PNG card.
   let extraDocUrl: string | undefined;
+  // Caption for the PDF document second-message (defaults per the second-send).
+  let extraDocCaption: string | undefined;
   // Set when a branch must NOT ship the generic card (e.g. a pin we couldn't
   // confirm as a field — the honest text must not carry a "SUA LAVOURA" image).
   let suppressCard = false;
@@ -690,6 +692,18 @@ export async function handleInbound(
     intent = 'brief';
     if (userId && user?.awaiting) await setAwaiting(userId, null);
     replyText = await buildAgronomoBrief(userId);
+    // Attach the caderno de aplicações PDF so the agrônomo gets the farmer's
+    // structured spray history alongside the briefing. Only when there's
+    // something recorded and the report URL can be signed; otherwise the brief
+    // ships text-only, exactly as before.
+    if (userId) {
+      const params = reportCardParams(userId);
+      if (params && (await listApplications(userId, { limit: 1 })).length > 0) {
+        extraDocUrl = `${PUBLIC_BASE}/api/report?${params}`;
+        extraDocCaption =
+          'Anexei também seu *caderno de aplicações* em PDF — dá pra encaminhar junto pro agrônomo, ele já vê o que foi aplicado. 📎';
+      }
+    }
   } else if (effective.kind === 'text' && effective.text && isReferralRequest(effective.text)) {
     // Explicit agrônomo referral request — the business-model seed.
     intent = 'referral';
@@ -845,7 +859,7 @@ export async function handleInbound(
       adapter,
       msg.from,
       {
-        text: 'Segue também em PDF, pra guardar ou imprimir. 📎',
+        text: extraDocCaption ?? 'Segue também em PDF, pra guardar ou imprimir. 📎',
         mediaUrl: extraDocUrl,
         mediaType: 'document',
         filename: 'caderno-de-aplicacoes.pdf',
