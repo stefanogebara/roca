@@ -231,9 +231,22 @@ export class CloudApiAdapter implements TransportAdapter {
     if (!token || !phoneId) {
       throw new Error('WHATSAPP_CLOUD_TOKEN / WHATSAPP_CLOUD_PHONE_NUMBER_ID not configured');
     }
-    // Media path: an image message with the text as caption. On failure, fall
-    // back to plain text so a broken card never drops the reply.
+    // Media path: an image (default) or a document (PDF), with the text as
+    // caption. On failure, fall back to plain text so a broken attachment never
+    // drops the reply.
     if (msg.mediaUrl) {
+      const caption = msg.text.slice(0, 1024);
+      const media =
+        msg.mediaType === 'document'
+          ? {
+              type: 'document',
+              document: {
+                link: msg.mediaUrl,
+                caption,
+                filename: msg.filename ?? 'documento.pdf',
+              },
+            }
+          : { type: 'image', image: { link: msg.mediaUrl, caption } };
       const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -241,8 +254,7 @@ export class CloudApiAdapter implements TransportAdapter {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
           to: msg.to,
-          type: 'image',
-          image: { link: msg.mediaUrl, caption: msg.text.slice(0, 1024) },
+          ...media,
         }),
       });
       if (res.ok) return;

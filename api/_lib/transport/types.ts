@@ -36,12 +36,20 @@ export interface OutboundMessage {
    */
   buttons?: string[];
   /**
-   * Optional image to attach (public PNG URL — a rendered card). When present,
-   * adapters send an image message with `text` as the caption/body and skip
-   * buttons; on any send failure they fall back to plain text so a broken image
-   * never drops the reply.
+   * Optional media to attach (public URL). When present, adapters send a media
+   * message with `text` as the caption/body and skip buttons; on any send
+   * failure they fall back to plain text so a broken attachment never drops the
+   * reply. Defaults to an image (a rendered PNG card).
    */
   mediaUrl?: string;
+  /**
+   * What kind of media `mediaUrl` is. 'image' (default) for PNG cards;
+   * 'document' for a PDF the farmer can save/print/forward. Twilio auto-detects
+   * from the URL's content-type; the Cloud API needs the explicit message type.
+   */
+  mediaType?: 'image' | 'document';
+  /** Filename shown for a 'document' attachment (Cloud API). */
+  filename?: string;
 }
 
 /**
