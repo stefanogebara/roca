@@ -2,6 +2,42 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
+## 2026-07-15 — `git commit` ships the whole index, which a concurrent session can pre-pollute
+
+**Context:** Committing my location-decoupling work in a worktree shared with the
+active caderno session. I staged explicit paths (`git add <my files>`, per the
+"never sweep" rule) — yet the commit still shipped 3 of the *other* session's
+files (`api/report.ts`, `api/_lib/report/pdf.ts`, `tests/application-pdf.test.ts`),
+because they were already **staged in the index** by that session. Caught it only
+because the commit output listed unexpected `create mode` lines.
+
+**What went wrong:** `git add <paths>` is *additive* — it doesn't clear the index
+— and `git commit` ships the **entire index**, not just what I added. Explicit
+staging guards what you ADD, not what another session already left staged.
+Separately: a grep had earlier shown my `pipeline.ts` wiring "gone" (the caderno
+session re-edited from a pre-my-changes base); I flagged it and held. When later
+told to re-apply, the file was **already reconciled** — blindly re-adding the
+branches would have duplicated and broken it.
+
+**Rules:**
+- **`git diff --cached --name-only` immediately before EVERY commit** — confirm
+  the staged set is EXACTLY your files. `git status --short` (working tree) is
+  NOT enough: the commit ships the *index*, and a concurrent session can pre-stage
+  into it. (This sharpens the CLAUDE.md "status before every commit" rule.)
+- Polluted commit → **`git reset HEAD~1`** (mixed: un-commits AND unstages,
+  working tree preserved), re-stage explicitly, re-verify `--cached`, re-commit.
+  Non-destructive.
+- A shared file that looks like it lost your work may already be reconciled —
+  **read it before re-applying**, never re-add wiring blind. Don't edit-war;
+  surface the collision and reconcile only when the other session is confirmed
+  parked.
+- Entangled files (both sessions edited the same regions) can't be split by file
+  without interactive `git add -p` (unavailable to the agent) — ship the features
+  together or coordinate the sessions.
+- Shared local repo → another session's commits land in your HEAD immediately;
+  HEAD can move between your own commits (saw an empty redeploy commit and a
+  lessons.md commit appear). Re-check `git log -1` before assuming your parent.
+
 ## 2026-07-15 — Surgical partial-commits must match import *paths*, not just symbols
 
 **Context:** Committing the caderno-de-aplicacoes feature whose changes were
