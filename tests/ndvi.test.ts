@@ -4,6 +4,7 @@ import {
   classifyUniformity,
   aggregateNdvi,
   gridPoints,
+  NDVI_VIGOR_BREAKS,
 } from '../api/_lib/tools/ndvi';
 
 describe('classifyVigor', () => {
@@ -42,6 +43,16 @@ describe('classifyVigor', () => {
     expect(classifyVigor(0.29).label).not.toBe(classifyVigor(0.31).label);
     expect(classifyVigor(0.49).label).not.toBe(classifyVigor(0.51).label);
     expect(classifyVigor(0.69).label).not.toBe(classifyVigor(0.71).label);
+  });
+
+  // Single-source guard: the NDVI card colours off NDVI_VIGOR_BREAKS, so those
+  // breaks MUST be exactly where classifyVigor's label changes — else the card
+  // colour and the text label silently disagree.
+  it('band transitions land exactly on the shared NDVI_VIGOR_BREAKS', () => {
+    expect([...NDVI_VIGOR_BREAKS]).toEqual([0.15, 0.3, 0.5, 0.7]);
+    for (const b of NDVI_VIGOR_BREAKS) {
+      expect(classifyVigor(b - 0.001).label, `below ${b}`).not.toBe(classifyVigor(b).label);
+    }
   });
 });
 

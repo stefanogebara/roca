@@ -58,8 +58,10 @@ export function deltaT(tempC: number, humidity: number): number {
 
 // Thresholds. Delta T favourable window is ~2–8 °C (EMBRAPA/Brazilian extension
 // guidance). Wind: drift risk climbs above ~10 km/h, unacceptable above ~15.
-const DELTA_T_MIN = 2;
-const DELTA_T_MAX = 8;
+// MIN/MAX are exported so the spray card and system prompt state the same range
+// this logic uses — one source, no drift.
+export const DELTA_T_MIN = 2;
+export const DELTA_T_MAX = 8;
 const DELTA_T_HARD_MAX = 10;
 const WIND_CAUTION = 10;
 const WIND_MAX = 15;

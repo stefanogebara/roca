@@ -5,7 +5,7 @@
  * matters for low-literacy users in the field.
  */
 
-import type { HourAssessment } from '../tools/deltaT';
+import { type HourAssessment, DELTA_T_MIN, DELTA_T_MAX } from '../tools/deltaT';
 import { C, esc } from './render';
 
 const W = 900;
@@ -86,6 +86,6 @@ export function spraySvg(hours: HourAssessment[], bestUpcoming: HourAssessment |
   ${bars}
 
   <text x="${padX}" y="${H - 70}" font-family="DM Sans" font-size="23" fill="${C.green2}">${esc(best)}</text>
-  <text x="${padX}" y="${H - 38}" font-family="DM Sans" font-size="18" fill="${C.muted}">Faixa boa: Delta T 2–8 °C, vento fraco, sem chuva. Combine com o que você vê no campo.</text>
+  <text x="${padX}" y="${H - 38}" font-family="DM Sans" font-size="18" fill="${C.muted}">Faixa boa: Delta T ${DELTA_T_MIN}–${DELTA_T_MAX} °C, vento fraco, sem chuva. Combine com o que você vê no campo.</text>
 </svg>`;
 }

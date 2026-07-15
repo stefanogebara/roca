@@ -84,6 +84,21 @@ export interface Uniformity {
  */
 export const VEGETATION_MIN_NDVI = 0.15;
 
+// Upper edges of the sparse / developing / vigorous vigor bands (the dense band
+// is everything above VIGOROUS_MAX). The NDVI card imports NDVI_VIGOR_BREAKS so
+// its colour ramp and marker can't drift from these labels.
+const NDVI_SPARSE_MAX = 0.3;
+const NDVI_DEVELOPING_MAX = 0.5;
+const NDVI_VIGOROUS_MAX = 0.7;
+
+/** The four ascending NDVI breakpoints between the five vigor bands. */
+export const NDVI_VIGOR_BREAKS = [
+  VEGETATION_MIN_NDVI,
+  NDVI_SPARSE_MAX,
+  NDVI_DEVELOPING_MAX,
+  NDVI_VIGOROUS_MAX,
+] as const;
+
 /**
  * Pin-drop land verdict. A dropped WhatsApp pin is *where the phone is*, not
  * necessarily a field — a farmer messaging from an apartment in São Paulo would
@@ -116,21 +131,21 @@ export function classifyVigor(ndvi: number): VigorClass {
       note: 'Pouca ou nenhuma vegetação ativa nesse ponto — pode ser entressafra, pós-colheita, área recém-plantada ou solo mesmo.',
     };
   }
-  if (ndvi < 0.3) {
+  if (ndvi < NDVI_SPARSE_MAX) {
     return {
       label: 'vegetação rala',
       emoji: '🟡',
       note: 'Cobertura baixa — início de cultura, rebrota, ou possível estresse. Vale olhar de perto.',
     };
   }
-  if (ndvi < 0.5) {
+  if (ndvi < NDVI_DEVELOPING_MAX) {
     return {
       label: 'desenvolvimento moderado',
       emoji: '🌱',
       note: 'A lavoura está se desenvolvendo, mas ainda não fechou o dossel.',
     };
   }
-  if (ndvi < 0.7) {
+  if (ndvi < NDVI_VIGOROUS_MAX) {
     return {
       label: 'lavoura vigorosa',
       emoji: '🟢',

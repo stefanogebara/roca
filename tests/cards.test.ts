@@ -4,7 +4,7 @@ import { ndviSvg } from '../api/_lib/cards/ndviCard';
 import { farmSvg } from '../api/_lib/cards/farm';
 import { pestSvg } from '../api/_lib/cards/pest';
 import { svgToPng } from '../api/_lib/cards/render';
-import type { HourAssessment } from '../api/_lib/tools/deltaT';
+import { type HourAssessment, DELTA_T_MIN, DELTA_T_MAX } from '../api/_lib/tools/deltaT';
 
 const hour = (h: number, verdict: HourAssessment['verdict'], deltaT = 5): HourAssessment => ({
   time: `2026-07-09T${String(h).padStart(2, '0')}:00`,
@@ -30,6 +30,10 @@ describe('spraySvg', () => {
   it('is valid single-root SVG', () => {
     const svg = spraySvg(hours, null);
     expect(svg.trim().endsWith('</svg>')).toBe(true);
+  });
+  it('states the favourable Delta-T range from the shared constants (no drift)', () => {
+    const svg = spraySvg(hours, null);
+    expect(svg).toContain(`Delta T ${DELTA_T_MIN}–${DELTA_T_MAX} °C`);
   });
 });
 

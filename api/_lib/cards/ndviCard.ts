@@ -8,9 +8,21 @@
  */
 
 import { C, esc } from './render';
+import { NDVI_VIGOR_BREAKS } from '../tools/ndvi';
 
 const W = 900;
 const H = 520;
+
+// One colour per vigor band (bare soil → dense canopy), aligned to the shared
+// NDVI_VIGOR_BREAKS so the card can't disagree with classifyVigor's label.
+const STOPS = [C.soil, '#c9a227', '#7cbf5a', C.leaf, C.green2];
+// NDVI value the legend bar's right edge represents (ramp domain, card-local).
+const NDVI_RAMP_MAX = 0.85;
+
+/** Which of the 5 vigor bands an NDVI falls in (0..4), by the shared breaks. */
+function bandIndex(ndvi: number): number {
+  return NDVI_VIGOR_BREAKS.filter((b) => ndvi >= b).length;
+}
 
 export interface NdviCardData {
   ndvi: number;
@@ -22,13 +34,9 @@ export interface NdviCardData {
   thumb?: string | null;
 }
 
-/** Color along the NDVI vigor ramp. */
+/** Color along the NDVI vigor ramp (same bands as classifyVigor). */
 function ramp(ndvi: number): string {
-  if (ndvi < 0.15) return C.soil;
-  if (ndvi < 0.3) return '#c9a227';
-  if (ndvi < 0.5) return '#7cbf5a';
-  if (ndvi < 0.7) return C.leaf;
-  return C.green2;
+  return STOPS[bandIndex(ndvi)];
 }
 
 /** "2026-06-29" → "29/06/2026". */
@@ -52,13 +60,12 @@ export function ndviSvg(data: NdviCardData): string {
   const barX = 48;
   const barY = 300;
   const barW = leftRight - barX - 8;
-  const stops = [C.soil, '#c9a227', '#7cbf5a', C.leaf, C.green2];
-  const segW = barW / stops.length;
-  const segs = stops
+  const segW = barW / STOPS.length;
+  const segs = STOPS
     .map((s, i) => `<rect x="${barX + i * segW}" y="${barY}" width="${segW}" height="26" fill="${s}"/>`)
     .join('');
-  // Marker position: NDVI 0..0.85 mapped across the bar.
-  const t = Math.max(0, Math.min(1, data.ndvi / 0.85));
+  // Marker position: NDVI 0..NDVI_RAMP_MAX mapped across the bar.
+  const t = Math.max(0, Math.min(1, data.ndvi / NDVI_RAMP_MAX));
   const markX = barX + t * barW;
 
   const uni = data.uniformity
