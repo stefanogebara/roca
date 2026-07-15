@@ -75,6 +75,10 @@ export function phraseSpray(w: SprayWindow): string {
     const hour = w.bestUpcoming.time.slice(11, 16);
     lines.push(`\n🕐 Janela melhor hoje: por volta das ${hour} (Delta T ${w.bestUpcoming.deltaT} °C).`);
   }
+  // The verdict is computed from a point weather forecast, which carries
+  // uncertainty — the frost card hedges the same way. The farmer sees the real
+  // conditions on the ground, so never present this as a measurement.
+  lines.push('\n_Baseado na previsão do tempo pro seu ponto; confirme as condições no campo antes de aplicar._');
   return lines.join('\n');
 }
 
@@ -86,6 +90,10 @@ async function handleFieldHealth(userId: string | null): Promise<string> {
   const farm = await getFarm(userId);
   if (!farm) {
     return 'Ainda não tenho a localização da sua lavoura. Manda o pin aqui (clipe 📎 → Localização) que eu puxo a imagem de satélite mais recente e te digo como tá o vigor.';
+  }
+  if (farm.precision === 'city') {
+    // A municipal centroid is the town, not the talhão — NDVI there is useless.
+    return 'Pra puxar a imagem de satélite eu preciso do ponto certinho da sua lavoura — a localização que tenho é aproximada, só pela cidade. Manda o pin da porteira (clipe 📎 → Localização) que aí eu te mostro o vigor (NDVI) do seu talhão. 🛰️';
   }
 
   let reading = await getCachedNdvi(farm.id);

@@ -7,7 +7,7 @@
 import type { TransportAdapter, InboundMessage } from './transport/types';
 import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
-import { buildFarmCard } from './farmcard';
+import { buildFarmCard, isFarmConfirmYes } from './farmcard';
 import { buildAgronomoBrief } from './brief';
 import { handleProspectInbound, respondAsProspectAgent } from './prospect/inbound';
 import { normalizePhoneBR } from './prospect/core';
@@ -26,6 +26,8 @@ import { describeImage, type ChatImage } from './llm';
 import {
   upsertUser,
   setUserSource,
+  setUserState,
+  setFarmLocation,
   markReferralPrompted,
   logMessage,
   claimInbound,
@@ -59,6 +61,7 @@ import {
   applicationsTextSummary,
 } from './cards/applications';
 import { reportCardParams } from './reportToken';
+import { isLocationSettingRequest, resolveStatedLocation, confirmLocationReply } from './location';
 import { formatTurnsBlock } from './memory';
 import { buildHistoryReply } from './caderno';
 import { fetchPrices, formatPricesReply, askedCommodities } from './tools/prices';
@@ -204,6 +207,9 @@ async function cardUrlFor(
       if (coords) return `${PUBLIC_BASE}/api/card?type=spray&lat=${coords.lat}&lon=${coords.lon}`;
     } else if (intent === 'field_health' && userId) {
       const farm = await getFarm(userId);
+      // A city-precision location is a municipal centroid, not the talhão — the
+      // reply already asks for the pin; never attach an NDVI card of the town.
+      if (farm && farm.precision === 'city') return undefined;
       if (farm) {
         const r = await getCachedNdvi(farm.id);
         if (r) {
@@ -301,13 +307,26 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
 async function sendOrRecord(
   adapter: TransportAdapter,
   to: string,
-  out: { text: string; buttons?: string[]; mediaUrl?: string },
+  out: {
+    text: string;
+    buttons?: string[];
+    mediaUrl?: string;
+    mediaType?: 'image' | 'document';
+    filename?: string;
+  },
   userId: string | null,
   intent: string
 ): Promise<boolean> {
   try {
     await withRetry(() =>
-      adapter.send({ to, text: out.text, buttons: out.buttons, mediaUrl: out.mediaUrl })
+      adapter.send({
+        to,
+        text: out.text,
+        buttons: out.buttons,
+        mediaUrl: out.mediaUrl,
+        mediaType: out.mediaType,
+        filename: out.filename,
+      })
     );
     return true;
   } catch (e) {
@@ -515,6 +534,12 @@ export async function handleInbound(
   // Set by branches that carry their own visual (prices) — pest keeps its
   // dedicated path below.
   let extraCardUrl: string | undefined;
+  // The applications report as a PDF, delivered as a second message
+  // (save/print/forward) after the in-chat PNG card.
+  let extraDocUrl: string | undefined;
+  // Set when a branch must NOT ship the generic card (e.g. a pin we couldn't
+  // confirm as a field — the honest text must not carry a "SUA LAVOURA" image).
+  let suppressCard = false;
 
   // If we asked what they grow (right after the farm card) and they replied with
   // recognizable crops, capture them. Only a crops-ONLY reply gets the capture
@@ -544,6 +569,28 @@ export async function handleInbound(
       ? await resolveConsentReply(userId, effective.text)
       : null;
 
+  // "É aí mesmo" — the farmer affirming that a bare pin we couldn't confirm IS
+  // their field (pousio / recém-colhida). Checked before the location resolve so
+  // an affirmation never spends an LLM extract.
+  const confirmYes =
+    user?.awaiting === 'farm_confirm' &&
+    effective.kind === 'text' &&
+    !!effective.text &&
+    isFarmConfirmYes(effective.text);
+
+  // Stated location: "minha lavoura fica em X" / "sou de X", or any redirect
+  // while awaiting the farmer to fix a bad pin. Geocodes to a coarse city
+  // centroid. The LLM extract only runs on an explicit location statement or a
+  // farm_confirm redirect — never on a plain confirm or an ordinary message.
+  const statedLocation =
+    !confirmYes &&
+    effective.kind === 'text' &&
+    !!effective.text &&
+    !!userId &&
+    (isLocationSettingRequest(effective.text) || user?.awaiting === 'farm_confirm')
+      ? await resolveStatedLocation(effective.text)
+      : null;
+
   if (cropAnswer && cropAnswer.length > 0 && cropsOnly) {
     if (userId) {
       await setFarmCrops(userId, cropAnswer);
@@ -555,6 +602,28 @@ export async function handleInbound(
     intent = 'referral';
     if (userId) await setAwaiting(userId, null);
     replyText = consentReply;
+  } else if (confirmYes) {
+    // Farmer confirmed the bare pin IS their field (pousio / recém-colhida) →
+    // keep the stored location and move on to the crop question.
+    intent = 'onboarding';
+    if (userId) await setAwaiting(userId, 'crop');
+    replyText =
+      'Beleza, mantive sua localização então. 🌱 Me conta: o que você planta aí? Soja, milho, café, pasto?';
+  } else if (statedLocation?.kind === 'resolved' && userId) {
+    // Farmer named where the field is → store a coarse city reference and invite
+    // the pin to refine. Decouples "onde você está" from "onde é a lavoura".
+    intent = 'onboarding';
+    await setFarmLocation(userId, statedLocation.lat, statedLocation.lon, 'city');
+    if (statedLocation.uf) await setUserState(userId, statedLocation.uf);
+    await setAwaiting(userId, 'crop');
+    replyText = confirmLocationReply(statedLocation);
+  } else if (statedLocation?.kind === 'ungeocodable' && userId) {
+    // Named a place we couldn't locate → ask for city+UF or the pin. A message
+    // that named NO place ('no_place') falls through instead — no false "não achei".
+    intent = 'onboarding';
+    if (user?.awaiting) await setAwaiting(userId, null);
+    replyText =
+      `Hmm, não consegui achar "${statedLocation.city.slice(0, 40)}" no mapa 🤔. Me diz a cidade e o estado da sua lavoura (ex: "Patrocínio-MG"), ou manda o pin (clipe 📎 → Localização).`;
   } else if (effective.kind === 'text' && effective.text && isApplicationReportRequest(effective.text)) {
     // Caderno de aplicações report (rastreabilidade). Checked BEFORE the history
     // fast-path, since "meu caderno de aplicações" also matches isHistoryRequest.
@@ -571,6 +640,7 @@ export async function handleInbound(
       if (params) {
         replyText = receituarioPrefix + applicationsCaption(rows.length);
         extraCardUrl = `${PUBLIC_BASE}/api/card?${params}`;
+        extraDocUrl = `${PUBLIC_BASE}/api/report?${params}`;
       } else {
         // No URL-signing secret configured → gate-safe text summary rather than
         // shipping the farmer's chemical history through an unsigned public URL.
@@ -674,13 +744,21 @@ export async function handleInbound(
     replyText =
       'Recebi seu áudio mas não consegui entender direito. 🙉 Pode escrever em texto, ou mandar o áudio de novo mais pertinho do celular?';
   } else if (effective.kind === 'location' && effective.location) {
-    // Pin drop → the payback moment. Deterministic, no LLM needed.
+    // Pin drop → the payback moment, or an honest "não achei vegetação aí" when
+    // the pin isn't a field. buildFarmCard sets `awaiting` itself ('crop', or
+    // 'farm_confirm' when it needs the farmer to confirm or redirect the pin).
     intent = 'onboarding';
-    replyText = await buildFarmCard(userId, effective.location.lat, effective.location.lon);
-    if (userId) await setAwaiting(userId, 'crop');
+    const fc = await buildFarmCard(userId, effective.location.lat, effective.location.lon);
+    replyText = fc.text;
+    // No vegetation → the reply is an honest question; never attach a "SUA
+    // LAVOURA" card over a rooftop/water.
+    suppressCard = !fc.card;
   } else {
-    // A pending crop question that got a non-crop reply: stop waiting, answer normally.
-    if (user?.awaiting === 'crop' && userId) await setAwaiting(userId, null);
+    // A pending crop/confirm question that got an unrelated reply: stop waiting,
+    // answer normally (don't leave the farmer stuck in an onboarding state).
+    if ((user?.awaiting === 'crop' || user?.awaiting === 'farm_confirm') && userId) {
+      await setAwaiting(userId, null);
+    }
     // kind guard matters: a photo with a "como está minha lavoura?" caption is
     // a pest-triage image, not a satellite ask — captions never fast-path.
     intent =
@@ -717,12 +795,14 @@ export async function handleInbound(
   if (firstContact) finalText += CONSENT_NOTE;
 
   // A gate-replaced reply never ships its visual — the pest card carries the
-  // exact product/group data the gate just blocked.
-  const mediaUrl = !gate.safe
-    ? undefined
-    : pestCard
-      ? pestCardUrl(pestCard)
-      : (extraCardUrl ?? (await cardUrlFor(intent, effective, userId)));
+  // exact product/group data the gate just blocked. `suppressCard` blocks the
+  // generic card when the text is an honest "isso não parece uma lavoura" hold.
+  const mediaUrl =
+    !gate.safe || suppressCard
+      ? undefined
+      : pestCard
+        ? pestCardUrl(pestCard)
+        : (extraCardUrl ?? (await cardUrlFor(intent, effective, userId)));
 
   // Referral nudge after a DELIVERED victory moment (visual verdict in hand):
   // the produtor→produtor chain the flight plan watches for. The link is
@@ -756,4 +836,22 @@ export async function handleInbound(
     text: finalText,
     intent,
   });
+
+  // Second message: the same report as a PDF document, to save/print/forward.
+  // Only after the caption shipped safely and a signed PDF URL was built. The
+  // caption text is gate-safe; the record's dose/brand live inside the PDF.
+  if (extraDocUrl && gate.safe) {
+    await sendOrRecord(
+      adapter,
+      msg.from,
+      {
+        text: 'Segue também em PDF, pra guardar ou imprimir. 📎',
+        mediaUrl: extraDocUrl,
+        mediaType: 'document',
+        filename: 'caderno-de-aplicacoes.pdf',
+      },
+      userId,
+      'application_report_pdf'
+    );
+  }
 }

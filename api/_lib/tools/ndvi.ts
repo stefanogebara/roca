@@ -79,11 +79,37 @@ export interface Uniformity {
 }
 
 /**
+ * The NDVI below which a point reads as "solo praticamente exposto" — no active
+ * vegetation. Shared by classifyVigor's lowest band and the pin-drop land gate.
+ */
+export const VEGETATION_MIN_NDVI = 0.15;
+
+/**
+ * Pin-drop land verdict. A dropped WhatsApp pin is *where the phone is*, not
+ * necessarily a field — a farmer messaging from an apartment in São Paulo would
+ * otherwise get their rooftop analyzed as "sua lavoura". This gate is the
+ * honesty backstop: only an area-mean showing plausible vegetation is asserted
+ * as a field; water and built-up read below the bare-soil band and get an honest
+ * "is this really your field?" instead. A missing read (clouds / titiler down)
+ * is 'unknown' so the caller fails OPEN — a flaky satellite never blocks
+ * onboarding. NOT an urban classifier: a legitimately bare field (entressafra,
+ * pós-colheita) also lands in 'no_vegetation', which is why the caller's copy
+ * offers the "é aí mesmo, tá em pousio" escape rather than asserting "área
+ * urbana". Pure; exported for tests.
+ */
+export type LandVerdict = 'vegetation' | 'no_vegetation' | 'unknown';
+
+export function interpretLand(reading: { ndvi: number } | null): LandVerdict {
+  if (!reading) return 'unknown';
+  return reading.ndvi < VEGETATION_MIN_NDVI ? 'no_vegetation' : 'vegetation';
+}
+
+/**
  * Plain-language vigor bands. Crop-agnostic and deliberately hedged — even an
  * area mean is a proxy, not a verdict.
  */
 export function classifyVigor(ndvi: number): VigorClass {
-  if (ndvi < 0.15) {
+  if (ndvi < VEGETATION_MIN_NDVI) {
     return {
       label: 'solo praticamente exposto',
       emoji: '🟤',

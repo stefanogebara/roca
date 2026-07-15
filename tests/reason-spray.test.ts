@@ -24,8 +24,9 @@ vi.mock('../api/_lib/db', async (importOriginal) => {
   };
 });
 
-import { reason, mentionsSprayConditions } from '../api/_lib/reason';
+import { reason, mentionsSprayConditions, phraseSpray } from '../api/_lib/reason';
 import { chat } from '../api/_lib/llm';
+import * as db from '../api/_lib/db';
 import type { InboundMessage } from '../api/_lib/transport/types';
 
 const msg = (text: string): InboundMessage => ({
@@ -83,5 +84,34 @@ describe('handleSpray without a pin', () => {
     vi.mocked(chat).mockRejectedValue(new Error('provider down'));
     const reply = await reason(msg('tá ventando demais, aplico?'), 'spray_window', { userId: null });
     expect(reply).toMatch(/preciso saber onde fica sua lavoura/);
+  });
+});
+
+describe('phraseSpray honesty hedge (it is a forecast, not a measurement)', () => {
+  const win = (verdict: 'go' | 'caution' | 'no-go') =>
+    ({ now: { verdict, deltaT: 5, windKmh: 6, reasons: ['Delta T 5 °C, vento fraco'] }, bestUpcoming: null }) as never;
+
+  it('every verdict carries a "confirm in the field" caveat', () => {
+    for (const v of ['go', 'caution', 'no-go'] as const) {
+      const out = phraseSpray(win(v));
+      expect(out, v).toMatch(/previs[ãa]o/i);
+      expect(out, v).toMatch(/confir\w+.*no campo/i);
+    }
+  });
+
+  it('still leads with the verdict and its reasons', () => {
+    const out = phraseSpray(win('go'));
+    expect(out).toMatch(/✅ Pode pulverizar/);
+    expect(out).toMatch(/Delta T 5 °C/);
+  });
+});
+
+describe('field_health with an approximate (city) location', () => {
+  it('asks for the exact pin instead of reading NDVI at a municipal centroid', async () => {
+    vi.mocked(db.getFarm).mockResolvedValue({ id: 'f1', lat: -18.9, lon: -46.9, precision: 'city' });
+    const reply = await reason(msg('como está minha lavoura?'), 'field_health', { userId: 'u1' });
+    expect(reply).toMatch(/aproximada, só pela cidade/i);
+    expect(reply).toMatch(/pin da porteira/i);
+    expect(db.getCachedNdvi).not.toHaveBeenCalled(); // never even tries the satellite read
   });
 });

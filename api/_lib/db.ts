@@ -78,15 +78,18 @@ export async function markReferralPrompted(userId: string): Promise<void> {
 }
 
 /** Persist the latest known farm location; returns the farm id for caching. */
+export type LocationPrecision = 'pin' | 'city';
+
 export async function setFarmLocation(
   userId: string,
   lat: number,
-  lon: number
+  lon: number,
+  precision: LocationPrecision = 'pin'
 ): Promise<string | null> {
   const db = getDb();
   const { data, error } = await db
     .from('farms')
-    .upsert({ user_id: userId, lat, lon }, { onConflict: 'user_id' })
+    .upsert({ user_id: userId, lat, lon, location_precision: precision }, { onConflict: 'user_id' })
     .select('id')
     .single();
   if (error) {
@@ -96,14 +99,14 @@ export async function setFarmLocation(
   return (data as { id: string }).id;
 }
 
-/** Fetch a user's farm id + coordinates (for NDVI caching + derivation). */
+/** Fetch a user's farm id + coordinates + precision (for NDVI/derivation). */
 export async function getFarm(
   userId: string
-): Promise<{ id: string; lat: number; lon: number } | null> {
+): Promise<{ id: string; lat: number; lon: number; precision: LocationPrecision } | null> {
   const db = getDb();
   const { data, error } = await db
     .from('farms')
-    .select('id, lat, lon')
+    .select('id, lat, lon, location_precision')
     .eq('user_id', userId)
     .not('lat', 'is', null)
     .order('updated_at', { ascending: false })
@@ -113,9 +116,19 @@ export async function getFarm(
     log.error('getFarm failed:', error.message);
     return null;
   }
-  const row = data as { id: string; lat: number | null; lon: number | null } | null;
+  const row = data as {
+    id: string;
+    lat: number | null;
+    lon: number | null;
+    location_precision: string | null;
+  } | null;
   if (!row || row.lat == null || row.lon == null) return null;
-  return { id: row.id, lat: row.lat, lon: row.lon };
+  return {
+    id: row.id,
+    lat: row.lat,
+    lon: row.lon,
+    precision: row.location_precision === 'city' ? 'city' : 'pin',
+  };
 }
 
 /** Store the derived UF on the user (drives vazio sanitário awareness). */

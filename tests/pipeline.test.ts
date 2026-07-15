@@ -20,6 +20,8 @@ vi.mock('../api/_lib/db', async (importOriginal) => {
     ...actual,
     upsertUser: vi.fn(),
     setUserSource: vi.fn(),
+    setUserState: vi.fn(),
+    setFarmLocation: vi.fn(),
     markReferralPrompted: vi.fn(),
     logMessage: vi.fn(),
     claimInbound: vi.fn(),
@@ -59,7 +61,14 @@ vi.mock('../api/_lib/notify', () => ({
   sendReferralNotification: vi.fn(),
   pingFoundersWhatsApp: vi.fn(),
 }));
-vi.mock('../api/_lib/farmcard', () => ({ buildFarmCard: vi.fn() }));
+vi.mock('../api/_lib/farmcard', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/_lib/farmcard')>();
+  return { ...actual, buildFarmCard: vi.fn() }; // real isFarmConfirmYes, stubbed card builder
+});
+vi.mock('../api/_lib/location', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/_lib/location')>();
+  return { ...actual, resolveStatedLocation: vi.fn() }; // real regex/copy, stubbed geocode
+});
 vi.mock('../api/_lib/brief', () => ({ buildAgronomoBrief: vi.fn() }));
 vi.mock('../api/_lib/transcribe', () => ({ transcribeVoice: vi.fn() }));
 vi.mock('../api/_lib/llm', () => ({ describeImage: vi.fn() }));
@@ -72,6 +81,8 @@ import { routeIntent } from '../api/_lib/router';
 import { handleProspectInbound } from '../api/_lib/prospect/inbound';
 import { findPartnerByPhone } from '../api/_lib/partners';
 import { checkOutbound } from '../api/_lib/compliance';
+import { resolveStatedLocation } from '../api/_lib/location';
+import { buildFarmCard } from '../api/_lib/farmcard';
 
 const USER = {
   id: 'u1',
@@ -120,6 +131,8 @@ beforeEach(() => {
   vi.mocked(db.getActivityLog).mockResolvedValue([]);
   vi.mocked(handleProspectInbound).mockResolvedValue({ handled: false, prospect: null } as never);
   vi.mocked(findPartnerByPhone).mockResolvedValue(null);
+  vi.mocked(db.setFarmLocation).mockResolvedValue('farm-1');
+  vi.mocked(resolveStatedLocation).mockResolvedValue({ kind: 'no_place' });
   vi.mocked(routeIntent).mockResolvedValue('general');
   vi.mocked(reason).mockResolvedValue('resposta padrão');
   vi.mocked(checkOutbound).mockImplementation((text: string) =>
@@ -302,5 +315,114 @@ describe('fail-closed when the user row is unavailable', () => {
     await handleInbound(adapter, msgFixture());
 
     expect(adapter.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('farm_confirm (pin had no vegetation — awaiting the farmer’s confirm)', () => {
+  it('an affirmative keeps the pin and moves to the crop question, no model call', async () => {
+    vi.mocked(db.upsertUser).mockResolvedValue({ ...USER, awaiting: 'farm_confirm' });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'é aí mesmo, tá em pousio' }));
+
+    expect(db.setAwaiting).toHaveBeenCalledWith('u1', 'crop');
+    expect(reason).not.toHaveBeenCalled();
+    expect(adapter.send.mock.calls[0][0].text).toMatch(/o que você planta/i);
+  });
+
+  it('an unrelated question clears the stuck state and answers normally', async () => {
+    vi.mocked(db.upsertUser).mockResolvedValue({ ...USER, awaiting: 'farm_confirm' });
+    vi.mocked(routeIntent).mockResolvedValue('general');
+    vi.mocked(reason).mockResolvedValue('resposta agronômica');
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'qual o melhor adubo pro café?' }));
+
+    expect(db.setAwaiting).toHaveBeenCalledWith('u1', null); // no longer stuck
+    expect(reason).toHaveBeenCalledTimes(1);
+    expect(adapter.send.mock.calls[0][0].text).toBe('resposta agronômica');
+  });
+});
+
+describe('stated location (naming the field instead of dropping a pin)', () => {
+  it('geocodes a named city, stores it as approximate, and asks for the pin', async () => {
+    vi.mocked(resolveStatedLocation).mockResolvedValue({
+      kind: 'resolved', lat: -18.94, lon: -46.99, city: 'Patrocínio', uf: 'MG',
+    });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'minha lavoura fica em Patrocínio-MG' }));
+
+    expect(db.setFarmLocation).toHaveBeenCalledWith('u1', -18.94, -46.99, 'city');
+    expect(db.setUserState).toHaveBeenCalledWith('u1', 'MG');
+    expect(db.setAwaiting).toHaveBeenCalledWith('u1', 'crop');
+    expect(reason).not.toHaveBeenCalled(); // deterministic path, no model
+    const sent = adapter.send.mock.calls[0][0].text as string;
+    expect(sent).toContain('Patrocínio-MG');
+    expect(sent).toMatch(/pin/i);
+  });
+
+  it('a spray question naming a city is NOT treated as a location statement', async () => {
+    vi.mocked(routeIntent).mockResolvedValue('spray_window');
+    vi.mocked(reason).mockResolvedValue('veredito delta-t');
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'posso pulverizar em Patrocínio hoje?' }));
+
+    expect(resolveStatedLocation).not.toHaveBeenCalled(); // gate didn't fire
+    expect(db.setFarmLocation).not.toHaveBeenCalled();
+    expect(reason).toHaveBeenCalledTimes(1); // answered as a spray question
+  });
+
+  it('a named-but-ungeocodable place asks for city+UF or a pin', async () => {
+    vi.mocked(resolveStatedLocation).mockResolvedValue({ kind: 'ungeocodable', city: 'Cidade Inventada' });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'minha fazenda fica em Cidade Inventada' }));
+
+    expect(db.setFarmLocation).not.toHaveBeenCalled();
+    expect(reason).not.toHaveBeenCalled();
+    expect(adapter.send.mock.calls[0][0].text).toMatch(/não consegui achar/i);
+  });
+
+  it('a message that named no place (referral intro) falls through — never a false "não achei"', async () => {
+    // "sou do João" matches the gate but extracts no city → no_place → normal handling.
+    vi.mocked(resolveStatedLocation).mockResolvedValue({ kind: 'no_place' });
+    vi.mocked(routeIntent).mockResolvedValue('smalltalk');
+    vi.mocked(reason).mockResolvedValue('oi! como posso ajudar?');
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'oi, sou do João, ele me indicou' }));
+
+    expect(db.setFarmLocation).not.toHaveBeenCalled();
+    expect(reason).toHaveBeenCalledTimes(1); // answered normally, not "não achei essa cidade"
+    expect(adapter.send.mock.calls[0][0].text).not.toMatch(/não consegui achar/i);
+  });
+});
+
+describe('non-field pin never ships a "SUA LAVOURA" card image', () => {
+  it('suppresses the card when buildFarmCard held for farm_confirm', async () => {
+    vi.mocked(buildFarmCard).mockResolvedValue({ text: 'não achei vegetação aí, é aí mesmo?', card: false });
+    const adapter = makeAdapter();
+
+    await handleInbound(
+      adapter,
+      msgFixture({ kind: 'location', text: null, location: { lat: -23.55, lon: -46.63 } })
+    );
+
+    expect(adapter.send.mock.calls[0][0].mediaUrl).toBeUndefined();
+    expect(adapter.send.mock.calls[0][0].text).toMatch(/não achei vegetação/i);
+  });
+
+  it('a confirmed field ships the card as before', async () => {
+    vi.mocked(buildFarmCard).mockResolvedValue({ text: 'guardei sua lavoura 📍', card: true });
+    const adapter = makeAdapter();
+
+    await handleInbound(
+      adapter,
+      msgFixture({ kind: 'location', text: null, location: { lat: -21.2, lon: -45.0 } })
+    );
+
+    expect(adapter.send.mock.calls[0][0].mediaUrl).toMatch(/type=farm/);
   });
 });
