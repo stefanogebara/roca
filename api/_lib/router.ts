@@ -24,7 +24,8 @@ export type Intent =
   | 'brief'
   // matched by fast regex in the pipeline, never returned by the LLM router
   | 'history'
-  | 'prices';
+  | 'prices'
+  | 'application_log';
 
 const ROUTER_INSTRUCTION = `Classifique a mensagem do produtor rural em UMA categoria. Responda só com a palavra-chave.
 

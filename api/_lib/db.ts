@@ -428,6 +428,71 @@ export async function getRecentTurns(
     .filter((t) => t.text.length > 0);
 }
 
+/**
+ * A declared application row (caderno de aplicações). Structurally matches the
+ * ParsedApplication produced by tools/applicationParse; kept defined here so the
+ * data layer stays independent of the parser.
+ */
+export interface ApplicationRow {
+  applied_on: string;
+  crop: string | null;
+  product_name: string | null;
+  active_ingredient: string | null;
+  dose_text: string | null;
+  area_ha: number | null;
+  target: string | null;
+  source: string;
+  raw_text: string;
+}
+
+/** Store a farmer-declared application. Never throws — a logged error, like the
+ * rest of the write path, so a DB hiccup can't take the webhook down. */
+export async function insertApplication(
+  userId: string,
+  app: ApplicationRow,
+  farmId: string | null = null
+): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('applications').insert({
+    user_id: userId,
+    farm_id: farmId,
+    applied_on: app.applied_on,
+    crop: app.crop,
+    product_name: app.product_name,
+    active_ingredient: app.active_ingredient,
+    dose_text: app.dose_text,
+    area_ha: app.area_ha,
+    target: app.target,
+    source: app.source,
+    raw_text: app.raw_text,
+  });
+  if (error) log.error('insertApplication failed:', error.message);
+}
+
+/** A user's declared applications, newest first — the report's data source.
+ * Returns [] on error (a report degrades to empty rather than failing). */
+export async function listApplications(
+  userId: string,
+  opts: { sinceIso?: string; limit?: number } = {}
+): Promise<ApplicationRow[]> {
+  const db = getDb();
+  let q = db
+    .from('applications')
+    .select(
+      'applied_on, crop, product_name, active_ingredient, dose_text, area_ha, target, source, raw_text'
+    )
+    .eq('user_id', userId)
+    .order('applied_on', { ascending: false })
+    .limit(opts.limit ?? 100);
+  if (opts.sinceIso) q = q.gte('applied_on', opts.sinceIso.slice(0, 10));
+  const { data, error } = await q;
+  if (error) {
+    log.error('listApplications failed:', error.message);
+    return [];
+  }
+  return (data ?? []) as ApplicationRow[];
+}
+
 export interface FarmProfile {
   uf: string | null;
   crop: string[] | null;
@@ -675,6 +740,7 @@ export async function deleteUserData(waId: string): Promise<boolean> {
   const userId = (user as { id: string }).id;
   await db.from('messages').delete().eq('user_id', userId);
   await db.from('referral_requests').delete().eq('user_id', userId);
+  await db.from('applications').delete().eq('user_id', userId);
   await db.from('farms').delete().eq('user_id', userId);
   const { error } = await db.from('users').delete().eq('id', userId);
   if (error) {

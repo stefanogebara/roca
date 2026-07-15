@@ -43,7 +43,14 @@ import {
   hasRecentReferral,
   getActivityLog,
   getRecentTurns,
+  insertApplication,
 } from './db';
+import {
+  isApplicationLog,
+  parseApplication,
+  formatApplicationConfirm,
+} from './tools/applicationParse';
+import { isLocationSettingRequest, resolveStatedLocation, confirmLocationReply } from './location';
 import { formatTurnsBlock } from './memory';
 import { buildHistoryReply } from './caderno';
 import { fetchPrices, formatPricesReply, askedCommodities } from './tools/prices';
@@ -536,6 +543,24 @@ export async function handleInbound(
     replyText = userId
       ? buildHistoryReply(await getFarmProfile(userId), await getActivityLog(userId))
       : buildHistoryReply({ uf: null, crop: null }, []);
+  } else if (effective.kind === 'text' && effective.text && isApplicationLog(effective.text)) {
+    // Caderno de aplicações — the farmer declaring an application they already
+    // made ("apliquei X ontem"). Record it (their own data, never a
+    // prescription) and read the parsed record back so they can correct it.
+    // The confirm keeps the numeric dose out of its text so it clears the
+    // compliance gate; the full dose lives in the record + rendered report.
+    intent = 'application_log';
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+    const app = await parseApplication(effective.text, {
+      source: msg.kind === 'voice' ? 'declared_voice' : 'declared_text',
+      knownCrops: profile.crop,
+    });
+    if (userId) {
+      const farm = await getFarm(userId);
+      await insertApplication(userId, app, farm?.id ?? null);
+    }
+    replyText = formatApplicationConfirm(app);
   } else if (effective.kind === 'text' && effective.text && isPriceRequest(effective.text)) {
     // Commodity quotes — the price habit loop. Crop-filtered when known.
     intent = 'prices';
