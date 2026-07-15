@@ -17,6 +17,7 @@ import { withRetry } from './retry';
 import { chat } from './llm';
 import { MODELS } from './env';
 import { FALLBACK_REPLY } from './pipeline';
+import { agrofitAgeDays, AGROFIT_MAX_AGE_DAYS, AGROFIT_GENERATED_AT } from './tools/agrofit';
 import { alertFounders } from './alert';
 import { createLogger } from './logger';
 
@@ -262,6 +263,25 @@ export interface CanaryRun {
 /** Run every check in parallel, diff against the previous run, persist, and
  * alert founders on transitions only. Never throws — the monitor stage wraps
  * it anyway, but a canary must not take the cron down. */
+/**
+ * Registry-snapshot freshness. A stale (or unstamped) agrofit.json makes the
+ * compliance gate blind to newly-registered actives and shows farmers an
+ * out-of-date "registrado" — a slow, silent drift no other check catches.
+ * Synchronous (the date is bundled); exported for tests.
+ */
+export function agrofitFreshnessCheck(now: Date = new Date()): CanaryCheck {
+  const age = agrofitAgeDays(now);
+  if (age == null) {
+    return { check: 'agrofit snapshot', ok: false, detail: 'sem data — rode scripts/agrofit-extract' };
+  }
+  const ok = age <= AGROFIT_MAX_AGE_DAYS;
+  return {
+    check: 'agrofit snapshot',
+    ok,
+    detail: ok ? `${age}d (${AGROFIT_GENERATED_AT})` : `${age}d — rode scripts/agrofit-extract`,
+  };
+}
+
 export async function runCanary(): Promise<CanaryRun> {
   const results = (
     await Promise.all([
@@ -270,6 +290,7 @@ export async function runCanary(): Promise<CanaryRun> {
       numberQualityCheck(),
       Promise.all(modelChecks()),
       fallbackRateCheck().then((c) => [c]),
+      Promise.resolve([agrofitFreshnessCheck()]),
     ])
   ).flat();
 

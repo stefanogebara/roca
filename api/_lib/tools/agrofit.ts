@@ -21,7 +21,7 @@ export interface PestEntry {
 }
 
 interface AgrofitFile {
-  meta: { source: string };
+  meta: { source: string; generated_at?: string };
   data: Record<string, Record<string, PestEntry>>;
 }
 
@@ -46,6 +46,36 @@ function loadAgrofit(): AgrofitFile {
 
 const AGROFIT = loadAgrofit();
 export const AGROFIT_SOURCE = AGROFIT.meta.source;
+
+/** When the bundled snapshot was extracted (YYYY-MM-DD), or null on a legacy
+ * unstamped file. Rebuilt by scripts/agrofit-extract.mjs, which stamps it. */
+export const AGROFIT_GENERATED_AT = AGROFIT.meta.generated_at ?? null;
+
+/**
+ * How old the registry snapshot may get before the canary nudges a rebuild.
+ * Agrofit changes continuously; a stale slice makes the compliance gate blind
+ * to newly-registered actives and shows farmers an out-of-date "registrado".
+ */
+export const AGROFIT_MAX_AGE_DAYS = 120;
+
+/** Age of the snapshot in whole days at `now`, or null if it carries no date. */
+export function agrofitAgeDays(now: Date, generatedAt = AGROFIT_GENERATED_AT): number | null {
+  if (!generatedAt) return null;
+  const t = Date.parse(generatedAt);
+  if (Number.isNaN(t)) return null;
+  return Math.floor((now.getTime() - t) / 86_400_000);
+}
+
+/** Whether the snapshot is older than `maxAgeDays`. A missing/invalid date is
+ * NOT "stale" here (unknown ≠ old) — the canary reports that case separately. */
+export function isAgrofitStale(
+  now: Date,
+  maxAgeDays = AGROFIT_MAX_AGE_DAYS,
+  generatedAt = AGROFIT_GENERATED_AT
+): boolean {
+  const age = agrofitAgeDays(now, generatedAt);
+  return age != null && age > maxAgeDays;
+}
 
 /** Every distinct registered active-ingredient name in the slice (deduped,
  * original casing). Used by the compliance gate to spot ingredient+dose

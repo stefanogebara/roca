@@ -9,8 +9,10 @@ import {
   diffCanary,
   formatCanaryAlert,
   fallbackVerdict,
+  agrofitFreshnessCheck,
   type CanaryCheck,
 } from '../api/_lib/canary';
+import { AGROFIT_GENERATED_AT, AGROFIT_MAX_AGE_DAYS } from '../api/_lib/tools/agrofit';
 
 const check = (name: string, ok: boolean, detail: string | null = null): CanaryCheck => ({
   check: name,
@@ -81,5 +83,22 @@ describe('fallbackVerdict', () => {
   });
   it('3 fallbacks out of hundreds is not', () => {
     expect(fallbackVerdict(3, 100).ok).toBe(true);
+  });
+});
+
+describe('agrofitFreshnessCheck (snapshot staleness is detectable now)', () => {
+  const gen = new Date(`${AGROFIT_GENERATED_AT}T00:00:00Z`);
+  const plusDays = (d: number) => new Date(gen.getTime() + d * 86_400_000);
+
+  it('is ok while the snapshot is within the max age', () => {
+    const c = agrofitFreshnessCheck(plusDays(AGROFIT_MAX_AGE_DAYS - 1));
+    expect(c.check).toBe('agrofit snapshot');
+    expect(c.ok).toBe(true);
+  });
+
+  it('fails once it is past the max age, and names the rebuild command', () => {
+    const c = agrofitFreshnessCheck(plusDays(AGROFIT_MAX_AGE_DAYS + 30));
+    expect(c.ok).toBe(false);
+    expect(c.detail).toMatch(/agrofit-extract/);
   });
 });

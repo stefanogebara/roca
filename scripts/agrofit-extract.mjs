@@ -123,6 +123,9 @@ const meta = {
   source: 'Agrofit / MAPA — produtos formulados (dados.agricultura.gov.br)',
   generated_from: 'produtos_formulados.csv',
   filter: 'SITUACAO=TRUE (registro ativo)',
+  // Extraction date — makes snapshot staleness detectable (isAgrofitStale) so
+  // the canary nudges a rebuild instead of silently serving a stale registry.
+  generated_at: new Date().toISOString().slice(0, 10),
   crops: Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Object.keys(v).length])),
 };
 
@@ -130,7 +133,7 @@ writeFileSync(OUT, JSON.stringify({ meta, data: out }));
 copyFileSync(OUT, RUNTIME_OUT);
 
 const brandList = [...brands].sort();
-writeFileSync(BRANDS_OUT, JSON.stringify({ meta: { source: meta.source, filter: meta.filter }, brands: brandList }));
+writeFileSync(BRANDS_OUT, JSON.stringify({ meta: { source: meta.source, filter: meta.filter, generated_at: meta.generated_at }, brands: brandList }));
 copyFileSync(BRANDS_OUT, BRANDS_RUNTIME_OUT);
 console.log(`brands: ${brandList.length} -> ${BRANDS_OUT} (+ runtime copy)`);
 console.log(`seen=${seen} kept=${kept}`);
