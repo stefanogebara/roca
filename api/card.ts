@@ -16,6 +16,9 @@ import { farmSvg } from './_lib/cards/farm';
 import { pestSvg } from './_lib/cards/pest';
 import { pricesSvg } from './_lib/cards/prices';
 import { frostSvg } from './_lib/cards/frost';
+import { buildApplicationsReport, applicationsSvg } from './_lib/cards/applications';
+import { verifyReportToken } from './_lib/reportToken';
+import { listApplications, getFarmProfile } from './_lib/db';
 import type { CommodityQuote } from './_lib/tools/prices';
 import type { FrostDay } from './_lib/tools/frost';
 import { fetchHourlyWeather } from './_lib/tools/weather';
@@ -43,6 +46,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     let svg: string;
     let maxAge = 600;
+    // The applications report is the farmer's private chemical history — served
+    // behind a signed token and never CDN-cached (unlike the public data cards).
+    let cachePrivate = false;
 
     if (type === 'spray') {
       const lat = num(req.query.lat);
@@ -191,6 +197,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         groups,
       });
       maxAge = 3600; // a given triage result is stable
+    } else if (type === 'applications') {
+      // Signed, expiring, per-user. The data is fetched server-side — the URL
+      // carries only an opaque user id + expiry + HMAC, never the records.
+      const u = String(req.query.u ?? '');
+      const exp = String(req.query.exp ?? '');
+      const sig = String(req.query.sig ?? '');
+      if (!u || !verifyReportToken(u, exp, sig)) {
+        res.status(403).send('forbidden');
+        return;
+      }
+      const [rows, profile] = await Promise.all([
+        listApplications(u, { limit: 200 }),
+        getFarmProfile(u),
+      ]);
+      svg = applicationsSvg(buildApplicationsReport(profile, rows));
+      cachePrivate = true;
     } else {
       res.status(400).send('unknown card type');
       return;
@@ -198,7 +220,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const png = svgToPng(svg);
     res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge}`);
+    res.setHeader(
+      'Cache-Control',
+      cachePrivate ? 'private, no-store' : `public, max-age=${maxAge}, s-maxage=${maxAge}`
+    );
     res.status(200).send(png);
   } catch (e) {
     log.error(`card render failed (${type}):`, (e as Error).message);

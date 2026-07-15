@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isApplicationLog,
+  isApplicationReportRequest,
   resolveApplyDate,
   finalizeApplication,
   formatApplicationConfirm,
@@ -42,6 +43,21 @@ describe('isApplicationLog — past-tense declaration, never a question', () => 
     expect(isApplicationLog('bom dia')).toBe(false);
     expect(isApplicationLog('como está minha lavoura?')).toBe(false);
     expect(isApplicationLog('quanto tá a soja hoje?')).toBe(false);
+  });
+});
+
+describe('isApplicationReportRequest — asks for the report, distinct from "meu caderno"', () => {
+  it('matches report/record asks', () => {
+    expect(isApplicationReportRequest('me manda o relatório de aplicações')).toBe(true);
+    expect(isApplicationReportRequest('quero meu caderno de aplicações')).toBe(true);
+    expect(isApplicationReportRequest('minhas aplicações')).toBe(true);
+    expect(isApplicationReportRequest('relatório de agrotóxicos pro financiamento')).toBe(true);
+    expect(isApplicationReportRequest('preciso do receituário')).toBe(true); // → we redirect
+  });
+  it('does NOT match the passive season record ("meu caderno" / "meu histórico")', () => {
+    expect(isApplicationReportRequest('meu caderno')).toBe(false);
+    expect(isApplicationReportRequest('meu histórico')).toBe(false);
+    expect(isApplicationReportRequest('o que a gente já conversou?')).toBe(false);
   });
 });
 

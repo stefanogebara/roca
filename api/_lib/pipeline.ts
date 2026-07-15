@@ -44,13 +44,21 @@ import {
   getActivityLog,
   getRecentTurns,
   insertApplication,
+  listApplications,
 } from './db';
 import {
   isApplicationLog,
+  isApplicationReportRequest,
   parseApplication,
   formatApplicationConfirm,
 } from './tools/applicationParse';
-import { isLocationSettingRequest, resolveStatedLocation, confirmLocationReply } from './location';
+import {
+  buildApplicationsReport,
+  applicationsCaption,
+  applicationsEmptyReply,
+  applicationsTextSummary,
+} from './cards/applications';
+import { reportCardParams } from './reportToken';
 import { formatTurnsBlock } from './memory';
 import { buildHistoryReply } from './caderno';
 import { fetchPrices, formatPricesReply, askedCommodities } from './tools/prices';
@@ -167,6 +175,11 @@ function isFirstContact(user: { consent_lgpd_at: string | null } | null): boolea
 // Where the public card images are served from (WhatsApp fetches these).
 const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://roca-black.vercel.app';
 
+// Honest redirect when a farmer asks for the "receituário": we don't write it
+// (the agrônomo signs it), we build the record they take to him.
+const RECEITUARIO_NOTE =
+  'O receituário quem assina é o engenheiro agrônomo — é ele que define produto e dose, com responsabilidade técnica. O que eu monto é o seu *caderno de aplicações*: o registro do que você já aplicou, pra levar pra ele. 👇';
+
 /**
  * Optional visual card for a reply, as a public PNG URL WhatsApp can fetch.
  * Reads the same data the reply used (fresh coords for spray; the just-cached
@@ -266,6 +279,12 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
     case 'history':
       // From the season record, the useful next steps are the pro handoffs.
       return ['Montar resumo', 'Quero um agrônomo'];
+    case 'application_log':
+      // Just logged an application → offer the report and the pro handoff.
+      // Titles are real queries: "Minhas aplicações" routes to application_report.
+      return ['Minhas aplicações', 'Quero um agrônomo'];
+    case 'application_report':
+      return ['Quero um agrônomo'];
     case 'prices':
       return ['Posso pulverizar?', 'Ver satélite'];
     default:
@@ -536,6 +555,29 @@ export async function handleInbound(
     intent = 'referral';
     if (userId) await setAwaiting(userId, null);
     replyText = consentReply;
+  } else if (effective.kind === 'text' && effective.text && isApplicationReportRequest(effective.text)) {
+    // Caderno de aplicações report (rastreabilidade). Checked BEFORE the history
+    // fast-path, since "meu caderno de aplicações" also matches isHistoryRequest.
+    // The dose/brand live in the rendered card (gate never sees it); the caption
+    // and any text fallback are gate-safe.
+    intent = 'application_report';
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const rows = userId ? await listApplications(userId, { limit: 200 }) : [];
+    const receituarioPrefix = /receitu/i.test(effective.text) ? `${RECEITUARIO_NOTE}\n\n` : '';
+    if (rows.length === 0) {
+      replyText = receituarioPrefix + applicationsEmptyReply();
+    } else {
+      const params = userId ? reportCardParams(userId) : null;
+      if (params) {
+        replyText = receituarioPrefix + applicationsCaption(rows.length);
+        extraCardUrl = `${PUBLIC_BASE}/api/card?${params}`;
+      } else {
+        // No URL-signing secret configured → gate-safe text summary rather than
+        // shipping the farmer's chemical history through an unsigned public URL.
+        const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+        replyText = receituarioPrefix + applicationsTextSummary(buildApplicationsReport(profile, rows));
+      }
+    }
   } else if (effective.kind === 'text' && effective.text && isHistoryRequest(effective.text)) {
     // Passive caderno de campo — the season record Stevi keeps for free.
     intent = 'history';

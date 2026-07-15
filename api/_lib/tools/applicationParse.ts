@@ -68,6 +68,19 @@ export function isApplicationLog(text: string): boolean {
   return false;
 }
 
+// Request for the caderno de aplicações report. Requires "de aplica…" (or an
+// explicit synonym) so it doesn't collide with "meu caderno"/"meu histórico"
+// (the passive season record) — the pipeline checks this BEFORE the history
+// fast-path. "receituário" is included so we can honestly redirect: we build the
+// record, the agrônomo signs the receituário.
+const REPORT_REQUEST =
+  /\b(relatorio|caderno)\s+de\s+aplica|\bminhas\s+aplica|\brelatorio\s+de\s+(agrotoxico|defensivo|pulveriza)|\breceituario\b/;
+
+/** Whether a message asks for the applications report (caderno de aplicações). */
+export function isApplicationReportRequest(text: string): boolean {
+  return REPORT_REQUEST.test(strip(text));
+}
+
 const DAY_MS = 86_400_000;
 const iso = (d: Date): string => d.toISOString().slice(0, 10);
 

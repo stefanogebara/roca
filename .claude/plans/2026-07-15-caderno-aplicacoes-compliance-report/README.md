@@ -193,6 +193,13 @@ Extend `scripts/agrofit-extract.mjs` to also emit a product-level slice
 §1.2 upgrade from "consta/não consta" to a genuine per-line registration + dose-plausibility check.
 Sizeable data task; gated behind whether v1's presence-check proves insufficient in the field.
 
+> **Update (implemented in Phase 1, not Phase 2):** the signed-URL mechanism
+> below was pulled forward — Phase 1's PNG delivery needs a fetchable URL, and
+> shipping the farmer's chemical history through an unauthenticated public query
+> string was not acceptable even as an interim. Delivered as `reportToken.ts`
+> (HMAC+TTL) + a server-side-fetch `type=applications` card endpoint. Without
+> `REPORT_URL_SECRET` configured, the report degrades to a gate-safe text summary.
+
 ### 2.5 Security / LGPD — signed, expiring report URLs (**required, not optional**)
 Pest/price cards encode non-identifying data in public query params. An application report is
 **identifiable personal data** (farm + chemical history). It must **not** sit at a guessable public
