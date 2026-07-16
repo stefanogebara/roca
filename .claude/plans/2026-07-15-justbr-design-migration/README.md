@@ -48,8 +48,9 @@ usage: --terra only on h2 em, eyebrows, decoratives).
 ## Follow-ups (not in this commit)
 
 1. ~~`web/painel.html`~~ — DONE (same token re-point; amber/red + chart colours kept semantic).
-2. `web/og-template.html` + regenerate `og-image.png` (offline render step) —
-   the ONLY surface still on the old look.
+2. ~~`web/og-template.html` + `og-image.png`~~ — DONE (template migrated;
+   PNG re-rendered headless via local Playwright at 1200×630, visually checked).
+   **Migration complete — no surface remains on the old system.**
 3. ~~PNG cards palette~~ — DONE (7326ea8: C palette → olive/wash; verdict/soil/
    frost colours kept semantic; per-card design pass in 60da2a3).
 4. ~~QR poster colors~~ — DONE (7326ea8: olive-dark on wash).
