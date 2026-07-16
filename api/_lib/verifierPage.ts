@@ -62,33 +62,49 @@ export function verifierHtml(cfg: VerifierConfig): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Verificação — Stevi, sua ajudante de lavoura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fragment+Mono&display=swap" rel="stylesheet">
 <style>
-  :root { --green:#14432f; --leaf:#2e7d4f; --cream:#f4efe4; --ink:#1c2b22; --muted:#5b6b60; --line:#e0d8c6; }
+  /* Campo Editorial — same tokens as web/styles.css (just-br-derived). */
+  :root { --paper:#fdfcfb; --wash:#f7fbeb; --ink:#0c0c0c; --muted:#4f4e4b;
+    --olive:#4c5e03; --olive-dark:#303b0c; --chip:#e8f4c3; --line:#e3e0dc; }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--cream); color:var(--ink);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    line-height:1.55; font-size:18px; }
-  .wrap { max-width:640px; margin:0 auto; padding:28px 20px 56px; }
-  header { text-align:center; padding:12px 0 8px; }
-  .badge { font-size:15px; color:var(--leaf); font-weight:700; letter-spacing:.02em; }
-  h1 { font-size:30px; line-height:1.2; margin:.3em 0 .2em; color:var(--green); }
-  .lede { color:var(--muted); font-size:17px; margin:0 auto; max-width:34ch; }
-  section { background:#fff; border:1px solid var(--line); border-radius:16px;
-    padding:18px 20px; margin:16px 0; }
-  h2 { font-size:19px; margin:0 0 .4em; color:var(--green); }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:'DM Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height:1.55; font-size:17px; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:640px; margin:0 auto; padding:32px 20px 64px; }
+  header { text-align:center; padding:16px 0 8px; }
+  .badge { display:inline-flex; align-items:center; gap:.5rem;
+    font-family:'Fragment Mono', ui-monospace, monospace; font-size:12px;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--olive); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--olive);
+    box-shadow:0 0 0 4px var(--chip); }
+  h1 { font-size:clamp(30px, 7vw, 40px); font-weight:400; letter-spacing:-.03em;
+    line-height:1.12; margin:.4em 0 .25em; color:var(--ink); }
+  .lede { color:var(--muted); font-size:17px; margin:0 auto; max-width:36ch; }
+  section { background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; margin:16px 0; box-shadow:0 4px 50px rgba(97,74,68,.06); }
+  h2 { font-size:19px; font-weight:500; letter-spacing:-.01em; margin:0 0 .4em; color:var(--olive-dark); }
   p { margin:.5em 0; }
-  .num { font-weight:700; color:var(--green); white-space:nowrap; }
-  .cta { display:block; text-align:center; background:var(--green); color:#fff;
-    text-decoration:none; font-weight:700; font-size:19px; padding:16px;
-    border-radius:14px; margin:22px 0 8px; }
-  footer { text-align:center; color:var(--muted); font-size:14px; margin-top:24px; }
-  a { color:var(--leaf); }
+  .num { font-family:'Fragment Mono', ui-monospace, monospace; font-weight:400;
+    color:var(--olive); white-space:nowrap; background:var(--wash);
+    padding:.05em .4em; border-radius:6px; }
+  .cta { display:block; text-align:center; background:var(--olive); color:#fff;
+    text-decoration:none; font-weight:600; font-size:18px; padding:16px 24px;
+    border-radius:999px; margin:24px 0 8px; cursor:pointer;
+    transition:background-color .2s ease; }
+  .cta:hover { background:var(--olive-dark); }
+  .cta:focus-visible, a:focus-visible { outline:3px solid var(--olive); outline-offset:3px; }
+  footer { text-align:center; color:var(--muted); font-size:14px; margin-top:28px; }
+  a { color:var(--olive); }
+  @media (prefers-reduced-motion: reduce) { .cta { transition:none; } }
 </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <div class="badge">✅ VERIFICAÇÃO</div>
+      <div class="badge"><span class="dot"></span>Verificação</div>
       <h1>Sim, a Stevi é de verdade.</h1>
       <p class="lede">Recebeu mensagem e quer confirmar antes de confiar? Desconfiar de número desconhecido é o certo. Aqui está tudo, na transparência.</p>
     </header>
