@@ -68,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const KEYS = new Set(['cafe', 'soja', 'milho']);
       const quotes: CommodityQuote[] = String(req.query.q ?? '')
         .split('|')
-        .map((part) => {
+        .map((part): CommodityQuote | null => {
           const [key, saca, pct, ser] = part.split(':');
           if (!KEYS.has(key) || !Number.isFinite(Number(saca))) return null;
           const LABELS: Record<string, string> = {
@@ -76,17 +76,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             soja: 'Soja (Chicago)',
             milho: 'Milho (Chicago)',
           };
-          // Honest sparkline data (≥3 real closes) packed by priceCardUrl.
-          const series = ser
-            ? ser.split(';').map(Number).filter(Number.isFinite)
-            : [];
-          return {
+          const quote: CommodityQuote = {
             key: key as CommodityQuote['key'],
             label: LABELS[key],
             sacaBrl: Number(saca),
             weekChangePct: pct && Number.isFinite(Number(pct)) ? Number(pct) : null,
-            series: series.length >= 3 ? series : undefined,
           };
+          // Honest sparkline data (≥3 real closes) packed by priceCardUrl.
+          const series = ser ? ser.split(';').map(Number).filter(Number.isFinite) : [];
+          if (series.length >= 3) quote.series = series;
+          return quote;
         })
         .filter((q): q is CommodityQuote => q != null)
         .slice(0, 3);
