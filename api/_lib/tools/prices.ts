@@ -33,11 +33,16 @@ export interface CommodityQuote {
   sacaBrl: number;
   /** vs ~one week ago, percent. */
   weekChangePct: number | null;
+  /** Last ≤7 daily closes converted to R$/saca — the card's honest sparkline.
+   * Absent when Yahoo returned too few points; the card then draws no line. */
+  series?: number[];
 }
 
 interface Series {
   last: number;
   weekAgo: number | null;
+  /** Raw daily closes (chronological) from the 10d window. */
+  closes: number[];
 }
 
 /** Last close + ~week-ago close from Yahoo's chart API. Throws on failure. */
@@ -60,6 +65,7 @@ async function fetchSeries(symbol: string): Promise<Series> {
     return {
       last: closes[closes.length - 1],
       weekAgo: closes.length >= 6 ? closes[closes.length - 6] : closes[0] ?? null,
+      closes,
     };
   } finally {
     clearTimeout(timer);
@@ -113,11 +119,17 @@ export async function fetchPrices(cropKeys?: string[] | null): Promise<PricesRes
     targets.map(async (c): Promise<CommodityQuote | null> => {
       try {
         const s = await fetchSeries(c.symbol);
+        // Honest sparkline data: the same closes, saca-converted. ≥3 or nothing.
+        const series =
+          s.closes.length >= 3
+            ? s.closes.slice(-7).map((v) => Number(c.toSaca(v, usdBrl as number).toFixed(1)))
+            : undefined;
         return {
           key: c.key,
           label: c.label,
           sacaBrl: c.toSaca(s.last, usdBrl as number),
           weekChangePct: s.weekAgo ? ((s.last - s.weekAgo) / s.weekAgo) * 100 : null,
+          series,
         };
       } catch {
         return null;

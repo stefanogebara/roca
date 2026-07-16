@@ -240,7 +240,12 @@ export function priceCardUrl(quotes: CommodityQuote[], usdBrl: number | null): s
   if (!quotes.length) return undefined;
   const q = quotes
     .slice(0, 3)
-    .map((c) => `${c.key}:${c.sacaBrl.toFixed(2)}:${c.weekChangePct?.toFixed(1) ?? ''}`)
+    .map(
+      (c) =>
+        `${c.key}:${c.sacaBrl.toFixed(2)}:${c.weekChangePct?.toFixed(1) ?? ''}:${
+          c.series?.map((v) => v.toFixed(1)).join(';') ?? ''
+        }`
+    )
     .join('|');
   const params = new URLSearchParams({ type: 'prices', q });
   if (usdBrl != null) params.set('usd', usdBrl.toFixed(2));
