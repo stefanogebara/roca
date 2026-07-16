@@ -182,6 +182,10 @@ async function templateChecks(): Promise<CanaryCheck[]> {
     process.env.PROSPECT_TEMPLATE_NAME || 'stevi_parceria_v1',
     process.env.PROSPECT_BUMP_TEMPLATE_NAME || 'stevi_parceria_bump',
     'stevi_lead_v1',
+    // Distribution template (coops/revendas) — PENDING at Meta since 13/jul.
+    // Watching it here means approval pages the founders as a "recovered"
+    // transition (the signal to wire per-kind routing + open those sends).
+    process.env.PROSPECT_COOP_TEMPLATE_NAME || 'stevi_parceria_coop_v1',
   ];
   const { getTemplateStatus } = await import('./prospect/template');
   return Promise.all(
