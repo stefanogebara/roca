@@ -6,10 +6,11 @@
  * card never shows a dose — only chemical groups for rotation literacy.
  */
 
-import { C, esc } from './render';
+import { C, T, esc, cardShell, brandHeader } from './render';
 
 const W = 900;
 const H = 560;
+const M = T.margin;
 
 /** Confidence → colour + PT-BR label. */
 const CONF: Record<string, { color: string; label: string }> = {
@@ -82,12 +83,10 @@ export function pestSvg(data: PestCardData): string {
       : 'Sem registro localizado no Agrofit pra esse alvo.';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="${W}" height="${H}" fill="${C.cream}"/>
-  <rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="24" fill="${C.card}" stroke="${C.line}" stroke-width="2"/>
+  ${cardShell(W, H)}
+  ${brandHeader(M, 90, 'Triagem por foto')}
 
-  <text x="48" y="86" font-family="DM Sans" font-size="26" font-weight="700" fill="${C.muted}">Stevi · Triagem por foto</text>
-
-  <text x="48" y="170" font-family="Instrument Serif" font-size="64" fill="${C.green}">${esc(data.pest)}</text>
+  <text x="48" y="176" font-family="Instrument Serif" font-size="60" fill="${C.green}">${esc(data.pest)}</text>
 
   <rect x="48" y="196" width="${22 + conf.label.length * 11}" height="40" rx="20" fill="${conf.color}"/>
   <text x="${48 + (22 + conf.label.length * 11) / 2}" y="223" font-family="DM Sans" font-size="20" font-weight="700" fill="#fff" text-anchor="middle">${esc(conf.label)}</text>
@@ -105,11 +104,11 @@ export function pestSvg(data: PestCardData): string {
       : ''
   }
 
-  <line x1="48" y1="374" x2="${W - 48}" y2="374" stroke="${C.line}" stroke-width="2"/>
+  <line x1="48" y1="374" x2="${W - 48}" y2="374" stroke="${C.line}" stroke-width="1"/>
   ${chipsSvg}
-  <text x="48" y="${groups.length ? 476 : 410}" font-family="DM Sans" font-size="19" fill="${C.muted}">${esc(agrofitLine)}</text>
+  <text x="48" y="${groups.length ? 462 : 410}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">${esc(agrofitLine)}</text>
 
-  <rect x="24" y="${H - 74}" width="${W - 48}" height="50" rx="0" fill="${C.green}"/>
-  <text x="${W / 2}" y="${H - 42}" font-family="DM Sans" font-size="20" font-weight="700" fill="${C.cream}" text-anchor="middle">Produto e dose: só o agrônomo, no receituário · triagem, não prescrição</text>
+  <rect x="${M - 8}" y="${H - 80}" width="${W - (M - 8) * 2}" height="48" rx="16" fill="${C.green}"/>
+  <text x="${W / 2}" y="${H - 50}" font-family="DM Sans" font-size="${T.small}" font-weight="700" fill="${C.cream}" text-anchor="middle">Produto e dose: só o agrônomo, no receituário · triagem, não prescrição</text>
 </svg>`;
 }

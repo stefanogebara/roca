@@ -7,11 +7,12 @@
  * into something a farmer reads in one glance.
  */
 
-import { C, esc } from './render';
+import { C, T, esc, cardShell, brandHeader, hairline } from './render';
 import { NDVI_VIGOR_BREAKS } from '../tools/ndvi';
 
 const W = 900;
 const H = 520;
+const M = T.margin;
 
 // One colour per vigor band (bare soil → dense canopy), aligned to the shared
 // NDVI_VIGOR_BREAKS so the card can't disagree with classifyVigor's label.
@@ -93,24 +94,22 @@ export function ndviSvg(data: NdviCardData): string {
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="${W}" height="${H}" fill="${C.cream}"/>
-  <rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="24" fill="${C.card}" stroke="${C.line}" stroke-width="2"/>
+  ${cardShell(W, H)}
+  ${brandHeader(M, 90, 'Vigor da lavoura (satélite)')}
+  <text x="${M}" y="120" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">Sentinel-2 · ${esc(br(data.date))} · ${esc(scope)}</text>
 
-  <text x="48" y="84" font-family="DM Sans" font-size="26" font-weight="700" fill="${C.muted}">Stevi · Vigor da lavoura (satélite)</text>
-  <text x="48" y="116" font-family="DM Sans" font-size="20" fill="${C.muted}">Sentinel-2 · ${esc(br(data.date))}</text>
-  <text x="48" y="142" font-family="DM Sans" font-size="20" fill="${C.muted}">${esc(scope)}</text>
-
-  <text x="48" y="215" font-family="Instrument Serif" font-size="88" fill="${col}">NDVI ${data.ndvi.toFixed(2)}</text>
-  <text x="48" y="258" font-family="DM Sans" font-size="30" font-weight="700" fill="${C.green}">${esc(data.vigor.label)}</text>
+  <text x="${M}" y="222" font-family="Instrument Serif" font-size="84" fill="${col}">NDVI ${data.ndvi.toFixed(2)}</text>
+  <text x="${M}" y="264" font-family="DM Sans" font-size="26" font-weight="700" fill="${C.green}">${esc(data.vigor.label)}</text>
 
   ${segs}
   <polygon points="${markX - 10},${barY - 6} ${markX + 10},${barY - 6} ${markX},${barY + 8}" fill="${C.ink}"/>
-  <text x="${barX}" y="${barY + 52}" font-family="DM Sans" font-size="17" fill="${C.muted}">solo</text>
-  <text x="${barX + barW}" y="${barY + 52}" font-family="DM Sans" font-size="17" fill="${C.muted}" text-anchor="end">dossel fechado</text>
+  <text x="${barX}" y="${barY + 52}" font-family="DM Sans" font-size="${T.micro}" fill="${C.muted}">solo</text>
+  <text x="${barX + barW}" y="${barY + 52}" font-family="DM Sans" font-size="${T.micro}" fill="${C.muted}" text-anchor="end">dossel fechado</text>
 
   ${miniMap}
 
   ${uni}
-  <text x="48" y="${H - 54}" font-family="DM Sans" font-size="18" fill="${C.muted}">Leitura aproximada por satélite — combine com o campo e com seu agrônomo.</text>
+  ${hairline(M, leftRight, H - 84)}
+  <text x="${M}" y="${H - 50}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">Leitura aproximada por satélite — combine com o campo e com seu agrônomo.</text>
 </svg>`;
 }

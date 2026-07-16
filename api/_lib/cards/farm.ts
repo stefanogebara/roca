@@ -8,7 +8,7 @@
  */
 
 import type { SprayVerdict } from '../tools/deltaT';
-import { C, esc } from './render';
+import { C, esc, cardShell } from './render';
 
 const W = 900;
 const H = 600;
@@ -76,14 +76,13 @@ export function farmSvg(data: FarmCardData): string {
       : 'Fora do vazio sanitário da soja no momento.';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="${W}" height="${H}" fill="${C.cream}"/>
-  <rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="24" fill="${C.card}" stroke="${C.line}" stroke-width="2"/>
+  ${cardShell(W, H)}
 
   ${pin(74, 92, C.leaf)}
   <text x="104" y="90" font-family="Instrument Serif" font-size="46" fill="${C.green}">Sua lavoura</text>
   <text x="104" y="122" font-family="DM Sans" font-size="20" fill="${C.muted}">Stevi · ${esc(where)}</text>
 
-  <line x1="56" y1="156" x2="${W - 56}" y2="156" stroke="${C.line}" stroke-width="2"/>
+  <line x1="56" y1="156" x2="${W - 56}" y2="156" stroke="${C.line}" stroke-width="1"/>
 
   ${row(220, C.soil, '<circle cx="__CX__" cy="__CY__" r="7" fill="#fff"/>', 'SOLO', soilText)}
   ${row(330, sprayDot, sprayInner, 'PULVERIZAÇÃO AGORA', sprayText)}

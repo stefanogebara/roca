@@ -6,10 +6,23 @@
  */
 
 import type { FrostDay } from '../tools/frost';
-import { C, esc } from './render';
+import { C, T, esc, cardShell, brandHeader, hairline } from './render';
 
 const W = 900;
 const H = 520;
+const M = T.margin;
+
+/** A 6-spoke snowflake drawn as SVG lines (no emoji font — tofu-proof). */
+function snowflake(cx: number, cy: number, col: string, r = 15): string {
+  return [0, 60, 120]
+    .map((deg) => {
+      const t = (deg * Math.PI) / 180;
+      const dx = Math.cos(t) * r;
+      const dy = Math.sin(t) * r;
+      return `<line x1="${(cx - dx).toFixed(1)}" y1="${(cy - dy).toFixed(1)}" x2="${(cx + dx).toFixed(1)}" y2="${(cy + dy).toFixed(1)}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`;
+    })
+    .join('');
+}
 
 const RISK = {
   geada: { color: '#3b6fb2', label: 'GEADA PROVÁVEL', note: 'temperatura de formação de geada' },
@@ -32,10 +45,10 @@ export function frostSvg(days: FrostDay[]): string {
   const r = RISK[worst.risk];
 
   const stripY = 300;
-  const cellW = (W - 128) / shown.length;
+  const cellW = (W - M * 2) / shown.length;
   const strip = shown
     .map((d, i) => {
-      const x = 64 + i * cellW;
+      const x = M + i * cellW;
       const col = RISK[d.risk].color;
       return `
       <rect x="${x + 4}" y="${stripY}" width="${cellW - 8}" height="88" rx="12" fill="${col}" opacity="0.14"/>
@@ -46,17 +59,17 @@ export function frostSvg(days: FrostDay[]): string {
     .join('');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="${W}" height="${H}" fill="${C.cream}"/>
-  <rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="24" fill="${C.card}" stroke="${C.line}" stroke-width="2"/>
+  ${cardShell(W, H)}
+  ${brandHeader(M, 92, 'Alerta de geada')}
 
-  <text x="64" y="92" font-family="DM Sans" font-size="26" font-weight="700" fill="${C.muted}">Stevi · Alerta de geada</text>
-
-  <text x="64" y="176" font-family="Instrument Serif" font-size="56" fill="${r.color}">❄ ${esc(r.label)}</text>
-  <text x="64" y="228" font-family="DM Sans" font-size="28" fill="${C.ink}">Mínima de ${celsius(worst.minC)} °C na madrugada de ${dm(worst.date)} — ${esc(r.note)}.</text>
+  ${snowflake(M + 15, 162, r.color)}
+  <text x="${M + 44}" y="178" font-family="Instrument Serif" font-size="${T.display}" fill="${r.color}">${esc(r.label)}</text>
+  <text x="${M}" y="232" font-family="DM Sans" font-size="${T.body}" fill="${C.ink}">Mínima de ${celsius(worst.minC)} °C na madrugada de ${dm(worst.date)} — ${esc(r.note)}.</text>
 
   ${strip}
 
-  <text x="64" y="${H - 70}" font-family="DM Sans" font-size="20" fill="${C.green2}">Vale proteger mudas e talhões baixos, e conversar com seu técnico sobre irrigação na véspera.</text>
-  <text x="64" y="${H - 40}" font-family="DM Sans" font-size="18" fill="${C.muted}">Previsão por localização da SUA lavoura · manda um "oi" pra Stevi no WhatsApp pra receber esse aviso. 🌱</text>
+  ${hairline(M, W - M, H - 104)}
+  <text x="${M}" y="${H - 68}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">Vale proteger mudas e talhões baixos, e conversar com seu técnico sobre irrigação na véspera.</text>
+  <text x="${M}" y="${H - 42}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">Previsão pra localização da SUA lavoura — manda um "oi" pra Stevi no WhatsApp pra receber o aviso.</text>
 </svg>`;
 }

@@ -6,10 +6,11 @@
  */
 
 import { type HourAssessment, DELTA_T_MIN, DELTA_T_MAX } from '../tools/deltaT';
-import { C, esc } from './render';
+import { C, T, esc, cardShell, brandHeader, hairline } from './render';
 
 const W = 900;
 const H = 520;
+const M = T.margin;
 
 const VERDICT = {
   go: { color: C.go, label: 'Pode pulverizar' },
@@ -43,7 +44,7 @@ export function spraySvg(hours: HourAssessment[], bestUpcoming: HourAssessment |
   const cells = hours.slice(0, 12);
   const n = cells.length;
 
-  const padX = 48;
+  const padX = M;
   const trackY = 300;
   const trackW = W - padX * 2;
   const cellW = trackW / n;
@@ -72,20 +73,19 @@ export function spraySvg(hours: HourAssessment[], bestUpcoming: HourAssessment |
         : 'Sem janela boa clara nas próximas horas.';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="${W}" height="${H}" fill="${C.cream}"/>
-  <rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="24" fill="${C.card}" stroke="${C.line}" stroke-width="2"/>
+  ${cardShell(W, H)}
+  ${brandHeader(padX, 92, 'Janela de pulverização')}
 
-  <text x="${padX}" y="92" font-family="DM Sans" font-size="26" font-weight="700" fill="${C.muted}">Stevi · Janela de pulverização</text>
+  <circle cx="${padX + 22}" cy="158" r="22" fill="${v.color}"/>
+  ${verdictMark(now.verdict, padX + 22, 158)}
+  <text x="${padX + 62}" y="170" font-family="Instrument Serif" font-size="${T.display}" fill="${C.green}">${esc(v.label)} agora</text>
 
-  <circle cx="${padX + 22}" cy="150" r="22" fill="${v.color}"/>
-  ${verdictMark(now.verdict, padX + 22, 150)}
-  <text x="${padX + 62}" y="162" font-family="Instrument Serif" font-size="52" fill="${C.green}">${esc(v.label)} agora</text>
-
-  <text x="${padX}" y="220" font-family="DM Sans" font-size="26" fill="${C.ink}">Delta T ${now.deltaT} °C · vento ${Math.round(now.windKmh)} km/h${now.precipProb != null ? ` · chuva ${now.precipProb}%` : ''}</text>
+  <text x="${padX}" y="224" font-family="DM Sans" font-size="${T.body}" fill="${C.ink}">Delta T ${now.deltaT} °C · vento ${Math.round(now.windKmh)} km/h${now.precipProb != null ? ` · chuva ${now.precipProb}%` : ''}</text>
 
   ${bars}
 
-  <text x="${padX}" y="${H - 70}" font-family="DM Sans" font-size="23" fill="${C.green2}">${esc(best)}</text>
-  <text x="${padX}" y="${H - 38}" font-family="DM Sans" font-size="18" fill="${C.muted}">Faixa boa: Delta T ${DELTA_T_MIN}–${DELTA_T_MAX} °C, vento fraco, sem chuva. Combine com o que você vê no campo.</text>
+  ${hairline(padX, W - padX, H - 104)}
+  <text x="${padX}" y="${H - 68}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">${esc(best)}</text>
+  <text x="${padX}" y="${H - 42}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">Faixa boa: Delta T ${DELTA_T_MIN}–${DELTA_T_MAX} °C, vento fraco, sem chuva. Combine com o que você vê no campo.</text>
 </svg>`;
 }
