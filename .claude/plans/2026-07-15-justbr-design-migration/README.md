@@ -47,7 +47,7 @@ usage: --terra only on h2 em, eyebrows, decoratives).
 
 ## Follow-ups (not in this commit)
 
-1. `web/painel.html` — internal ops console still on the old system (5 refs).
+1. ~~`web/painel.html`~~ — DONE (same token re-point; amber/red + chart colours kept semantic).
 2. `web/og-template.html` + regenerate `og-image.png` (offline render step).
 3. **PNG cards palette** (`api/_lib/cards/render.ts` C palette): cream/forest →
    paper/olive so the WhatsApp cards match the web. Higher blast radius (most-

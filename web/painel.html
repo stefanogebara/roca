@@ -8,14 +8,14 @@
   <link rel="icon" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fragment+Mono&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --green: #14432f; --green-2: #1f6b47; --leaf: #2e9e63;
-      --cream: #f4efe4; --card: #ffffff; --ink: #1a2420; --muted: #6b7a72;
-      --line: #e3dccb; --amber: #b7791f; --red: #b23b3b;
-      --shadow: 0 1px 2px rgba(20,40,30,.06), 0 6px 20px rgba(20,40,30,.06);
-      --radius: 14px;
+      --green: #303b0c; --green-2: #4c5e03; --leaf: #748145;
+      --cream: #f7fbeb; --card: #ffffff; --ink: #0c0c0c; --muted: #7a7568;
+      --line: #e3e0dc; --amber: #b7791f; --red: #b23b3b;
+      --shadow: 0 4px 50px rgba(97,74,68,.07);
+      --radius: 10px;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; }
@@ -24,8 +24,8 @@
       color: var(--ink); background: var(--cream);
       -webkit-font-smoothing: antialiased; font-size: 15px; line-height: 1.5;
     }
-    .serif { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-synthesis: none; letter-spacing: .2px; }
-    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .serif { font-family: 'DM Sans', system-ui, sans-serif; font-weight: 400; font-synthesis: none; letter-spacing: -0.03em; }
+    .mono { font-family: 'Fragment Mono', ui-monospace, monospace; }
     a { color: var(--green-2); }
 
     /* Login */
@@ -35,7 +35,7 @@
     .brand .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--green); display: grid; place-items: center; color: #efe8; font-size: 18px; }
     .login-card h1 { font-size: 30px; margin: 4px 0 2px; }
     .login-card p { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
-    input[type=password], input[type=text] { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: #fbfaf6; }
+    input[type=password], input[type=text] { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: #fbfdf3; }
     input:focus { outline: 2px solid var(--leaf); border-color: transparent; }
     button { font: inherit; cursor: pointer; }
     .btn { background: var(--green); color: #fff; border: none; border-radius: 10px; padding: 12px 16px; font-weight: 600; width: 100%; margin-top: 12px; }
@@ -60,14 +60,14 @@
     /* Stat cards */
     .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
     .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
-    .stat .n { font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1; color: var(--green); }
+    .stat .n { font-family: 'DM Sans', system-ui, sans-serif; letter-spacing: -0.03em; font-size: 34px; line-height: 1; color: var(--green); }
     .stat .n.warn { color: var(--amber); } .stat .n.bad { color: var(--red); }
     .stat .l { color: var(--muted); font-size: 12.5px; margin-top: 6px; text-transform: uppercase; letter-spacing: .5px; }
 
     .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-bottom: 16px; }
     .card h3 { margin: 0 0 12px; font-size: 15px; }
     .bars .bar { display: grid; grid-template-columns: 130px 1fr 40px; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
-    .bars .track { background: #eef2ee; border-radius: 6px; height: 10px; overflow: hidden; }
+    .bars .track { background: #f0f4e2; border-radius: 6px; height: 10px; overflow: hidden; }
     .bars .fill { background: var(--leaf); height: 100%; }
     .bars .v { text-align: right; color: var(--muted); }
 
@@ -77,14 +77,14 @@
     .conv .who { font-weight: 600; }
     .conv .meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
     .conv .right { text-align: right; color: var(--muted); font-size: 12px; white-space: nowrap; }
-    .pill { display: inline-block; background: #eef4ef; color: var(--green-2); border-radius: 20px; padding: 1px 9px; font-size: 11.5px; margin-right: 4px; }
+    .pill { display: inline-block; background: #f0f4e2; color: var(--green-2); border-radius: 20px; padding: 1px 9px; font-size: 11.5px; margin-right: 4px; }
 
     /* Prospecção */
     .funnel { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
     .fstage { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; cursor: pointer; text-align: left; transition: transform .12s ease, border-color .12s ease; font: inherit; }
     .fstage:hover { transform: translateY(-1px); border-color: var(--leaf); }
     .fstage.on { border-color: var(--green-2); outline: 2px solid var(--leaf); }
-    .fstage .n { font-family: 'Instrument Serif', serif; font-size: 30px; line-height: 1; color: var(--green); }
+    .fstage .n { font-family: 'DM Sans', system-ui, sans-serif; letter-spacing: -0.03em; font-size: 30px; line-height: 1; color: var(--green); }
     .fstage .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 5px; }
     .fstage .dot { position: absolute; top: 12px; right: 12px; width: 9px; height: 9px; border-radius: 50%; }
     .fstage .arr { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); color: var(--line); font-size: 13px; z-index: 1; }
@@ -117,11 +117,11 @@
     .pack { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow); }
     .pack .hd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
-    .badge.on { background: var(--leaf); color: #fff; } .badge.off { background: #eef2ee; color: var(--muted); }
+    .badge.on { background: var(--leaf); color: #fff; } .badge.off { background: #f0f4e2; color: var(--muted); }
     .pack .notes { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
-    .pack pre { background: #faf8f2; border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow: auto; font-size: 12.5px; max-height: 320px; white-space: pre-wrap; }
+    .pack pre { background: #fbfdf3; border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow: auto; font-size: 12.5px; max-height: 320px; white-space: pre-wrap; }
 
-    .digest pre { background: #faf8f2; border: 1px solid var(--line); border-radius: 10px; padding: 14px; white-space: pre-wrap; font-family: inherit; font-size: 13.5px; }
+    .digest pre { background: #fbfdf3; border: 1px solid var(--line); border-radius: 10px; padding: 14px; white-space: pre-wrap; font-family: inherit; font-size: 13.5px; }
     .digest .when { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
     .empty { color: var(--muted); text-align: center; padding: 40px 0; }
     .loading { color: var(--muted); padding: 20px 0; }
