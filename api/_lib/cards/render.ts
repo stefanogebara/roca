@@ -14,15 +14,18 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Brand palette (matches the landing page / ops console). */
+// "Campo Editorial" (just-br-derived) — matches web/styles.css so the cards a
+// farmer forwards look like the site they land on. Verdict colours (go/caution/
+// nogo), soil brown and the frost blue stay SEMANTIC, deliberately off-brand.
 export const C = {
-  green: '#14432f',
-  green2: '#1f6b47',
-  leaf: '#2e9e63',
-  cream: '#f4efe4',
+  green: '#303b0c', // olive-dark — headings/brand
+  green2: '#4c5e03', // deep olive — secondary brand text (7:1 on white)
+  leaf: '#748145', // mid olive — accents/ramp fills
+  cream: '#f7fbeb', // olive wash — outer bg (paper would erase the card frame)
   card: '#ffffff',
-  ink: '#1a2420',
-  muted: '#6b7a72',
-  line: '#e3dccb',
+  ink: '#0c0c0c',
+  muted: '#7a7568',
+  line: '#e3e0dc',
   go: '#2e9e63',
   caution: '#c98a1a',
   nogo: '#c0392b',

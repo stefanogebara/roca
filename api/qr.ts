@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       width: 720,
       margin: 2,
       errorCorrectionLevel: 'M',
-      color: { dark: '#14432f', light: '#f4efe4' }, // brand green on cream
+      color: { dark: '#303b0c', light: '#f7fbeb' }, // Campo Editorial: olive-dark on wash
     });
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400');
