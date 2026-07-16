@@ -10,9 +10,10 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyReportToken } from './_lib/reportToken';
-import { listApplications, getFarmProfile } from './_lib/db';
+import { listApplications, getFarmProfile, getUserName, getActivityLog } from './_lib/db';
 import { buildApplicationsReport } from './_lib/cards/applications';
-import { buildApplicationsPdf } from './_lib/report/pdf';
+import { buildApplicationsPdf, buildFinancingPdf } from './_lib/report/pdf';
+import { buildFinancingReport } from './_lib/report/financing';
 import { createLogger } from './_lib/logger';
 
 const log = createLogger('report');
@@ -27,17 +28,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    const [rows, profile] = await Promise.all([
-      listApplications(u, { limit: 200 }),
-      getFarmProfile(u),
-    ]);
-    const report = buildApplicationsReport(profile, rows, { maxLines: 200 });
-    const pdf = await buildApplicationsPdf(report);
+    const kind = String(req.query.kind ?? '');
+    let pdf: Uint8Array;
+    let filename: string;
+    if (kind === 'pronaf') {
+      // Histórico de Manejo — the crédito-rural SUPPORT report (not the
+      // application; see plan 2026-07-16-pronaf-report). Same access model.
+      const [rows, profile, name, activity] = await Promise.all([
+        listApplications(u, { limit: 200 }),
+        getFarmProfile(u),
+        getUserName(u),
+        getActivityLog(u),
+      ]);
+      pdf = await buildFinancingPdf(buildFinancingReport(name, profile, rows, activity));
+      filename = 'historico-manejo-pronaf.pdf';
+    } else {
+      const [rows, profile] = await Promise.all([
+        listApplications(u, { limit: 200 }),
+        getFarmProfile(u),
+      ]);
+      pdf = await buildApplicationsPdf(buildApplicationsReport(profile, rows, { maxLines: 200 }));
+      filename = 'caderno-de-aplicacoes.pdf';
+    }
 
     res.setHeader('Content-Type', 'application/pdf');
     // Private data — never CDN-cached; inline so WhatsApp/browser can preview.
     res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('Content-Disposition', 'inline; filename="caderno-de-aplicacoes.pdf"');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.status(200).send(Buffer.from(pdf));
   } catch (e) {
     log.error('report pdf failed:', (e as Error).message);

@@ -506,6 +506,17 @@ export async function listApplications(
   return (data ?? []) as ApplicationRow[];
 }
 
+/** Display name for a user id (WhatsApp profile name). Null on miss/error. */
+export async function getUserName(userId: string): Promise<string | null> {
+  const db = getDb();
+  const { data, error } = await db.from('users').select('name').eq('id', userId).maybeSingle();
+  if (error) {
+    log.error('getUserName failed:', error.message);
+    return null;
+  }
+  return (data as { name: string | null } | null)?.name ?? null;
+}
+
 export interface FarmProfile {
   uf: string | null;
   crop: string[] | null;

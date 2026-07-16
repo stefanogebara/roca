@@ -51,9 +51,11 @@ import {
 import {
   isApplicationLog,
   isApplicationReportRequest,
+  isFinancingReportRequest,
   parseApplication,
   formatApplicationConfirm,
 } from './tools/applicationParse';
+import { financingCaption, financingEmptyReply } from './report/financing';
 import {
   buildApplicationsReport,
   applicationsCaption,
@@ -290,6 +292,9 @@ export function buttonsForIntent(intent: Intent): string[] | undefined {
       // Titles are real queries: "Minhas aplicações" routes to application_report.
       return ['Minhas aplicações', 'Quero um agrônomo'];
     case 'application_report':
+      return ['Quero um agrônomo'];
+    case 'financing_report':
+      // The doc goes to a professional — offer the connection.
       return ['Quero um agrônomo'];
     case 'prices':
       return ['Posso pulverizar?', 'Ver satélite'];
@@ -539,6 +544,8 @@ export async function handleInbound(
   let extraDocUrl: string | undefined;
   // Caption for the PDF document second-message (defaults per the second-send).
   let extraDocCaption: string | undefined;
+  // Filename for the PDF document (defaults to the caderno name).
+  let extraDocFilename: string | undefined;
   // Set when a branch must NOT ship the generic card (e.g. a pin we couldn't
   // confirm as a field — the honest text must not carry a "SUA LAVOURA" image).
   let suppressCard = false;
@@ -626,6 +633,35 @@ export async function handleInbound(
     if (user?.awaiting) await setAwaiting(userId, null);
     replyText =
       `Hmm, não consegui achar "${statedLocation.city.slice(0, 40)}" no mapa 🤔. Me diz a cidade e o estado da sua lavoura (ex: "Patrocínio-MG"), ou manda o pin (clipe 📎 → Localização).`;
+  } else if (effective.kind === 'text' && effective.text && isFinancingReportRequest(effective.text)) {
+    // Histórico de manejo — the crédito-rural/PRONAF SUPPORT report. Checked
+    // BEFORE application_report so "relatório de aplicações pro banco" lands
+    // here. A record, never the application: the projeto técnico (ART), the
+    // DAP/CAF, the CAR and the credit analysis stay with the professionals —
+    // the caption says so explicitly.
+    intent = 'financing_report';
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const finRows = userId ? await listApplications(userId, { limit: 200 }) : [];
+    if (finRows.length === 0) {
+      replyText = financingEmptyReply();
+    } else {
+      const finParams = userId ? reportCardParams(userId) : null;
+      if (finParams) {
+        replyText = financingCaption(finRows.length);
+        extraDocUrl = `${PUBLIC_BASE}/api/report?${finParams}&kind=pronaf`;
+        extraDocCaption =
+          'Segue o *histórico de manejo* em PDF — leve ao seu agrônomo, cooperativa ou banco junto com seus documentos. 📎';
+        extraDocFilename = 'historico-manejo-pronaf.pdf';
+      } else {
+        // No URL-signing secret → gate-safe text: the honest framing plus the
+        // aggregate summary, never an unsigned URL to private records.
+        const finProfile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+        replyText =
+          financingCaption(finRows.length) +
+          '\n\n' +
+          applicationsTextSummary(buildApplicationsReport(finProfile, finRows));
+      }
+    }
   } else if (effective.kind === 'text' && effective.text && isApplicationReportRequest(effective.text)) {
     // Caderno de aplicações report (rastreabilidade). Checked BEFORE the history
     // fast-path, since "meu caderno de aplicações" also matches isHistoryRequest.
@@ -862,7 +898,7 @@ export async function handleInbound(
         text: extraDocCaption ?? 'Segue também em PDF, pra guardar ou imprimir. 📎',
         mediaUrl: extraDocUrl,
         mediaType: 'document',
-        filename: 'caderno-de-aplicacoes.pdf',
+        filename: extraDocFilename ?? 'caderno-de-aplicacoes.pdf',
       },
       userId,
       'application_report_pdf'

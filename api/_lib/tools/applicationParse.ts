@@ -81,6 +81,22 @@ export function isApplicationReportRequest(text: string): boolean {
   return REPORT_REQUEST.test(strip(text));
 }
 
+// Financing/credit-support document ask ("relatório pro banco", "documento pro
+// PRONAF", "histórico de manejo"). Requires a document noun + credit context,
+// or a need-verb + credit program — so "o que é PRONAF?" (an info question)
+// still routes to general reasoning. The pipeline checks this BEFORE the
+// caderno report, since "relatório de aplicações pro banco" belongs here.
+const FINANCING_REQUEST = new RegExp(
+  '\\b(relatorio|documento|historico|comprovante|papelada|papel)\\b[^.?!]{0,40}\\b(banco|pronaf|financiamento|credito|emprestimo)\\b' +
+    '|\\bhistorico\\s+de\\s+manejo\\b' +
+    '|\\b(preciso|quero|vou\\s+pedir|pedir|solicitar)\\b[^.?!]{0,40}\\b(pronaf|credito\\s+rural|financiamento)\\b'
+);
+
+/** Whether a message asks for the crédito-rural/PRONAF support report. */
+export function isFinancingReportRequest(text: string): boolean {
+  return FINANCING_REQUEST.test(strip(text));
+}
+
 const DAY_MS = 86_400_000;
 const iso = (d: Date): string => d.toISOString().slice(0, 10);
 

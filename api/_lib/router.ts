@@ -26,7 +26,8 @@ export type Intent =
   | 'history'
   | 'prices'
   | 'application_log'
-  | 'application_report';
+  | 'application_report'
+  | 'financing_report';
 
 const ROUTER_INSTRUCTION = `Classifique a mensagem do produtor rural em UMA categoria. Responda só com a palavra-chave.
 
