@@ -1,0 +1,34 @@
+name: CI
+
+# Gate every push and PR on the same checks the repo already runs locally:
+# strict typecheck + the full vitest suite. The suite mocks all I/O (no network,
+# no Supabase, no OpenRouter), so it needs no secrets and runs deterministically.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# A newer push to the same branch/PR cancels the older in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

@@ -180,6 +180,7 @@ async function handleSpray(
         return await chat({
           model: MODELS.reasoning(),
           maxTokens: 400,
+          cacheSystem: true,
           system:
             (await steviSystemPrompt(packOverride ?? null)) +
             '\n\nO produtor descreveu uma condição de clima/horário e quer saber se dá pra pulverizar. ' +
@@ -279,6 +280,7 @@ async function triagePhoto(
     return chat({
       model: MODELS.reasoning(),
       system: (await steviSystemPrompt(packOverride)) + '\n\n' + PEST_HANDOFF_REMINDER,
+      cacheSystem: true,
       maxTokens: 700,
       image: media,
       user:
@@ -316,6 +318,7 @@ async function triagePhoto(
   return chat({
     model: MODELS.reasoning(),
     system: (await steviSystemPrompt(packOverride)) + '\n\n' + PEST_HANDOFF_REMINDER,
+    cacheSystem: true,
     maxTokens: 900,
     user:
       `${parts.join('\n')}\n\n` +
@@ -353,6 +356,7 @@ async function handleText(
   return chat({
     model: MODELS.reasoning(),
     system: (await steviSystemPrompt(packOverride)) + extra,
+    cacheSystem: true,
     maxTokens: 900,
     user: (msg.text ?? '') + ctx,
   });

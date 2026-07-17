@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import QRCode from 'qrcode';
 import { createLogger } from './_lib/logger';
+import { enforcePublicRateLimit } from './_lib/httpRateLimit';
 
 const log = createLogger('qr');
 
@@ -19,6 +20,7 @@ const WA_NUMBER = process.env.PUBLIC_WA_NUMBER || '19705509125';
 const DEFAULT_TEXT = 'Oi, Stevi! Quero testar.';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if (!enforcePublicRateLimit('qr', req.headers, res)) return;
   try {
     const text = typeof req.query.text === 'string' && req.query.text.trim() ? req.query.text : DEFAULT_TEXT;
     const url = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;

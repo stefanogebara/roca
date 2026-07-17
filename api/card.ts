@@ -33,6 +33,7 @@ import { fetchSoil, textureLabel } from './_lib/tools/soil';
 import { reverseGeocodeUf } from './_lib/tools/geo';
 import { vazioStatus } from './_lib/tools/calendar';
 import { createLogger } from './_lib/logger';
+import { enforcePublicRateLimit } from './_lib/httpRateLimit';
 
 const log = createLogger('card');
 
@@ -43,6 +44,10 @@ function num(v: unknown): number | null {
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const type = String(req.query.type ?? '');
+  // Cap per-IP before any external fetch or rasterization. The public data cards
+  // (spray/farm/ndvi) fire weather/soil/geo calls and vary by lat/lon, so a
+  // single source can bypass the CDN cache and drain upstream quota + CPU.
+  if (!enforcePublicRateLimit('card', req.headers, res)) return;
   try {
     let svg: string;
     let maxAge = 600;

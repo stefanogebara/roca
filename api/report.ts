@@ -15,10 +15,14 @@ import { buildApplicationsReport } from './_lib/cards/applications';
 import { buildApplicationsPdf, buildFinancingPdf } from './_lib/report/pdf';
 import { buildFinancingReport } from './_lib/report/financing';
 import { createLogger } from './_lib/logger';
+import { enforcePublicRateLimit } from './_lib/httpRateLimit';
 
 const log = createLogger('report');
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  // Cap before the token check too: a valid token still triggers DB reads + a
+  // PDF render, and an unauthenticated flood of 403s is itself cheap to abuse.
+  if (!enforcePublicRateLimit('report', req.headers, res)) return;
   try {
     const u = String(req.query.u ?? '');
     const exp = String(req.query.exp ?? '');

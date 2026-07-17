@@ -29,12 +29,25 @@ export interface ChatOptions {
   maxTokens?: number;
   /** Sampling temperature. Omit for provider default; the Gym runs personas hot. */
   temperature?: number;
+  /**
+   * Mark the system prompt as an Anthropic prompt-cache breakpoint (ephemeral).
+   * Worth it when the same large system prompt repeats across requests — the
+   * farmer reasoning path reuses the base persona + style pack on every call and
+   * puts all per-request content in the user message, so the system block is a
+   * stable prefix Anthropic can cache (~90% input-token cut on a hit). No-op on
+   * models/providers that don't cache, or below the minimum cacheable length.
+   */
+  cacheSystem?: boolean;
 }
 
 type ContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }
   | { type: 'input_audio'; input_audio: { data: string; format: string } };
+
+/** A system message either as a plain string or a cache-marked content block. */
+type SystemBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } };
+type ChatMessage = { role: string; content: string | ContentPart[] | SystemBlock[] };
 
 /** Short PT-BR description of an image (for feeding vision into text-only flows). */
 export async function describeImage(image: ChatImage): Promise<string> {
@@ -61,9 +74,12 @@ export async function chat(opts: ChatOptions): Promise<string> {
   });
 }
 
-async function chatOnce(opts: ChatOptions): Promise<string> {
-  const apiKey = requireEnv('OPENROUTER_API_KEY');
-
+/**
+ * Build the OpenRouter `messages` array from chat options. Pure — extracted so
+ * message shaping (image/audio parts, system prompt-cache breakpoint) is unit
+ * testable without a live API call.
+ */
+export function buildMessages(opts: ChatOptions): ChatMessage[] {
   let content: string | ContentPart[] = opts.user;
   if (opts.image || opts.audio) {
     const parts: ContentPart[] = [];
@@ -83,9 +99,25 @@ async function chatOnce(opts: ChatOptions): Promise<string> {
     content = parts;
   }
 
-  const messages: Array<{ role: string; content: string | ContentPart[] }> = [];
-  if (opts.system) messages.push({ role: 'system', content: opts.system });
+  const messages: ChatMessage[] = [];
+  if (opts.system) {
+    // With cacheSystem, send the system prompt as a content block carrying an
+    // ephemeral cache_control breakpoint (Anthropic prompt caching, passed
+    // through by OpenRouter). Otherwise a plain string, as before.
+    messages.push(
+      opts.cacheSystem
+        ? { role: 'system', content: [{ type: 'text', text: opts.system, cache_control: { type: 'ephemeral' } }] }
+        : { role: 'system', content: opts.system }
+    );
+  }
   messages.push({ role: 'user', content });
+  return messages;
+}
+
+async function chatOnce(opts: ChatOptions): Promise<string> {
+  const apiKey = requireEnv('OPENROUTER_API_KEY');
+
+  const messages = buildMessages(opts);
 
   const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
