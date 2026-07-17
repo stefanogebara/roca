@@ -104,6 +104,12 @@ honestamente. Por isso o próximo passo é campo, não código.
    voz de quem voucha.
 5. Anti-canal: tráfego pago frio pro +1 — proibido até o +55 existir.
 6. Fundador lê a primeira sessão de todo produtor novo em <24h, os 60 dias todos.
+7. **Canal de prospecção (17/jul): TODO prospect/parceiro novo entra via
+   Vitória** — o pipeline de prospecção no número da Stevi (source → aprovação
+   no painel → template → conversa da Vitória → promoção a parceiro), com a
+   armadura toda (caps, latch, kinds, pre-flight). O WhatsApp pessoal do
+   fundador fica reservado a RELACIONAMENTO com parceiros já ativos (Michel) —
+   nunca a primeiro contato. Exceção só por decisão explícita do fundador.
 
 ## Roteiros
 
