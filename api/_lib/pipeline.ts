@@ -461,6 +461,392 @@ async function buildRouteContext(base: RouteContextBase): Promise<RouteContext> 
   return { ...base, cropAnswer, cropsOnly, consentReply, confirmYes, statedLocation };
 }
 
+// --- The route table -------------------------------------------------------
+// Each route is an intent branch lifted verbatim from the old ladder. ORDER IS
+// PRIORITY: ROUTES is scanned top-to-bottom and the first match wins, which
+// preserves the load-bearing precedence the fast-path regexes rely on
+// (financing before application_report before history — overlapping patterns).
+// A route's `match` is a pure, I/O-free predicate; `handle` does the work and
+// returns the reply. The trailing `else` (field_health | routeIntent → reason)
+// is reasonFallback, run when nothing matches.
+
+const cropsOnlyRoute: Route = {
+  name: 'cropsOnly',
+  match: (ctx) => !!ctx.cropAnswer && ctx.cropAnswer.length > 0 && ctx.cropsOnly,
+  handle: async (ctx) => {
+    const { userId, cropAnswer } = ctx;
+    if (userId) {
+      await setFarmCrops(userId, cropAnswer!);
+      await setAwaiting(userId, null);
+    }
+    return {
+      intent: 'onboarding',
+      replyText: `Anotado: você trabalha com ${joinCrops(cropAnswer!)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`,
+    };
+  },
+};
+
+const consentRoute: Route = {
+  name: 'consent',
+  match: (ctx) => !!ctx.consentReply,
+  handle: async (ctx) => {
+    const { userId, consentReply } = ctx;
+    if (userId) await setAwaiting(userId, null);
+    return { intent: 'referral', replyText: consentReply! };
+  },
+};
+
+const confirmYesRoute: Route = {
+  name: 'confirmYes',
+  match: (ctx) => ctx.confirmYes,
+  handle: async (ctx) => {
+    // Farmer confirmed the bare pin IS their field (pousio / recém-colhida) →
+    // keep the stored location and move on to the crop question.
+    const { userId } = ctx;
+    if (userId) await setAwaiting(userId, 'crop');
+    return {
+      intent: 'onboarding',
+      replyText:
+        'Beleza, mantive sua localização então. 🌱 Me conta: o que você planta aí? Soja, milho, café, pasto?',
+    };
+  },
+};
+
+const statedLocationResolvedRoute: Route = {
+  name: 'statedLocationResolved',
+  match: (ctx) => ctx.statedLocation?.kind === 'resolved' && !!ctx.userId,
+  handle: async (ctx) => {
+    // Farmer named where the field is → store a coarse city reference and invite
+    // the pin to refine. Decouples "onde você está" from "onde é a lavoura".
+    const { userId } = ctx;
+    const sl = ctx.statedLocation as Extract<StatedLocation, { kind: 'resolved' }>;
+    await setFarmLocation(userId, sl.lat, sl.lon, 'city');
+    if (sl.uf) await setUserState(userId, sl.uf);
+    await setAwaiting(userId, 'crop');
+    return { intent: 'onboarding', replyText: confirmLocationReply(sl) };
+  },
+};
+
+const statedLocationUngeocodableRoute: Route = {
+  name: 'statedLocationUngeocodable',
+  match: (ctx) => ctx.statedLocation?.kind === 'ungeocodable' && !!ctx.userId,
+  handle: async (ctx) => {
+    // Named a place we couldn't locate → ask for city+UF or the pin. A message
+    // that named NO place ('no_place') falls through instead — no false "não achei".
+    const { userId, user } = ctx;
+    const sl = ctx.statedLocation as Extract<StatedLocation, { kind: 'ungeocodable' }>;
+    if (user?.awaiting) await setAwaiting(userId, null);
+    return {
+      intent: 'onboarding',
+      replyText: `Hmm, não consegui achar "${sl.city.slice(0, 40)}" no mapa 🤔. Me diz a cidade e o estado da sua lavoura (ex: "Patrocínio-MG"), ou manda o pin (clipe 📎 → Localização).`,
+    };
+  },
+};
+
+const financingReportRoute: Route = {
+  name: 'financingReport',
+  // Histórico de manejo — the crédito-rural/PRONAF SUPPORT report. Checked
+  // BEFORE application_report so "relatório de aplicações pro banco" lands here.
+  // A record, never the application: the projeto técnico (ART), the DAP/CAF, the
+  // CAR and the credit analysis stay with the professionals — caption says so.
+  match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isFinancingReportRequest(ctx.effective.text),
+  handle: async (ctx) => {
+    const { userId, user } = ctx;
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const finRows = userId ? await listApplications(userId, { limit: 200 }) : [];
+    if (finRows.length === 0) {
+      return { intent: 'financing_report', replyText: financingEmptyReply() };
+    }
+    const finParams = userId ? reportCardParams(userId) : null;
+    if (finParams) {
+      return {
+        intent: 'financing_report',
+        replyText: financingCaption(finRows.length),
+        extraDocUrl: `${PUBLIC_BASE}/api/report?${finParams}&kind=pronaf`,
+        extraDocCaption:
+          'Segue o *histórico de manejo* em PDF — leve ao seu agrônomo, cooperativa ou banco junto com seus documentos. 📎',
+        extraDocFilename: 'historico-manejo-pronaf.pdf',
+      };
+    }
+    // No URL-signing secret → gate-safe text: honest framing + aggregate summary,
+    // never an unsigned URL to private records.
+    const finProfile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+    return {
+      intent: 'financing_report',
+      replyText:
+        financingCaption(finRows.length) +
+        '\n\n' +
+        applicationsTextSummary(buildApplicationsReport(finProfile, finRows)),
+    };
+  },
+};
+
+const applicationReportRoute: Route = {
+  name: 'applicationReport',
+  // Caderno de aplicações report (rastreabilidade). Checked BEFORE the history
+  // fast-path, since "meu caderno de aplicações" also matches isHistoryRequest.
+  // The dose/brand live in the rendered card (gate never sees it); the caption
+  // and any text fallback are gate-safe.
+  match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isApplicationReportRequest(ctx.effective.text),
+  handle: async (ctx) => {
+    const { userId, user, effective } = ctx;
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const rows = userId ? await listApplications(userId, { limit: 200 }) : [];
+    const receituarioPrefix = /receitu/i.test(effective.text!) ? `${RECEITUARIO_NOTE}\n\n` : '';
+    if (rows.length === 0) {
+      return { intent: 'application_report', replyText: receituarioPrefix + applicationsEmptyReply() };
+    }
+    const params = userId ? reportCardParams(userId) : null;
+    if (params) {
+      return {
+        intent: 'application_report',
+        replyText: receituarioPrefix + applicationsCaption(rows.length),
+        extraCardUrl: `${PUBLIC_BASE}/api/card?${params}`,
+        extraDocUrl: `${PUBLIC_BASE}/api/report?${params}`,
+      };
+    }
+    // No URL-signing secret configured → gate-safe text summary rather than
+    // shipping the farmer's chemical history through an unsigned public URL.
+    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+    return {
+      intent: 'application_report',
+      replyText: receituarioPrefix + applicationsTextSummary(buildApplicationsReport(profile, rows)),
+    };
+  },
+};
+
+const historyRoute: Route = {
+  name: 'history',
+  // Passive caderno de campo — the season record Stevi keeps for free.
+  match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isHistoryRequest(ctx.effective.text),
+  handle: async (ctx) => {
+    const { userId, user } = ctx;
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const replyText = userId
+      ? buildHistoryReply(await getFarmProfile(userId), await getActivityLog(userId))
+      : buildHistoryReply({ uf: null, crop: null }, []);
+    return { intent: 'history', replyText };
+  },
+};
+
+const applicationLogRoute: Route = {
+  name: 'applicationLog',
+  // Caderno de aplicações — the farmer declaring an application already made
+  // ("apliquei X ontem"). Record it (their own data, never a prescription) and
+  // read the parsed record back. The confirm keeps the numeric dose out of its
+  // text so it clears the compliance gate; the dose lives in the record + report.
+  match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isApplicationLog(ctx.effective.text),
+  handle: async (ctx) => {
+    const { userId, user, effective, msg } = ctx;
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+    const app = await parseApplication(effective.text!, {
+      source: msg.kind === 'voice' ? 'declared_voice' : 'declared_text',
+      knownCrops: profile.crop,
+    });
+    if (userId) {
+      const farm = await getFarm(userId);
+      await insertApplication(userId, app, farm?.id ?? null);
+    }
+    return { intent: 'application_log', replyText: formatApplicationConfirm(app) };
+  },
+};
+
+const pricesRoute: Route = {
+  name: 'prices',
+  // Commodity quotes — the price habit loop. Crop-filtered when known.
+  match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isPriceRequest(ctx.effective.text),
+  handle: async (ctx) => {
+    const { userId, user, effective } = ctx;
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    // An explicitly named commodity beats the profile filter.
+    const asked = askedCommodities(effective.text!);
+    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+    const { quotes, usdBrl } = await fetchPrices(asked.length > 0 ? asked : profile.crop);
+    return {
+      intent: 'prices',
+      replyText: formatPricesReply(quotes, usdBrl),
+      // The shareable card — prices are the most-forwarded content in rural
+      // groups, so the reply ships as an image farmers can pass on.
+      extraCardUrl: priceCardUrl(quotes, usdBrl),
+    };
+  },
+};
+
+const briefRoute: Route = {
+  name: 'brief',
+  // Assemble the agrônomo briefing from the farmer's profile + recent messages.
+  match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isBriefRequest(ctx.effective.text),
+  handle: async (ctx) => {
+    const { userId, user } = ctx;
+    if (userId && user?.awaiting) await setAwaiting(userId, null);
+    const replyText = await buildAgronomoBrief(userId);
+    // Attach the caderno de aplicações PDF so the agrônomo gets the structured
+    // spray history alongside the briefing. Only when there's something recorded
+    // and the report URL can be signed; otherwise the brief ships text-only.
+    let extraDocUrl: string | undefined;
+    let extraDocCaption: string | undefined;
+    if (userId) {
+      const params = reportCardParams(userId);
+      if (params && (await listApplications(userId, { limit: 1 })).length > 0) {
+        extraDocUrl = `${PUBLIC_BASE}/api/report?${params}`;
+        extraDocCaption =
+          'Anexei também seu *caderno de aplicações* em PDF — dá pra encaminhar junto pro agrônomo, ele já vê o que foi aplicado. 📎';
+      }
+    }
+    return { intent: 'brief', replyText, extraDocUrl, extraDocCaption };
+  },
+};
+
+const referralRoute: Route = {
+  name: 'referral',
+  // Explicit agrônomo referral request — the business-model seed.
+  match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isReferralRequest(ctx.effective.text),
+  handle: async (ctx) => {
+    const { userId, user, effective, msg, adapter } = ctx;
+    let replyText = REFERRAL_REPLY;
+    if (userId) {
+      if (user?.awaiting) await setAwaiting(userId, null);
+      const profile = await getFarmProfile(userId);
+      // Checked BEFORE inserting the new row: repeat taps within 24h stay quiet
+      // on founder channels (the row below is still recorded for audit).
+      const alreadyNotified = await hasRecentReferral(
+        userId,
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      );
+      const referralId = await createReferralRequest(userId, {
+        uf: profile.uf,
+        crop: profile.crop,
+        topic: effective.text!.slice(0, 280),
+        consentVersion: REFERRAL_CONSENT_VERSION,
+      });
+      if (!alreadyNotified) {
+        // Concierge handoff: a human hears about the opt-in immediately —
+        // email + WhatsApp ping to the founders' own numbers.
+        const notice = {
+          maskedPhone: maskWa(msg.from),
+          uf: profile.uf,
+          crops: profile.crop,
+          topic: effective.text!.slice(0, 280),
+        };
+        await sendReferralNotification(notice);
+        await pingFoundersWhatsApp((to, text) => adapter.send({ to, text }), notice);
+      }
+      // Partner match (farm pin within a partner's coverage): instead of the
+      // generic promise, ask the farmer's explicit consent to share — LGPD: the
+      // referral opt-in alone never hands data to a third party.
+      try {
+        const matched = await matchPartnerForFarm(userId);
+        if (matched && referralId) {
+          await setReferralPartner(referralId, matched.id);
+          await setAwaiting(userId, 'referral_consent');
+          replyText = consentAskText(matched);
+        }
+      } catch (e) {
+        log.error('partner match failed (generic referral reply kept):', (e as Error).message);
+      }
+    }
+    return { intent: 'referral', replyText };
+  },
+};
+
+const mediaTooLargeRoute: Route = {
+  name: 'mediaTooLarge',
+  match: (ctx) => ctx.mediaTooLarge,
+  handle: async () => ({
+    intent: 'general',
+    replyText:
+      'Opa, esse arquivo veio grande demais pra eu processar. 😅 Manda de novo como foto normal (sem ser em qualidade máxima/documento) que eu dou conta.',
+  }),
+};
+
+const voiceNoTranscriptRoute: Route = {
+  name: 'voiceNoTranscript',
+  match: (ctx) => ctx.msg.kind === 'voice' && !ctx.transcript,
+  handle: async () => ({
+    intent: 'general',
+    replyText:
+      'Recebi seu áudio mas não consegui entender direito. 🙉 Pode escrever em texto, ou mandar o áudio de novo mais pertinho do celular?',
+  }),
+};
+
+const locationPinRoute: Route = {
+  name: 'locationPin',
+  match: (ctx) => ctx.effective.kind === 'location' && !!ctx.effective.location,
+  handle: async (ctx) => {
+    // Pin drop → the payback moment, or an honest "não achei vegetação aí" when
+    // the pin isn't a field. buildFarmCard sets `awaiting` itself ('crop', or
+    // 'farm_confirm' when it needs the farmer to confirm or redirect the pin).
+    const { userId, effective } = ctx;
+    const fc = await buildFarmCard(userId, effective.location!.lat, effective.location!.lon);
+    // No vegetation → the reply is an honest question; never attach a "SUA
+    // LAVOURA" card over a rooftop/water.
+    return { intent: 'onboarding', replyText: fc.text, suppressCard: !fc.card };
+  },
+};
+
+// Order = priority. Do not reorder without re-checking the overlapping fast-path
+// regexes (see the per-route comments; the T0 characterization tests pin it).
+const ROUTES: Route[] = [
+  cropsOnlyRoute,
+  consentRoute,
+  confirmYesRoute,
+  statedLocationResolvedRoute,
+  statedLocationUngeocodableRoute,
+  financingReportRoute,
+  applicationReportRoute,
+  historyRoute,
+  applicationLogRoute,
+  pricesRoute,
+  briefRoute,
+  referralRoute,
+  mediaTooLargeRoute,
+  voiceNoTranscriptRoute,
+  locationPinRoute,
+];
+
+/**
+ * The trailing `else` of the old ladder: clear a stuck onboarding wait, pick the
+ * intent (field_health fast-path | LLM router), then reason() with working
+ * memory. Fail-soft to FALLBACK_REPLY. Captures the pest card via the callback.
+ */
+async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
+  const { effective, userId, user, msg, media } = ctx;
+  // A pending crop/confirm question that got an unrelated reply: stop waiting,
+  // answer normally (don't leave the farmer stuck in an onboarding state).
+  if ((user?.awaiting === 'crop' || user?.awaiting === 'farm_confirm') && userId) {
+    await setAwaiting(userId, null);
+  }
+  // kind guard matters: a photo with a "como está minha lavoura?" caption is a
+  // pest-triage image, not a satellite ask — captions never fast-path.
+  const intent: Intent =
+    effective.kind === 'text' && effective.text && isFieldHealthRequest(effective.text)
+      ? 'field_health'
+      : await routeIntent(effective);
+  let pestCard: PestCardData | undefined;
+  let replyText: string;
+  try {
+    // Working memory: the last few turns, so follow-ups ("e o que eu faço?")
+    // resolve their referent. Fail-soft — no memory beats no reply.
+    const history =
+      userId && effective.kind === 'text'
+        ? formatTurnsBlock(await getRecentTurns(userId, msg.messageId))
+        : null;
+    replyText = await reason(effective, intent, {
+      userId,
+      media,
+      history,
+      onPestCard: (c) => {
+        pestCard = c;
+      },
+    });
+  } catch (e) {
+    log.error('reasoning failed:', (e as Error).message);
+    replyText = FALLBACK_REPLY;
+  }
+  return { intent, replyText, pestCard };
+}
+
 export async function handleInbound(
   adapter: TransportAdapter,
   msg: InboundMessage
@@ -648,26 +1034,9 @@ export async function handleInbound(
     return; // prospects never fall through to the farmer pipeline
   }
 
-  let intent: Intent;
-  let replyText: string;
-  let pestCard: PestCardData | undefined;
-  // Set by branches that carry their own visual (prices) — pest keeps its
-  // dedicated path below.
-  let extraCardUrl: string | undefined;
-  // The applications report as a PDF, delivered as a second message
-  // (save/print/forward) after the in-chat PNG card.
-  let extraDocUrl: string | undefined;
-  // Caption for the PDF document second-message (defaults per the second-send).
-  let extraDocCaption: string | undefined;
-  // Filename for the PDF document (defaults to the caderno name).
-  let extraDocFilename: string | undefined;
-  // Set when a branch must NOT ship the generic card (e.g. a pin we couldn't
-  // confirm as a field — the honest text must not carry a "SUA LAVOURA" image).
-  let suppressCard = false;
-
-  // Build the route context: the onboarding signals (crop/consent/confirm/
-  // statedLocation) are precomputed here, eagerly and in order, including the
-  // silent-crop-capture side effect. The ladder below reads them unchanged.
+  // Build the route context (guard survivors + onboarding signals), then pick
+  // the first matching route by priority order; if nothing matches, the
+  // reasoning fallback. The branch's 8 outputs come back as one RouteResult.
   const ctx = await buildRouteContext({
     adapter,
     msg,
@@ -680,243 +1049,10 @@ export async function handleInbound(
     contactText,
     mediaTooLarge,
   });
-  const { cropAnswer, cropsOnly, consentReply, confirmYes, statedLocation } = ctx;
-
-  if (cropAnswer && cropAnswer.length > 0 && cropsOnly) {
-    if (userId) {
-      await setFarmCrops(userId, cropAnswer);
-      await setAwaiting(userId, null);
-    }
-    intent = 'onboarding';
-    replyText = `Anotado: você trabalha com ${joinCrops(cropAnswer)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`;
-  } else if (consentReply) {
-    intent = 'referral';
-    if (userId) await setAwaiting(userId, null);
-    replyText = consentReply;
-  } else if (confirmYes) {
-    // Farmer confirmed the bare pin IS their field (pousio / recém-colhida) →
-    // keep the stored location and move on to the crop question.
-    intent = 'onboarding';
-    if (userId) await setAwaiting(userId, 'crop');
-    replyText =
-      'Beleza, mantive sua localização então. 🌱 Me conta: o que você planta aí? Soja, milho, café, pasto?';
-  } else if (statedLocation?.kind === 'resolved' && userId) {
-    // Farmer named where the field is → store a coarse city reference and invite
-    // the pin to refine. Decouples "onde você está" from "onde é a lavoura".
-    intent = 'onboarding';
-    await setFarmLocation(userId, statedLocation.lat, statedLocation.lon, 'city');
-    if (statedLocation.uf) await setUserState(userId, statedLocation.uf);
-    await setAwaiting(userId, 'crop');
-    replyText = confirmLocationReply(statedLocation);
-  } else if (statedLocation?.kind === 'ungeocodable' && userId) {
-    // Named a place we couldn't locate → ask for city+UF or the pin. A message
-    // that named NO place ('no_place') falls through instead — no false "não achei".
-    intent = 'onboarding';
-    if (user?.awaiting) await setAwaiting(userId, null);
-    replyText =
-      `Hmm, não consegui achar "${statedLocation.city.slice(0, 40)}" no mapa 🤔. Me diz a cidade e o estado da sua lavoura (ex: "Patrocínio-MG"), ou manda o pin (clipe 📎 → Localização).`;
-  } else if (effective.kind === 'text' && effective.text && isFinancingReportRequest(effective.text)) {
-    // Histórico de manejo — the crédito-rural/PRONAF SUPPORT report. Checked
-    // BEFORE application_report so "relatório de aplicações pro banco" lands
-    // here. A record, never the application: the projeto técnico (ART), the
-    // DAP/CAF, the CAR and the credit analysis stay with the professionals —
-    // the caption says so explicitly.
-    intent = 'financing_report';
-    if (userId && user?.awaiting) await setAwaiting(userId, null);
-    const finRows = userId ? await listApplications(userId, { limit: 200 }) : [];
-    if (finRows.length === 0) {
-      replyText = financingEmptyReply();
-    } else {
-      const finParams = userId ? reportCardParams(userId) : null;
-      if (finParams) {
-        replyText = financingCaption(finRows.length);
-        extraDocUrl = `${PUBLIC_BASE}/api/report?${finParams}&kind=pronaf`;
-        extraDocCaption =
-          'Segue o *histórico de manejo* em PDF — leve ao seu agrônomo, cooperativa ou banco junto com seus documentos. 📎';
-        extraDocFilename = 'historico-manejo-pronaf.pdf';
-      } else {
-        // No URL-signing secret → gate-safe text: the honest framing plus the
-        // aggregate summary, never an unsigned URL to private records.
-        const finProfile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
-        replyText =
-          financingCaption(finRows.length) +
-          '\n\n' +
-          applicationsTextSummary(buildApplicationsReport(finProfile, finRows));
-      }
-    }
-  } else if (effective.kind === 'text' && effective.text && isApplicationReportRequest(effective.text)) {
-    // Caderno de aplicações report (rastreabilidade). Checked BEFORE the history
-    // fast-path, since "meu caderno de aplicações" also matches isHistoryRequest.
-    // The dose/brand live in the rendered card (gate never sees it); the caption
-    // and any text fallback are gate-safe.
-    intent = 'application_report';
-    if (userId && user?.awaiting) await setAwaiting(userId, null);
-    const rows = userId ? await listApplications(userId, { limit: 200 }) : [];
-    const receituarioPrefix = /receitu/i.test(effective.text) ? `${RECEITUARIO_NOTE}\n\n` : '';
-    if (rows.length === 0) {
-      replyText = receituarioPrefix + applicationsEmptyReply();
-    } else {
-      const params = userId ? reportCardParams(userId) : null;
-      if (params) {
-        replyText = receituarioPrefix + applicationsCaption(rows.length);
-        extraCardUrl = `${PUBLIC_BASE}/api/card?${params}`;
-        extraDocUrl = `${PUBLIC_BASE}/api/report?${params}`;
-      } else {
-        // No URL-signing secret configured → gate-safe text summary rather than
-        // shipping the farmer's chemical history through an unsigned public URL.
-        const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
-        replyText = receituarioPrefix + applicationsTextSummary(buildApplicationsReport(profile, rows));
-      }
-    }
-  } else if (effective.kind === 'text' && effective.text && isHistoryRequest(effective.text)) {
-    // Passive caderno de campo — the season record Stevi keeps for free.
-    intent = 'history';
-    if (userId && user?.awaiting) await setAwaiting(userId, null);
-    replyText = userId
-      ? buildHistoryReply(await getFarmProfile(userId), await getActivityLog(userId))
-      : buildHistoryReply({ uf: null, crop: null }, []);
-  } else if (effective.kind === 'text' && effective.text && isApplicationLog(effective.text)) {
-    // Caderno de aplicações — the farmer declaring an application they already
-    // made ("apliquei X ontem"). Record it (their own data, never a
-    // prescription) and read the parsed record back so they can correct it.
-    // The confirm keeps the numeric dose out of its text so it clears the
-    // compliance gate; the full dose lives in the record + rendered report.
-    intent = 'application_log';
-    if (userId && user?.awaiting) await setAwaiting(userId, null);
-    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
-    const app = await parseApplication(effective.text, {
-      source: msg.kind === 'voice' ? 'declared_voice' : 'declared_text',
-      knownCrops: profile.crop,
-    });
-    if (userId) {
-      const farm = await getFarm(userId);
-      await insertApplication(userId, app, farm?.id ?? null);
-    }
-    replyText = formatApplicationConfirm(app);
-  } else if (effective.kind === 'text' && effective.text && isPriceRequest(effective.text)) {
-    // Commodity quotes — the price habit loop. Crop-filtered when known.
-    intent = 'prices';
-    if (userId && user?.awaiting) await setAwaiting(userId, null);
-    // An explicitly named commodity beats the profile filter.
-    const asked = askedCommodities(effective.text);
-    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
-    const { quotes, usdBrl } = await fetchPrices(asked.length > 0 ? asked : profile.crop);
-    replyText = formatPricesReply(quotes, usdBrl);
-    // The shareable card — prices are the most-forwarded content in rural
-    // groups, so the reply ships as an image farmers can pass on.
-    extraCardUrl = priceCardUrl(quotes, usdBrl);
-  } else if (effective.kind === 'text' && effective.text && isBriefRequest(effective.text)) {
-    // Assemble the agrônomo briefing from the farmer's profile + recent messages.
-    intent = 'brief';
-    if (userId && user?.awaiting) await setAwaiting(userId, null);
-    replyText = await buildAgronomoBrief(userId);
-    // Attach the caderno de aplicações PDF so the agrônomo gets the farmer's
-    // structured spray history alongside the briefing. Only when there's
-    // something recorded and the report URL can be signed; otherwise the brief
-    // ships text-only, exactly as before.
-    if (userId) {
-      const params = reportCardParams(userId);
-      if (params && (await listApplications(userId, { limit: 1 })).length > 0) {
-        extraDocUrl = `${PUBLIC_BASE}/api/report?${params}`;
-        extraDocCaption =
-          'Anexei também seu *caderno de aplicações* em PDF — dá pra encaminhar junto pro agrônomo, ele já vê o que foi aplicado. 📎';
-      }
-    }
-  } else if (effective.kind === 'text' && effective.text && isReferralRequest(effective.text)) {
-    // Explicit agrônomo referral request — the business-model seed.
-    intent = 'referral';
-    replyText = REFERRAL_REPLY;
-    if (userId) {
-      if (user?.awaiting) await setAwaiting(userId, null);
-      const profile = await getFarmProfile(userId);
-      // Checked BEFORE inserting the new row: repeat taps within 24h stay
-      // quiet on founder channels (the row below is still recorded for audit).
-      const alreadyNotified = await hasRecentReferral(
-        userId,
-        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      );
-      const referralId = await createReferralRequest(userId, {
-        uf: profile.uf,
-        crop: profile.crop,
-        topic: effective.text.slice(0, 280),
-        consentVersion: REFERRAL_CONSENT_VERSION,
-      });
-      if (!alreadyNotified) {
-        // Concierge handoff: a human hears about the opt-in immediately —
-        // email + WhatsApp ping to the founders' own numbers.
-        const notice = {
-          maskedPhone: maskWa(msg.from),
-          uf: profile.uf,
-          crops: profile.crop,
-          topic: effective.text.slice(0, 280),
-        };
-        await sendReferralNotification(notice);
-        await pingFoundersWhatsApp((to, text) => adapter.send({ to, text }), notice);
-      }
-      // Partner match (farm pin within a partner's coverage): instead of the
-      // generic promise, ask the farmer's explicit consent to share — LGPD:
-      // the referral opt-in alone never hands data to a third party.
-      try {
-        const matched = await matchPartnerForFarm(userId);
-        if (matched && referralId) {
-          await setReferralPartner(referralId, matched.id);
-          await setAwaiting(userId, 'referral_consent');
-          replyText = consentAskText(matched);
-        }
-      } catch (e) {
-        log.error('partner match failed (generic referral reply kept):', (e as Error).message);
-      }
-    }
-  } else if (mediaTooLarge) {
-    intent = 'general';
-    replyText =
-      'Opa, esse arquivo veio grande demais pra eu processar. 😅 Manda de novo como foto normal (sem ser em qualidade máxima/documento) que eu dou conta.';
-  } else if (msg.kind === 'voice' && !transcript) {
-    intent = 'general';
-    replyText =
-      'Recebi seu áudio mas não consegui entender direito. 🙉 Pode escrever em texto, ou mandar o áudio de novo mais pertinho do celular?';
-  } else if (effective.kind === 'location' && effective.location) {
-    // Pin drop → the payback moment, or an honest "não achei vegetação aí" when
-    // the pin isn't a field. buildFarmCard sets `awaiting` itself ('crop', or
-    // 'farm_confirm' when it needs the farmer to confirm or redirect the pin).
-    intent = 'onboarding';
-    const fc = await buildFarmCard(userId, effective.location.lat, effective.location.lon);
-    replyText = fc.text;
-    // No vegetation → the reply is an honest question; never attach a "SUA
-    // LAVOURA" card over a rooftop/water.
-    suppressCard = !fc.card;
-  } else {
-    // A pending crop/confirm question that got an unrelated reply: stop waiting,
-    // answer normally (don't leave the farmer stuck in an onboarding state).
-    if ((user?.awaiting === 'crop' || user?.awaiting === 'farm_confirm') && userId) {
-      await setAwaiting(userId, null);
-    }
-    // kind guard matters: a photo with a "como está minha lavoura?" caption is
-    // a pest-triage image, not a satellite ask — captions never fast-path.
-    intent =
-      effective.kind === 'text' && effective.text && isFieldHealthRequest(effective.text)
-        ? 'field_health'
-        : await routeIntent(effective);
-    try {
-      // Working memory: the last few turns, so follow-ups ("e o que eu
-      // faço?") resolve their referent. Fail-soft — no memory beats no reply.
-      const history =
-        userId && effective.kind === 'text'
-          ? formatTurnsBlock(await getRecentTurns(userId, msg.messageId))
-          : null;
-      replyText = await reason(effective, intent, {
-        userId,
-        media,
-        history,
-        onPestCard: (c) => {
-          pestCard = c;
-        },
-      });
-    } catch (e) {
-      log.error('reasoning failed:', (e as Error).message);
-      replyText = FALLBACK_REPLY;
-    }
-  }
+  const route = ROUTES.find((r) => r.match(ctx));
+  const result = route ? await route.handle(ctx) : await reasonFallback(ctx);
+  const { intent, replyText, pestCard, extraCardUrl, extraDocUrl, extraDocCaption, extraDocFilename, suppressCard } =
+    result;
 
   const gate = checkOutbound(replyText);
   if (!gate.safe) {
