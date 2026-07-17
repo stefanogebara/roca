@@ -2,7 +2,31 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
-## 2026-07-15 — `git commit` ships the whole index, which a concurrent session can pre-pollute
+## 2026-07-16 — A timed-out `git push` may have LANDED; probe with ls-remote before retrying
+
+**Context:** Pushing two commits during a network flap. `git push` hit the tool
+timeout twice (exit 143 at 2min and 90s) while `git ls-remote` answered fine.
+Third attempt — backgrounded, generous timeout, self-verifying — landed.
+
+**What almost went wrong:** a killed push is only killed *locally* — the objects
+may already be uploaded and the ref updated server-side. Blindly re-pushing is
+usually harmless, but blindly *assuming failure* leads to wrong reports ("not
+pushed") or, worse, panic re-work; and hammering retries at a 2-minute wall just
+burns turns without ever learning whether the network or the push is the problem.
+
+**Rules:**
+- **After any timed-out push, check state before acting:**
+  `git ls-remote origin master` vs `git log -1 --format=%H`. Same SHA → the push
+  landed, you're done. Different → retry is safe (pushes are idempotent).
+- `ls-remote` doubles as a **cheap network probe**: reads answering while pushes
+  hang = upload-path degradation, worth retrying; ls-remote also dead = network
+  down, stop and say so.
+- **Make the retry self-verifying and background it** with a generous timeout, so
+  even if the foreground would have timed out you still learn the outcome:
+  `git push origin master 2>&1 | tail -3; echo "EXIT=$?"; git ls-remote origin master | cut -c1-8`
+- Two strikes → stop hammering. Report honestly: commits are safe locally,
+  nothing is at risk while unpushed, they ride the next successful push (or the
+  user's own terminal). A push is never worth a retry loop.
 
 **Context:** Committing my location-decoupling work in a worktree shared with the
 active caderno session. I staged explicit paths (`git add <my files>`, per the
