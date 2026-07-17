@@ -15,6 +15,42 @@ humano que vouча (técnico, parceiro, balcão de armazém, vizinho) — nunca 
 número frio; agrônomos são CLIENTES (pagam por lead), coops/revendas são
 DISTRIBUIÇÃO (Stevi devolve o produtor pros técnicos DELES).
 
+## Posicionamento — "por que não os apps / a internet / o ChatGPT?" (16/jul)
+
+**Quem é o produtor-alvo:** 5–50 ha de café (Caparaó/Sul de Minas), mais velho,
+pouca paciência com tecnologia, WhatsApp = a internet inteira dele. Essa
+realidade responde quase tudo:
+
+- **vs. apps de agro** — ele não tem (e quando tentou: download, cadastro,
+  senha, dashboard vazio pedindo que ELE digite dados). Todo app de agro faz o
+  produtor trabalhar; a Stevi pede um pin e responde mensagem. As ferramentas
+  reais dele são o técnico, o vizinho e o rádio — a Stevi não compete com eles,
+  ela se pluga neles (chega vouchada, devolve o caso difícil pro agrônomo).
+- **vs. dados grátis da web** — os dados da Stevi SÃO públicos; o produto é a
+  MONTAGEM: seis fontes viram uma frase na língua dele ("✅ Pode pulverizar
+  agora"). Ninguém calcula Delta-T da roça. E a web nunca liga pra ele — a
+  Stevi avisa da geada ANTES.
+- **vs. ChatGPT** — o ChatGPT não sabe ONDE ele está (sem pin → sem clima real,
+  sem satélite DA lavoura dele, sem vazio do estado dele); receita produto e
+  dose de bom grado (ilegal + perigoso — a Stevi é cercada: registro oficial,
+  nunca dose, encaminha ao agrônomo); não lembra da operação (a Stevi acumula o
+  caderno passivamente); nunca avisa nada; e termina em texto — a Stevi termina
+  num humano com CREA. Nenhuma coop endossa "pergunta pro ChatGPT"; o
+  cercamento é exatamente o que permite o vouch.
+
+**Admissão honesta:** o Q&A puro ("qual adubo pro café?") é commodity — modelo
+de fronteira responde igual (e usamos um por baixo). O moat NÃO é a IA; é
+**distribuição** (chega por humano de confiança, no app onde ele já vive) +
+**contexto** (pin, cultura, histórico — acumulando) + **cercamento** (a postura
+legal que faz profissional endossar) + **proatividade** (fala primeiro quando
+importa) + **rede de dois lados** (agrônomo paga pelo problema difícil, que
+mantém grátis pro produtor). Cada peça é copiável sozinha; juntas e ganhas
+produtor a produtor, são o negócio.
+
+**Este posicionamento é a APOSTA que o scorecard testa** — não um fato: D7
+vouchado alto = o argumento provado por comportamento; churn = a tese morre
+honestamente. Por isso o próximo passo é campo, não código.
+
 ## As três correções estruturais (fan-out 13/jul)
 
 1. **Template por tipo**: pitch de lead-gen é ameaça competitiva pra coop/revenda.
