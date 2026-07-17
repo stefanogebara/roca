@@ -847,79 +847,100 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
   return { intent, replyText, pestCard };
 }
 
-export async function handleInbound(
+/** The media survivors of the fetch step, normalized for downstream routing. */
+interface InboundMedia {
+  media: ChatImage | null;
+  transcript: string | null;
+  contactText: string | null;
+  mediaTooLarge: boolean;
+}
+
+type ProspectState = Awaited<ReturnType<typeof handleProspectInbound>>;
+
+/**
+ * LGPD deletion short-circuit — honour it before anything else. No DB write
+ * on a send failure here: the user's data was just deleted, keep it that way.
+ * Returns true when handled (caller returns).
+ */
+async function guardDeletionRequest(adapter: TransportAdapter, msg: InboundMessage): Promise<boolean> {
+  if (!(msg.text && isDeletionRequest(msg.text))) return false;
+  await deleteUserData(msg.from);
+  try {
+    await withRetry(() =>
+      adapter.send({
+        to: msg.from,
+        text: 'Pronto, apaguei seus dados (localização e histórico). Se quiser voltar a usar é só mandar mensagem. 👍',
+      })
+    );
+  } catch (e) {
+    log.error('LGPD confirmation send failed:', (e as Error).message);
+    await alertFounders(
+      `⚠️ Stevi: confirmação de exclusão LGPD não foi entregue — ${(e as Error).message.slice(0, 200)}`
+    );
+  }
+  return true;
+}
+
+/**
+ * Partner replies (agronomists in the referral network): their reply opens
+ * the 24h window → deliver any pending lead dossier free-form. Partners
+ * never reach the farmer pipeline (and never get a farmer profile). Returns
+ * true when the sender is a partner (caller returns).
+ */
+async function guardPartnerReply(adapter: TransportAdapter, msg: InboundMessage): Promise<boolean> {
+  const partnerPhone = normalizePhoneBR(msg.from);
+  const partner = partnerPhone ? await findPartnerByPhone(partnerPhone) : null;
+  if (!partner) return false;
+  const dossier = await buildDossierReply(partner);
+  if (dossier) {
+    await sendOrRecord(adapter, msg.from, { text: dossier }, null, 'partner_dossier');
+    await alertFounders(`🤝 Dossiê de lead entregue pro parceiro ${partner.name}. Acompanhe o fechamento!`);
+  } else {
+    // No pending lead — this is relationship talk; a human answers it.
+    await alertFounders(
+      `💬 Parceiro ${partner.name} mandou mensagem (responda você): "${(msg.text ?? '(mídia)').slice(0, 150)}"`
+    );
+  }
+  return true;
+}
+
+/**
+ * Resolve the farmer's user row, upserting on first contact. On DB failure
+ * there's no user row → no rate limit and no memory, so running the LLM path
+ * would be an unmetered cost/abuse hole: fail closed with the human apology.
+ * Still claim by provider id (user_id null) so a redelivery doesn't buy a
+ * second apology. Returns null when it has fully handled (caller returns).
+ */
+async function resolveUserOrFailClosed(
   adapter: TransportAdapter,
   msg: InboundMessage
-): Promise<void> {
-  // LGPD deletion short-circuit — honour it before anything else. No DB write
-  // on a send failure here: the user's data was just deleted, keep it that way.
-  if (msg.text && isDeletionRequest(msg.text)) {
-    await deleteUserData(msg.from);
-    try {
-      await withRetry(() =>
-        adapter.send({
-          to: msg.from,
-          text: 'Pronto, apaguei seus dados (localização e histórico). Se quiser voltar a usar é só mandar mensagem. 👍',
-        })
-      );
-    } catch (e) {
-      log.error('LGPD confirmation send failed:', (e as Error).message);
-      await alertFounders(
-        `⚠️ Stevi: confirmação de exclusão LGPD não foi entregue — ${(e as Error).message.slice(0, 200)}`
-      );
-    }
-    return;
-  }
-
-  // Partner replies (agronomists in the referral network): their reply opens
-  // the 24h window → deliver any pending lead dossier free-form. Partners
-  // never reach the farmer pipeline (and never get a farmer profile).
-  {
-    const partnerPhone = normalizePhoneBR(msg.from);
-    const partner = partnerPhone ? await findPartnerByPhone(partnerPhone) : null;
-    if (partner) {
-      const dossier = await buildDossierReply(partner);
-      if (dossier) {
-        await sendOrRecord(adapter, msg.from, { text: dossier }, null, 'partner_dossier');
-        await alertFounders(`🤝 Dossiê de lead entregue pro parceiro ${partner.name}. Acompanhe o fechamento!`);
-      } else {
-        // No pending lead — this is relationship talk; a human answers it.
-        await alertFounders(
-          `💬 Parceiro ${partner.name} mandou mensagem (responda você): "${(msg.text ?? '(mídia)').slice(0, 150)}"`
-        );
-      }
-      return;
-    }
-  }
-
+): Promise<PipelineUser | null> {
   const user = await upsertUser(msg.from, msg.profileName);
-  if (!user) {
-    // DB unhealthy: without a user row there is no rate limit and no memory —
-    // running the LLM path anyway would be an unmetered cost/abuse hole. Fail
-    // closed with the human apology instead. Still claim by provider id
-    // (user_id null) so a provider redelivery doesn't buy a second apology.
-    const claimed = await claimInbound(null, {
-      kind: msg.kind,
-      text: msg.text,
-      messageId: msg.messageId,
-    });
-    if (!claimed) {
-      log.info('duplicate inbound on the fail-closed path — dropped:', msg.messageId);
-      return;
-    }
-    log.error('upsertUser unavailable — failing closed, no LLM work');
-    try {
-      await withRetry(() => adapter.send({ to: msg.from, text: FALLBACK_REPLY }));
-    } catch (e) {
-      log.error('fail-closed notice send failed:', (e as Error).message);
-    }
-    return;
+  if (user) return user;
+  const claimed = await claimInbound(null, {
+    kind: msg.kind,
+    text: msg.text,
+    messageId: msg.messageId,
+  });
+  if (!claimed) {
+    log.info('duplicate inbound on the fail-closed path — dropped:', msg.messageId);
+    return null;
   }
-  const userId = user.id;
-  const firstContact = isFirstContact(user);
+  log.error('upsertUser unavailable — failing closed, no LLM work');
+  try {
+    await withRetry(() => adapter.send({ to: msg.from, text: FALLBACK_REPLY }));
+  } catch (e) {
+    log.error('fail-closed notice send failed:', (e as Error).message);
+  }
+  return null;
+}
 
-  // Idempotency gate: claim the message by provider id before any work. A
-  // provider retry (timeout redelivery) is a duplicate → ack without reprocessing.
+/**
+ * Idempotency gate: claim the message by provider id before any work. A
+ * provider retry (timeout redelivery) is a duplicate → ack without reprocessing.
+ * Returns true when the message was already claimed (caller returns).
+ */
+async function guardDuplicateInbound(userId: string, msg: InboundMessage): Promise<boolean> {
   const claimed = await claimInbound(userId, {
     kind: msg.kind,
     text: msg.text,
@@ -927,50 +948,40 @@ export async function handleInbound(
   });
   if (!claimed) {
     log.info('duplicate inbound ignored:', msg.messageId);
-    return;
+    return true;
   }
+  return false;
+}
 
-  // Acquisition attribution: a vouched farmer's first message carries who sent
-  // them ("Oi! Vim pelo José" / #tec-jose). First-wins at the DB layer — the
-  // vouchado/orgânico cohort split is the flight plan's gate metric.
-  if (firstContact && msg.text) {
-    const src = parseSourceToken(msg.text);
-    if (src) await setUserSource(userId, src);
-  }
-
-  // Prospect replies: honour an opt-out ("sair") immediately and permanently
-  // before any other handling. A non-opt-out prospect reply is routed to the
-  // partnerships conversation agent after media normalization (below).
-  const pr = await handleProspectInbound(msg.from, msg.text ?? null);
-  if (pr.handled && pr.reply) {
-    await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
-    if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
-    return;
-  }
-
-  // Rate limit before any expensive work (media fetch, LLM). The current message
-  // is already claimed (counted), so throttle strictly above the cap; notify once
-  // at the threshold, then drop silently so a flood / echo loop can't storm.
-  if (userId) {
-    const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
-    const count = await countRecentInbound(userId, since);
-    if (count > RATE_MAX_PER_WINDOW) {
-      if (count === RATE_MAX_PER_WINDOW + 1) {
-        const notice =
-          'Opa, chegou bastante coisa junta! 😅 Me dá uns segundinhos e manda de novo, que eu te respondo com calma.';
-        const sent = await sendOrRecord(adapter, msg.from, { text: notice }, userId, 'rate_limited');
-        if (sent) {
-          await logMessage(userId, 'out', { kind: 'text', text: notice, intent: 'rate_limited' });
-        }
-      }
-      return;
+/**
+ * Rate limit before any expensive work (media fetch, LLM). The current message
+ * is already claimed (counted), so throttle strictly above the cap; notify once
+ * at the threshold, then drop silently so a flood / echo loop can't storm.
+ * Returns true when throttled (caller returns).
+ */
+async function guardRateLimit(adapter: TransportAdapter, msg: InboundMessage, userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+  const count = await countRecentInbound(userId, since);
+  if (count <= RATE_MAX_PER_WINDOW) return false;
+  if (count === RATE_MAX_PER_WINDOW + 1) {
+    const notice =
+      'Opa, chegou bastante coisa junta! 😅 Me dá uns segundinhos e manda de novo, que eu te respondo com calma.';
+    const sent = await sendOrRecord(adapter, msg.from, { text: notice }, userId, 'rate_limited');
+    if (sent) {
+      await logMessage(userId, 'out', { kind: 'text', text: notice, intent: 'rate_limited' });
     }
   }
+  return true;
+}
 
-  // Media fetch (image or voice) — provider-agnostic, lazy, fail-soft.
-  // Size cap before any LLM work: an oversized payload is a cost-abuse vector
-  // (each image feeds two reasoning-tier vision calls) and breaks model input
-  // limits anyway. ~8 MB binary ≈ 11 MB base64.
+/**
+ * Media fetch (image or voice) — provider-agnostic, lazy, fail-soft.
+ * Size cap before any LLM work: an oversized payload is a cost-abuse vector
+ * (each image feeds two reasoning-tier vision calls) and breaks model input
+ * limits anyway. ~8 MB binary ≈ 11 MB base64.
+ */
+async function fetchInboundMedia(adapter: TransportAdapter, msg: InboundMessage): Promise<InboundMedia> {
   const MEDIA_BASE64_CAP = 11_000_000;
   let media: ChatImage | null = null;
   let transcript: string | null = null;
@@ -996,61 +1007,60 @@ export async function handleInbound(
       log.error('media fetch failed:', (e as Error).message);
     }
   }
+  return { media, transcript, contactText, mediaTooLarge };
+}
 
-  // A transcribed voice note becomes a normal text message downstream.
-  const effective: InboundMessage =
-    msg.kind === 'voice' && transcript ? { ...msg, kind: 'text', text: transcript } : msg;
-
-  // Attach the transcript to the already-claimed inbound row (observability).
-  if (transcript) await updateInboundTranscript(msg.messageId, transcript);
-
-  // Prospect conversation agent: a reply from a cold-messaged business talks to
-  // the partnerships persona, not farmer-Stevi. Media is normalized to text
-  // first (voice transcript, vision description, vCard summary).
-  if (pr.prospect) {
-    let inboundText = effective.text ?? '';
-    let inboundKind = 'text';
-    if (contactText) {
-      inboundText = [inboundText, contactText].filter(Boolean).join('\n');
-      inboundKind = 'contact';
-    } else if (msg.kind === 'voice' && transcript) {
-      inboundKind = 'voice';
-    } else if (msg.kind === 'image' && media) {
-      inboundKind = 'image';
-      try {
-        const caption = await describeImage(media);
-        inboundText = [inboundText, `[imagem enviada: ${caption}]`].filter(Boolean).join('\n');
-      } catch (e) {
-        log.error('prospect image description failed:', (e as Error).message);
-        inboundText = [inboundText, '[imagem enviada — não consegui processar]'].filter(Boolean).join('\n');
-      }
+/**
+ * Prospect conversation agent: a reply from a cold-messaged business talks to
+ * the partnerships persona, not farmer-Stevi. Media is normalized to text
+ * first (voice transcript, vision description, vCard summary). Returns true when
+ * the sender is a prospect — they never fall through to the farmer pipeline.
+ */
+async function respondAsProspectIfApplicable(
+  adapter: TransportAdapter,
+  msg: InboundMessage,
+  userId: string,
+  prospect: ProspectState['prospect'],
+  effective: InboundMessage,
+  media: ChatImage | null,
+  transcript: string | null,
+  contactText: string | null
+): Promise<boolean> {
+  if (!prospect) return false;
+  let inboundText = effective.text ?? '';
+  let inboundKind = 'text';
+  if (contactText) {
+    inboundText = [inboundText, contactText].filter(Boolean).join('\n');
+    inboundKind = 'contact';
+  } else if (msg.kind === 'voice' && transcript) {
+    inboundKind = 'voice';
+  } else if (msg.kind === 'image' && media) {
+    inboundKind = 'image';
+    try {
+      const caption = await describeImage(media);
+      inboundText = [inboundText, `[imagem enviada: ${caption}]`].filter(Boolean).join('\n');
+    } catch (e) {
+      log.error('prospect image description failed:', (e as Error).message);
+      inboundText = [inboundText, '[imagem enviada — não consegui processar]'].filter(Boolean).join('\n');
     }
-    if (!inboundText) inboundText = '[mensagem sem texto legível]';
-
-    const agentReply = await respondAsProspectAgent(pr.prospect, inboundText, inboundKind);
-    if (agentReply) {
-      await sendOrRecord(adapter, msg.from, { text: agentReply }, userId, 'prospect_agent');
-    }
-    return; // prospects never fall through to the farmer pipeline
   }
+  if (!inboundText) inboundText = '[mensagem sem texto legível]';
 
-  // Build the route context (guard survivors + onboarding signals), then pick
-  // the first matching route by priority order; if nothing matches, the
-  // reasoning fallback. The branch's 8 outputs come back as one RouteResult.
-  const ctx = await buildRouteContext({
-    adapter,
-    msg,
-    effective,
-    user,
-    userId,
-    firstContact,
-    media,
-    transcript,
-    contactText,
-    mediaTooLarge,
-  });
-  const route = ROUTES.find((r) => r.match(ctx));
-  const result = route ? await route.handle(ctx) : await reasonFallback(ctx);
+  const agentReply = await respondAsProspectAgent(prospect, inboundText, inboundKind);
+  if (agentReply) {
+    await sendOrRecord(adapter, msg.from, { text: agentReply }, userId, 'prospect_agent');
+  }
+  return true; // prospects never fall through to the farmer pipeline
+}
+
+/**
+ * Common send tail (phase D): compliance gate → first-contact consent note →
+ * media/card selection → referral nudge → send → delivery-gated markers →
+ * optional second PDF document. Order and conditions unchanged from the inline
+ * tail; the route's outputs arrive as one RouteResult.
+ */
+async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<void> {
+  const { adapter, msg, effective, user, userId, firstContact } = ctx;
   const { intent, replyText, pestCard, extraCardUrl, extraDocUrl, extraDocCaption, extraDocFilename, suppressCard } =
     result;
 
@@ -1122,4 +1132,72 @@ export async function handleInbound(
       'application_report_pdf'
     );
   }
+}
+
+export async function handleInbound(
+  adapter: TransportAdapter,
+  msg: InboundMessage
+): Promise<void> {
+  // Pre-route guards — each may fully handle the message and short-circuit.
+  if (await guardDeletionRequest(adapter, msg)) return;
+  if (await guardPartnerReply(adapter, msg)) return;
+
+  const user = await resolveUserOrFailClosed(adapter, msg);
+  if (!user) return;
+  const userId = user.id;
+  const firstContact = isFirstContact(user);
+
+  if (await guardDuplicateInbound(userId, msg)) return;
+
+  // Acquisition attribution: a vouched farmer's first message carries who sent
+  // them ("Oi! Vim pelo José" / #tec-jose). First-wins at the DB layer — the
+  // vouchado/orgânico cohort split is the flight plan's gate metric.
+  if (firstContact && msg.text) {
+    const src = parseSourceToken(msg.text);
+    if (src) await setUserSource(userId, src);
+  }
+
+  // Prospect opt-out ("sair") is honoured immediately and permanently, before
+  // any other handling. `pr` also carries the prospect for the agent branch,
+  // which runs after media normalization below.
+  const pr = await handleProspectInbound(msg.from, msg.text ?? null);
+  if (pr.handled && pr.reply) {
+    await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
+    if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
+    return;
+  }
+
+  if (await guardRateLimit(adapter, msg, userId)) return;
+
+  const { media, transcript, contactText, mediaTooLarge } = await fetchInboundMedia(adapter, msg);
+
+  // A transcribed voice note becomes a normal text message downstream.
+  const effective: InboundMessage =
+    msg.kind === 'voice' && transcript ? { ...msg, kind: 'text', text: transcript } : msg;
+  // Attach the transcript to the already-claimed inbound row (observability).
+  if (transcript) await updateInboundTranscript(msg.messageId, transcript);
+
+  if (
+    await respondAsProspectIfApplicable(adapter, msg, userId, pr.prospect, effective, media, transcript, contactText)
+  )
+    return;
+
+  // Build the route context (guard survivors + onboarding signals), then pick
+  // the first matching route by priority order; if nothing matches, the
+  // reasoning fallback. The branch's 8 outputs come back as one RouteResult.
+  const ctx = await buildRouteContext({
+    adapter,
+    msg,
+    effective,
+    user,
+    userId,
+    firstContact,
+    media,
+    transcript,
+    contactText,
+    mediaTooLarge,
+  });
+  const route = ROUTES.find((r) => r.match(ctx));
+  const result = route ? await route.handle(ctx) : await reasonFallback(ctx);
+  await finalizeAndSend(ctx, result);
 }
