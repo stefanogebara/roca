@@ -65,3 +65,56 @@ número real na mesa."
 - Mandar pra ele: o cartão de contato (`/api/vcard`) + link tokenizado da
   carteira + o resumo do acordo em 5 linhas por WhatsApp.
 - Stevi re-consenta os 4 produtores → dossiês fluem no reply dele.
+
+---
+
+## Plano B — por mensagem (escolhido 16/jul: fundador prefere não ligar)
+
+Trade-off assumido: mensagem perde um pouco de taxa de fechamento vs. voz, mas
+custa 60 segundos. **As mensagens saem do WhatsApp PESSOAL do fundador** (Michel
+conhece o Stefano — o acordo não pode vir do robô). A máquina resolve o resto
+sozinha: qualquer reply dele pra Stevi abre a janela de 24h → os 4 dossiês
+entregam automaticamente → fundador é alertado (🤝).
+
+### Sequência (copiar-colar, 4 mensagens)
+
+**1 — abre:**
+> Michel! Aqui é o Stefano, da Stevi. Não vou te tomar tempo com ligação — dá
+> pra resolver tudo por aqui mesmo. 👊
+> Tenho **4 produtores de café da tua região** que pediram agrônomo pela Stevi
+> e autorizaram passar o contato. Tão te esperando.
+
+**2 — a ação (anexar o .vcf de `roca-black.vercel.app/api/vcard`):**
+> Pra eles chegarem até você é só responder qualquer coisa ("oi" serve) pra
+> Stevi nesse contato aqui 👇
+> Na hora ela te manda o resumo de cada produtor — cultura, região, o que ele
+> precisa. Sem app, sem cadastro, só WhatsApp.
+
+**3 — o acordo:**
+> O acordo que te proponho, bem simples: **leads do Caparaó de graça até
+> agosto.** Em troca: você tenta contato em até 48h, me dá 15 min por semana
+> validando as respostas técnicas da Stevi (teu nome como responsável técnico
+> dela), e depois do teu primeiro fechamento a gente conversa sobre seguir. Se
+> fizer sentido pra você, me apresenta 1 cooperativa e 1 revenda da região
+> também.
+
+**4 — o CREA:**
+> Última coisa: tô publicando a página de verificação da Stevi (produtor
+> desconfiado confere lá quem responde por ela). Quero colocar teu nome como
+> agrônomo responsável — **me passa teu CREA (número e UF)?** Publico só com
+> tua autorização. 🙏
+
+### O que acontece depois do envio (tudo automático)
+
+- Michel responde à Stevi → dossiês fluem → fundador recebe o alerta 🤝.
+- Silêncio ≥24h num lead aceito → SLA pinga o fundador.
+- CREA chegar → colar pro Claude → `VERIFIER_*` na Vercel → página completa.
+- **Silêncio total por ~2 dias = diagnóstico** → a ligação de 20 min vira o
+  fallback (roteiro acima), não o default.
+
+### Guard-rails (inalterados)
+
+- **Preço não entra** nas mensagens — regra pré-registrada: só depois do 1º
+  fechamento dele.
+- Lead >1 semana parado no momento do reply dele → avisar o Claude ANTES do
+  dossiê sair (re-consentimento do produtor).
