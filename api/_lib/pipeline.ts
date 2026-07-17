@@ -351,6 +351,116 @@ async function sendOrRecord(
   }
 }
 
+// --- Route table scaffolding (refactor 2026-07-16-handleinbound-refactor) ---
+// The intent ladder is being extracted into an ordered list of routes. T1 lands
+// the shared types + context builder; the branch bodies move into routes in T2.
+
+type PipelineUser = NonNullable<Awaited<ReturnType<typeof upsertUser>>>;
+type StatedLocation = Awaited<ReturnType<typeof resolveStatedLocation>>;
+
+/**
+ * Everything a route needs to decide and handle a message, built once after the
+ * pre-route guards (LGPD/partner/fail-closed/idempotency/prospect/rate-limit)
+ * and media normalization have run. The onboarding signals (crop/consent/
+ * confirm/statedLocation) are precomputed here — eagerly and in the same order
+ * as before — so a route's `match` predicate stays pure and cheap.
+ */
+interface RouteContext {
+  adapter: TransportAdapter;
+  msg: InboundMessage;
+  /** Voice→text normalized message (transcript folded in when present). */
+  effective: InboundMessage;
+  user: PipelineUser;
+  userId: string;
+  firstContact: boolean;
+  media: ChatImage | null;
+  transcript: string | null;
+  contactText: string | null;
+  mediaTooLarge: boolean;
+  // Onboarding precomputes (may fire side effects — see buildRouteContext).
+  cropAnswer: string[] | null;
+  cropsOnly: boolean;
+  consentReply: string | null;
+  confirmYes: boolean;
+  statedLocation: StatedLocation | null;
+}
+
+/** The 8 outputs an intent branch produces — replaces the mutable accumulators. */
+interface RouteResult {
+  intent: Intent;
+  replyText: string;
+  pestCard?: PestCardData;
+  extraCardUrl?: string;
+  extraDocUrl?: string;
+  extraDocCaption?: string;
+  extraDocFilename?: string;
+  suppressCard?: boolean;
+}
+
+/**
+ * One intent branch. `match` is a pure, I/O-free predicate over the context;
+ * `handle` produces the reply. ROUTES order is priority (overlapping fast-path
+ * regexes make ordering load-bearing).
+ */
+interface Route {
+  name: string;
+  match: (ctx: RouteContext) => boolean;
+  handle: (ctx: RouteContext) => Promise<RouteResult>;
+}
+
+/** The pre-route-guard survivors, before the onboarding signals are computed. */
+type RouteContextBase = Omit<
+  RouteContext,
+  'cropAnswer' | 'cropsOnly' | 'consentReply' | 'confirmYes' | 'statedLocation'
+>;
+
+/**
+ * Build the route context from the guard survivors: compute the onboarding
+ * signals eagerly, in the exact order and under the exact conditions the inline
+ * precompute used. Preserves the one side effect here — a crop answer that ALSO
+ * carries a question ("posso pulverizar na soja?") is captured silently, so the
+ * message can still route normally instead of being swallowed by onboarding.
+ */
+async function buildRouteContext(base: RouteContextBase): Promise<RouteContext> {
+  const { effective, user, userId } = base;
+
+  const cropAnswer =
+    user?.awaiting === 'crop' &&
+    effective.kind === 'text' &&
+    effective.text &&
+    !CROP_NEGATION.test(effective.text)
+      ? parseCrops(effective.text)
+      : null;
+  const cropsOnly =
+    !!cropAnswer && cropAnswer.length > 0 && !!effective.text && isCropsOnlyMessage(effective.text);
+  if (cropAnswer && cropAnswer.length > 0 && !cropsOnly && userId) {
+    await setFarmCrops(userId, cropAnswer);
+    await setAwaiting(userId, null);
+  }
+
+  const consentReply =
+    user?.awaiting === 'referral_consent' && effective.kind === 'text' && effective.text && userId
+      ? await resolveConsentReply(userId, effective.text)
+      : null;
+
+  const confirmYes =
+    user?.awaiting === 'farm_confirm' &&
+    effective.kind === 'text' &&
+    !!effective.text &&
+    isFarmConfirmYes(effective.text);
+
+  const statedLocation =
+    !confirmYes &&
+    effective.kind === 'text' &&
+    !!effective.text &&
+    !!userId &&
+    (isLocationSettingRequest(effective.text) || user?.awaiting === 'farm_confirm')
+      ? await resolveStatedLocation(effective.text)
+      : null;
+
+  return { ...base, cropAnswer, cropsOnly, consentReply, confirmYes, statedLocation };
+}
+
 export async function handleInbound(
   adapter: TransportAdapter,
   msg: InboundMessage
@@ -555,55 +665,22 @@ export async function handleInbound(
   // confirm as a field — the honest text must not carry a "SUA LAVOURA" image).
   let suppressCard = false;
 
-  // If we asked what they grow (right after the farm card) and they replied with
-  // recognizable crops, capture them. Only a crops-ONLY reply gets the capture
-  // confirmation; a question that merely names a crop ("posso pulverizar na
-  // soja?") is captured silently and routes normally — never swallowed. A
-  // negated mention ("não planto soja, parei") is never captured — the model
-  // handles it. A no-crop reply clears the wait and falls through.
-  const cropAnswer =
-    user?.awaiting === 'crop' &&
-    effective.kind === 'text' &&
-    effective.text &&
-    !CROP_NEGATION.test(effective.text)
-      ? parseCrops(effective.text)
-      : null;
-  const cropsOnly =
-    !!cropAnswer && cropAnswer.length > 0 && !!effective.text && isCropsOnlyMessage(effective.text);
-  if (cropAnswer && cropAnswer.length > 0 && !cropsOnly && userId) {
-    await setFarmCrops(userId, cropAnswer);
-    await setAwaiting(userId, null);
-  }
-
-  // Pending share-consent question (partner handoff): a clear yes/no resolves
-  // it; anything else falls through to normal handling and the question stays
-  // open until answered or superseded by another intent.
-  const consentReply =
-    user?.awaiting === 'referral_consent' && effective.kind === 'text' && effective.text && userId
-      ? await resolveConsentReply(userId, effective.text)
-      : null;
-
-  // "É aí mesmo" — the farmer affirming that a bare pin we couldn't confirm IS
-  // their field (pousio / recém-colhida). Checked before the location resolve so
-  // an affirmation never spends an LLM extract.
-  const confirmYes =
-    user?.awaiting === 'farm_confirm' &&
-    effective.kind === 'text' &&
-    !!effective.text &&
-    isFarmConfirmYes(effective.text);
-
-  // Stated location: "minha lavoura fica em X" / "sou de X", or any redirect
-  // while awaiting the farmer to fix a bad pin. Geocodes to a coarse city
-  // centroid. The LLM extract only runs on an explicit location statement or a
-  // farm_confirm redirect — never on a plain confirm or an ordinary message.
-  const statedLocation =
-    !confirmYes &&
-    effective.kind === 'text' &&
-    !!effective.text &&
-    !!userId &&
-    (isLocationSettingRequest(effective.text) || user?.awaiting === 'farm_confirm')
-      ? await resolveStatedLocation(effective.text)
-      : null;
+  // Build the route context: the onboarding signals (crop/consent/confirm/
+  // statedLocation) are precomputed here, eagerly and in order, including the
+  // silent-crop-capture side effect. The ladder below reads them unchanged.
+  const ctx = await buildRouteContext({
+    adapter,
+    msg,
+    effective,
+    user,
+    userId,
+    firstContact,
+    media,
+    transcript,
+    contactText,
+    mediaTooLarge,
+  });
+  const { cropAnswer, cropsOnly, consentReply, confirmYes, statedLocation } = ctx;
 
   if (cropAnswer && cropAnswer.length > 0 && cropsOnly) {
     if (userId) {
