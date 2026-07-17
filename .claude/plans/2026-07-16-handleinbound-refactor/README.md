@@ -1,7 +1,10 @@
 # Refactor: `handleInbound` — from a 559-line ladder to an ordered route table
 
 Date: 2026-07-16 · Audit ref: `.claude/plans/2026-07-16-platform-audit` (High #2,
-theme 2). Status: PLAN. No code changed yet.
+theme 2). **Status: DONE (shipped 2026-07-17).** All milestones landed —
+`handleInbound` went from a 559-line ladder to a 67-line orchestrator, every step
+verified behavior-identical. Commits: `73a0e5c` (T0), `9897918` (T1), `2faf88d`
+(T2), `7cb36b4` (M2), `d820ec5` (M3). Full suite 58 files / 539 green.
 
 ## Why
 
@@ -126,7 +129,7 @@ and greppable, and a route's `match` is the exact predicate from today's `else i
 
 ## Milestones
 
-### M0 — Safety net (characterization tests FIRST, no prod change)
+### M0 — Safety net (characterization tests FIRST, no prod change) ✅ DONE (`73a0e5c`)
 `pipeline.test.ts` already locks the onboarding-state branches (crop capture, farm_confirm,
 stated location, suppressCard, fail-closed, growth, compliance-vs-card). It does NOT drive
 the pipeline through these intent branches — add characterization tests that assert, at the
@@ -137,42 +140,52 @@ brief, referral (incl. the partner-match → referral_consent branch), mediaTooL
 voice-no-transcript, consentReply**, and the **second PDF document send** (`extraDocUrl &&
 gate.safe`). These are the behavioral lock the extraction is verified against.
 
-### M1 — Extract the ladder (the core win)
+### M1 — Extract the ladder (the core win) ✅ DONE (`9897918` T1, `2faf88d` T2)
 Introduce `RouteContext`/`RouteResult`/`Route`, move each `else if` body **verbatim** into a
 `handle`, its condition into `match`, assemble `ROUTES` + `reasonFallback`, and replace the
 chain + 9 `let`s with the `find`/fallback dispatch. `buildRouteContext` holds phases A-survivors
 + B. Verify: full suite green (M0 tests especially), `tsc` clean.
 
-### M2 — Extract guards + tail
+### M2 — Extract guards + tail ✅ DONE (`7cb36b4`)
 Pull phase-A guards into named `guard*` functions returning `handled: boolean`, and phase D
 into `finalizeAndSend(ctx, result)`. `handleInbound` becomes a ~40-line orchestrator.
+Shipped: `guardDeletionRequest` / `guardPartnerReply` / `guardDuplicateInbound` /
+`guardRateLimit` (→ boolean), `resolveUserOrFailClosed` (→ user|null), `fetchInboundMedia`,
+`respondAsProspectIfApplicable`, and `finalizeAndSend`. `handleInbound` = 67 lines.
 
-### M3 — (Optional, higher risk) Unify the Intent taxonomy
-Make each route declare its `Intent`; derive the single source of truth so `router.ts` and
-the regex fast-paths stop being two half-maps (arch audit High #2b). Defer unless we're
-touching routing again anyway.
+### M3 — Unify the Intent taxonomy ✅ DONE (`d820ec5`) — done now rather than deferred
+Each route declares its `Intent` statically (`Route.intent`); the dispatcher stamps it and
+handlers return `RouteOutput` (result minus intent). `Intent` is DERIVED from four producer
+registries in `router.ts` (`LLM_INTENTS` / `STRUCTURAL_INTENTS` / `FASTPATH_INTENTS` /
+`FALLBACK_INTENTS`), so the type and the runtime allow-lists can't drift — the "two
+half-maps" (arch audit High #2b) are gone. New guard test `tests/intent-taxonomy.test.ts`
+locks `FASTPATH_INTENTS` ≡ the intents ROUTES declare, both directions.
 
 ## Task table
 
-| ID | Task | Files | Effort | Risk | Deps |
-|----|------|-------|--------|------|------|
-| T0 | Characterization tests for the 11 untested branches + 2nd-PDF send | `tests/pipeline-routes.test.ts` (new) | M | none | — |
-| T1 | Define `RouteContext`/`RouteResult`/`Route`; `buildRouteContext` (phases A-survivors + B, verbatim) | `pipeline.ts` | M | med | T0 |
-| T2 | Move 15 branch bodies → `match`/`handle`; assemble `ROUTES` + `reasonFallback` | `pipeline.ts` | L | med | T1 |
-| T3 | Replace the if/else chain + 9 `let`s with `find`/fallback dispatch | `pipeline.ts` | S | med | T2 |
-| T4 | Verify: full suite + tsc + a behavior-diff spot check on live-shaped inputs | — | S | none | T3 |
-| T5 | (M2) Extract phase-A guards + `finalizeAndSend` | `pipeline.ts` | M | low | T4 |
-| T6 | (M3, optional) Unify Intent source of truth | `pipeline.ts`,`router.ts` | M | med | T5 |
+| ID | Task | Files | Effort | Risk | Deps | Status |
+|----|------|-------|--------|------|------|--------|
+| T0 | Characterization tests for the 11 untested branches + 2nd-PDF send | `tests/pipeline-routes.test.ts` (new) | M | none | — | ✅ `73a0e5c` |
+| T1 | Define `RouteContext`/`RouteResult`/`Route`; `buildRouteContext` (phases A-survivors + B, verbatim) | `pipeline.ts` | M | med | T0 | ✅ `9897918` |
+| T2 | Move 15 branch bodies → `match`/`handle`; assemble `ROUTES` + `reasonFallback` (folded in T3's dispatch swap) | `pipeline.ts` | L | med | T1 | ✅ `2faf88d` |
+| T3 | Replace the if/else chain + 9 `let`s with `find`/fallback dispatch | `pipeline.ts` | S | med | T2 | ✅ folded into T2 |
+| T4 | Verify: full suite + tsc + a behavior-diff spot check on live-shaped inputs | — | S | none | T3 | ✅ baseline (`73a0e5c`) vs HEAD both green |
+| T5 | (M2) Extract phase-A guards + `finalizeAndSend` | `pipeline.ts` | M | low | T4 | ✅ `7cb36b4` |
+| T6 | (M3) Unify Intent source of truth | `pipeline.ts`,`router.ts`,`tests/intent-taxonomy.test.ts` | M | med | T5 | ✅ `d820ec5` |
 
-Effort: S<2h, M half-day, L 1-2 days. **M0+M1 (T0-T4) is the shippable unit** (~1-1.5 days);
-M2 and M3 are separate follow-up commits.
+Effort: S<2h, M half-day, L 1-2 days. **M0+M1 (T0-T4) was the shippable unit**; M2 and M3
+landed as separate follow-up commits (all shipped 2026-07-17).
 
-## Done signals
-- `handleInbound` < ~150 lines (target ~40 after M2); zero mutable accumulators in the
-  orchestrator (they live in `RouteResult`).
-- `ROUTES` is one ordered list; each route's `match`/`handle` unit-testable in isolation.
-- Full suite green including the M0 characterization tests; `tsc --noEmit` clean; CI green.
-- No diff in reply text / routing / side effects on a representative input sweep.
+## Done signals (all met)
+- ✅ `handleInbound` **67 lines** (from 559); zero mutable accumulators in the orchestrator
+  (they live in `RouteResult`).
+- ✅ `ROUTES` is one ordered list; each route's `match`/`handle` unit-testable in isolation.
+- ✅ Full suite green including the M0 characterization tests (**58 files / 539**);
+  `tsc --noEmit` clean. ⚠️ CI green not confirmed from the dev box — the GitHub API was
+  unreachable (TLS handshake timeouts) throughout the session; `git push` succeeded on every
+  commit and the local suite was the gate. Confirm the Actions runs `73a0e5c → d820ec5`.
+- ✅ No diff in reply text / routing / side effects — proven by running the T0 characterization
+  suite against BOTH the original ladder (`73a0e5c`) and the final code (HEAD); both green.
 
 ## Risks & mitigations
 - **Behavior drift (the real risk).** → M0 characterization tests written and green BEFORE
@@ -190,8 +203,15 @@ Each task is a separate commit; the extraction (T1-T3) is behavior-identical, so
 reverts to the prior commit with no data/state implications (pure code motion). M0 tests are
 kept regardless — they have standalone value.
 
-## Open questions
-1. Ship M2 (guards + tail extraction) in the same PR as M1, or as a fast follow? (Recommend
-   follow: keep the core extraction diff reviewable.)
-2. Do M3 (Intent unification) now or leave it? (Recommend leave until routing is touched
-   again — it's the one piece with real behavior-change surface.)
+## Open questions (resolved)
+1. ~~Ship M2 in the same PR as M1, or as a fast follow?~~ → **Fast follow.** M2 landed as its
+   own commit (`7cb36b4`) after M1's T4 verification.
+2. ~~Do M3 (Intent unification) now or leave it?~~ → **Done now** (`d820ec5`). Executed as the
+   full flow restructure (static `Route.intent` + dispatcher stamps + derived taxonomy), kept
+   behavior-preserving and guarded by the new `tests/intent-taxonomy.test.ts`.
+
+## Surfaced during the work (follow-ups, not part of this refactor)
+- **PRICE_INTENT gap:** writing the T0 prices test surfaced that `PRICE_INTENT` doesn't match
+  "quanto tá a saca do café" (the commodity must follow "quanto tá o/a" directly). Documented
+  in the test; spun off as a separate task — behavior-changing, so out of scope for this
+  behavior-locking refactor.
