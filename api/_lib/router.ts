@@ -12,22 +12,37 @@ import { createLogger } from './logger';
 
 const log = createLogger('router');
 
+// --- Intent taxonomy: the single source of truth ---------------------------
+// The `Intent` union is DERIVED from these producer sets, so the type and the
+// runtime allow-lists can't drift apart. Each intent is grouped by who emits it;
+// a few intents have more than one producer (e.g. 'general' is both an LLM class
+// and a fast-path reply; 'onboarding' is structural and fast-path; 'pest_triage'
+// is LLM and structural) — that overlap is intentional, not a duplicate map.
+
+/** Intents a cheap-tier model may classify a text message into (see VALID/routeIntent). */
+export const LLM_INTENTS = ['pest_triage', 'spray_window', 'field_profile', 'general', 'smalltalk'] as const;
+/** Intents short-circuited by message structure before the LLM (image → pest, location → onboarding). */
+export const STRUCTURAL_INTENTS = ['pest_triage', 'onboarding'] as const;
+/** Intents emitted by the regex fast-path routes (the pipeline ROUTES table). Kept in sync by a guard test. */
+export const FASTPATH_INTENTS = [
+  'onboarding',
+  'referral',
+  'financing_report',
+  'application_report',
+  'history',
+  'application_log',
+  'prices',
+  'brief',
+  'general',
+] as const;
+/** Intents emitted only by the reasoning fallback's own regex. */
+export const FALLBACK_INTENTS = ['field_health'] as const;
+
 export type Intent =
-  | 'pest_triage'
-  | 'spray_window'
-  | 'field_profile'
-  | 'field_health'
-  | 'general'
-  | 'onboarding'
-  | 'smalltalk'
-  | 'referral'
-  | 'brief'
-  // matched by fast regex in the pipeline, never returned by the LLM router
-  | 'history'
-  | 'prices'
-  | 'application_log'
-  | 'application_report'
-  | 'financing_report';
+  | (typeof LLM_INTENTS)[number]
+  | (typeof STRUCTURAL_INTENTS)[number]
+  | (typeof FASTPATH_INTENTS)[number]
+  | (typeof FALLBACK_INTENTS)[number];
 
 const ROUTER_INSTRUCTION = `Classifique a mensagem do produtor rural em UMA categoria. Responda só com a palavra-chave.
 
@@ -40,13 +55,9 @@ Categorias:
 
 Responda apenas a palavra-chave, nada mais.`;
 
-const VALID: Intent[] = [
-  'pest_triage',
-  'spray_window',
-  'field_profile',
-  'general',
-  'smalltalk',
-];
+// The classifier allow-list IS the LLM producer set — no second hand-maintained
+// copy to drift from the taxonomy above.
+const VALID = LLM_INTENTS;
 
 /**
  * Route a message to an intent. Structural fast-paths first; LLM classification

@@ -398,14 +398,23 @@ interface RouteResult {
 }
 
 /**
+ * A route handler's output: everything in RouteResult EXCEPT the intent, which
+ * the route declares statically (Route.intent) and the dispatcher stamps on.
+ * This keeps the fast-path intent taxonomy in one place per route.
+ */
+type RouteOutput = Omit<RouteResult, 'intent'>;
+
+/**
  * One intent branch. `match` is a pure, I/O-free predicate over the context;
  * `handle` produces the reply. ROUTES order is priority (overlapping fast-path
  * regexes make ordering load-bearing).
  */
 interface Route {
   name: string;
+  /** The (fixed) intent every match of this route emits — the single place it's declared. */
+  intent: Intent;
   match: (ctx: RouteContext) => boolean;
-  handle: (ctx: RouteContext) => Promise<RouteResult>;
+  handle: (ctx: RouteContext) => Promise<RouteOutput>;
 }
 
 /** The pre-route-guard survivors, before the onboarding signals are computed. */
@@ -472,6 +481,7 @@ async function buildRouteContext(base: RouteContextBase): Promise<RouteContext> 
 
 const cropsOnlyRoute: Route = {
   name: 'cropsOnly',
+  intent: 'onboarding',
   match: (ctx) => !!ctx.cropAnswer && ctx.cropAnswer.length > 0 && ctx.cropsOnly,
   handle: async (ctx) => {
     const { userId, cropAnswer } = ctx;
@@ -480,7 +490,6 @@ const cropsOnlyRoute: Route = {
       await setAwaiting(userId, null);
     }
     return {
-      intent: 'onboarding',
       replyText: `Anotado: você trabalha com ${joinCrops(cropAnswer!)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`,
     };
   },
@@ -488,16 +497,18 @@ const cropsOnlyRoute: Route = {
 
 const consentRoute: Route = {
   name: 'consent',
+  intent: 'referral',
   match: (ctx) => !!ctx.consentReply,
   handle: async (ctx) => {
     const { userId, consentReply } = ctx;
     if (userId) await setAwaiting(userId, null);
-    return { intent: 'referral', replyText: consentReply! };
+    return { replyText: consentReply! };
   },
 };
 
 const confirmYesRoute: Route = {
   name: 'confirmYes',
+  intent: 'onboarding',
   match: (ctx) => ctx.confirmYes,
   handle: async (ctx) => {
     // Farmer confirmed the bare pin IS their field (pousio / recém-colhida) →
@@ -505,7 +516,6 @@ const confirmYesRoute: Route = {
     const { userId } = ctx;
     if (userId) await setAwaiting(userId, 'crop');
     return {
-      intent: 'onboarding',
       replyText:
         'Beleza, mantive sua localização então. 🌱 Me conta: o que você planta aí? Soja, milho, café, pasto?',
     };
@@ -514,6 +524,7 @@ const confirmYesRoute: Route = {
 
 const statedLocationResolvedRoute: Route = {
   name: 'statedLocationResolved',
+  intent: 'onboarding',
   match: (ctx) => ctx.statedLocation?.kind === 'resolved' && !!ctx.userId,
   handle: async (ctx) => {
     // Farmer named where the field is → store a coarse city reference and invite
@@ -523,12 +534,13 @@ const statedLocationResolvedRoute: Route = {
     await setFarmLocation(userId, sl.lat, sl.lon, 'city');
     if (sl.uf) await setUserState(userId, sl.uf);
     await setAwaiting(userId, 'crop');
-    return { intent: 'onboarding', replyText: confirmLocationReply(sl) };
+    return { replyText: confirmLocationReply(sl) };
   },
 };
 
 const statedLocationUngeocodableRoute: Route = {
   name: 'statedLocationUngeocodable',
+  intent: 'onboarding',
   match: (ctx) => ctx.statedLocation?.kind === 'ungeocodable' && !!ctx.userId,
   handle: async (ctx) => {
     // Named a place we couldn't locate → ask for city+UF or the pin. A message
@@ -537,7 +549,6 @@ const statedLocationUngeocodableRoute: Route = {
     const sl = ctx.statedLocation as Extract<StatedLocation, { kind: 'ungeocodable' }>;
     if (user?.awaiting) await setAwaiting(userId, null);
     return {
-      intent: 'onboarding',
       replyText: `Hmm, não consegui achar "${sl.city.slice(0, 40)}" no mapa 🤔. Me diz a cidade e o estado da sua lavoura (ex: "Patrocínio-MG"), ou manda o pin (clipe 📎 → Localização).`,
     };
   },
@@ -545,6 +556,7 @@ const statedLocationUngeocodableRoute: Route = {
 
 const financingReportRoute: Route = {
   name: 'financingReport',
+  intent: 'financing_report',
   // Histórico de manejo — the crédito-rural/PRONAF SUPPORT report. Checked
   // BEFORE application_report so "relatório de aplicações pro banco" lands here.
   // A record, never the application: the projeto técnico (ART), the DAP/CAF, the
@@ -555,12 +567,11 @@ const financingReportRoute: Route = {
     if (userId && user?.awaiting) await setAwaiting(userId, null);
     const finRows = userId ? await listApplications(userId, { limit: 200 }) : [];
     if (finRows.length === 0) {
-      return { intent: 'financing_report', replyText: financingEmptyReply() };
+      return { replyText: financingEmptyReply() };
     }
     const finParams = userId ? reportCardParams(userId) : null;
     if (finParams) {
       return {
-        intent: 'financing_report',
         replyText: financingCaption(finRows.length),
         extraDocUrl: `${PUBLIC_BASE}/api/report?${finParams}&kind=pronaf`,
         extraDocCaption:
@@ -572,7 +583,6 @@ const financingReportRoute: Route = {
     // never an unsigned URL to private records.
     const finProfile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
     return {
-      intent: 'financing_report',
       replyText:
         financingCaption(finRows.length) +
         '\n\n' +
@@ -583,6 +593,7 @@ const financingReportRoute: Route = {
 
 const applicationReportRoute: Route = {
   name: 'applicationReport',
+  intent: 'application_report',
   // Caderno de aplicações report (rastreabilidade). Checked BEFORE the history
   // fast-path, since "meu caderno de aplicações" also matches isHistoryRequest.
   // The dose/brand live in the rendered card (gate never sees it); the caption
@@ -594,12 +605,11 @@ const applicationReportRoute: Route = {
     const rows = userId ? await listApplications(userId, { limit: 200 }) : [];
     const receituarioPrefix = /receitu/i.test(effective.text!) ? `${RECEITUARIO_NOTE}\n\n` : '';
     if (rows.length === 0) {
-      return { intent: 'application_report', replyText: receituarioPrefix + applicationsEmptyReply() };
+      return { replyText: receituarioPrefix + applicationsEmptyReply() };
     }
     const params = userId ? reportCardParams(userId) : null;
     if (params) {
       return {
-        intent: 'application_report',
         replyText: receituarioPrefix + applicationsCaption(rows.length),
         extraCardUrl: `${PUBLIC_BASE}/api/card?${params}`,
         extraDocUrl: `${PUBLIC_BASE}/api/report?${params}`,
@@ -609,7 +619,6 @@ const applicationReportRoute: Route = {
     // shipping the farmer's chemical history through an unsigned public URL.
     const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
     return {
-      intent: 'application_report',
       replyText: receituarioPrefix + applicationsTextSummary(buildApplicationsReport(profile, rows)),
     };
   },
@@ -617,6 +626,7 @@ const applicationReportRoute: Route = {
 
 const historyRoute: Route = {
   name: 'history',
+  intent: 'history',
   // Passive caderno de campo — the season record Stevi keeps for free.
   match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isHistoryRequest(ctx.effective.text),
   handle: async (ctx) => {
@@ -625,12 +635,13 @@ const historyRoute: Route = {
     const replyText = userId
       ? buildHistoryReply(await getFarmProfile(userId), await getActivityLog(userId))
       : buildHistoryReply({ uf: null, crop: null }, []);
-    return { intent: 'history', replyText };
+    return { replyText };
   },
 };
 
 const applicationLogRoute: Route = {
   name: 'applicationLog',
+  intent: 'application_log',
   // Caderno de aplicações — the farmer declaring an application already made
   // ("apliquei X ontem"). Record it (their own data, never a prescription) and
   // read the parsed record back. The confirm keeps the numeric dose out of its
@@ -648,12 +659,13 @@ const applicationLogRoute: Route = {
       const farm = await getFarm(userId);
       await insertApplication(userId, app, farm?.id ?? null);
     }
-    return { intent: 'application_log', replyText: formatApplicationConfirm(app) };
+    return { replyText: formatApplicationConfirm(app) };
   },
 };
 
 const pricesRoute: Route = {
   name: 'prices',
+  intent: 'prices',
   // Commodity quotes — the price habit loop. Crop-filtered when known.
   match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isPriceRequest(ctx.effective.text),
   handle: async (ctx) => {
@@ -664,7 +676,6 @@ const pricesRoute: Route = {
     const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
     const { quotes, usdBrl } = await fetchPrices(asked.length > 0 ? asked : profile.crop);
     return {
-      intent: 'prices',
       replyText: formatPricesReply(quotes, usdBrl),
       // The shareable card — prices are the most-forwarded content in rural
       // groups, so the reply ships as an image farmers can pass on.
@@ -675,6 +686,7 @@ const pricesRoute: Route = {
 
 const briefRoute: Route = {
   name: 'brief',
+  intent: 'brief',
   // Assemble the agrônomo briefing from the farmer's profile + recent messages.
   match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isBriefRequest(ctx.effective.text),
   handle: async (ctx) => {
@@ -694,12 +706,13 @@ const briefRoute: Route = {
           'Anexei também seu *caderno de aplicações* em PDF — dá pra encaminhar junto pro agrônomo, ele já vê o que foi aplicado. 📎';
       }
     }
-    return { intent: 'brief', replyText, extraDocUrl, extraDocCaption };
+    return { replyText, extraDocUrl, extraDocCaption };
   },
 };
 
 const referralRoute: Route = {
   name: 'referral',
+  intent: 'referral',
   // Explicit agrônomo referral request — the business-model seed.
   match: (ctx) => ctx.effective.kind === 'text' && !!ctx.effective.text && isReferralRequest(ctx.effective.text),
   handle: async (ctx) => {
@@ -746,15 +759,15 @@ const referralRoute: Route = {
         log.error('partner match failed (generic referral reply kept):', (e as Error).message);
       }
     }
-    return { intent: 'referral', replyText };
+    return { replyText };
   },
 };
 
 const mediaTooLargeRoute: Route = {
   name: 'mediaTooLarge',
+  intent: 'general',
   match: (ctx) => ctx.mediaTooLarge,
   handle: async () => ({
-    intent: 'general',
     replyText:
       'Opa, esse arquivo veio grande demais pra eu processar. 😅 Manda de novo como foto normal (sem ser em qualidade máxima/documento) que eu dou conta.',
   }),
@@ -762,9 +775,9 @@ const mediaTooLargeRoute: Route = {
 
 const voiceNoTranscriptRoute: Route = {
   name: 'voiceNoTranscript',
+  intent: 'general',
   match: (ctx) => ctx.msg.kind === 'voice' && !ctx.transcript,
   handle: async () => ({
-    intent: 'general',
     replyText:
       'Recebi seu áudio mas não consegui entender direito. 🙉 Pode escrever em texto, ou mandar o áudio de novo mais pertinho do celular?',
   }),
@@ -772,6 +785,7 @@ const voiceNoTranscriptRoute: Route = {
 
 const locationPinRoute: Route = {
   name: 'locationPin',
+  intent: 'onboarding',
   match: (ctx) => ctx.effective.kind === 'location' && !!ctx.effective.location,
   handle: async (ctx) => {
     // Pin drop → the payback moment, or an honest "não achei vegetação aí" when
@@ -781,13 +795,15 @@ const locationPinRoute: Route = {
     const fc = await buildFarmCard(userId, effective.location!.lat, effective.location!.lon);
     // No vegetation → the reply is an honest question; never attach a "SUA
     // LAVOURA" card over a rooftop/water.
-    return { intent: 'onboarding', replyText: fc.text, suppressCard: !fc.card };
+    return { replyText: fc.text, suppressCard: !fc.card };
   },
 };
 
 // Order = priority. Do not reorder without re-checking the overlapping fast-path
 // regexes (see the per-route comments; the T0 characterization tests pin it).
-const ROUTES: Route[] = [
+// Exported so the intent-taxonomy guard test can assert the routes' declared
+// intents stay in sync with router.ts's FASTPATH_INTENTS.
+export const ROUTES: Route[] = [
   cropsOnlyRoute,
   consentRoute,
   confirmYesRoute,
@@ -1198,6 +1214,10 @@ export async function handleInbound(
     mediaTooLarge,
   });
   const route = ROUTES.find((r) => r.match(ctx));
-  const result = route ? await route.handle(ctx) : await reasonFallback(ctx);
+  // The route declares its intent statically; stamp it onto the handler output.
+  // The fallback owns its own (dynamic) intent, so it returns a full RouteResult.
+  const result: RouteResult = route
+    ? { ...(await route.handle(ctx)), intent: route.intent }
+    : await reasonFallback(ctx);
   await finalizeAndSend(ctx, result);
 }
