@@ -2,6 +2,35 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
+## 2026-07-17 — Facts inherited through compaction are hearsay; verify against prod before any outbound promise
+
+**Context:** The "4 leads parados esperando o Michel" narrative rode through
+session summaries into the partner one-pager and then into WhatsApp messages
+SENT to partner #1 ("4 produtores de café da tua região te esperando").
+A later DB check showed the truth: 5 referral_requests, ALL in SP/MT
+(soja/milho), partner_id null — zero ever matched or notified to Michel. The
+promise was false; it cost a public walk-back to the first partner (recovered
+by converting it into the carteira-invite ask).
+
+**What went wrong:** a stateful claim ("X is waiting in the system") was
+carried across compaction like a fact and re-used in an outbound message
+without re-verification. Summaries preserve *narrative*, not *state* — state
+drifts, and summarization can also distort it.
+
+**Rules:**
+- **Before ANY outbound promise that asserts system state** (leads waiting,
+  data published, counts, statuses — in a message, page, or template), query
+  the system of record FRESH in the same session. The DB is truth; a
+  compaction summary is hearsay.
+- Symmetric check when the claim involves a matcher/filter: verify the rows
+  are actually LINKED (partner_id/status), not just that rows exist.
+- If a false claim already shipped: correct it to the human FAST, before
+  their next action can collide with reality — and convert the correction
+  into the honest next step rather than a bare apology.
+- Bonus tell that was missed: the lead-SLA never paged. A monitor's silence
+  is itself evidence about state — reconcile "why hasn't X fired?" against
+  the narrative before trusting it.
+
 ## 2026-07-16 — A timed-out `git push` may have LANDED; probe with ls-remote before retrying
 
 **Context:** Pushing two commits during a network flap. `git push` hit the tool
