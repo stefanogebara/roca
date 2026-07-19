@@ -24,7 +24,14 @@ import {
   recordSendFailed,
 } from './db';
 import { sendProspectTemplate } from './send';
-import { buildTemplateParams, renderTemplateText, buildBumpParams, renderBumpText } from './personalize';
+import {
+  buildTemplateParams,
+  renderTemplateText,
+  buildBumpParams,
+  renderBumpText,
+  buildCoopParams,
+  renderCoopText,
+} from './personalize';
 import { logProspectMessage, loadBumpDueProspects, recordBump } from './db';
 import {
   gradeCap,
@@ -41,22 +48,32 @@ import {
 // template is approved, only right-fit kinds receive sends. Widen with
 // PROSPECT_SEND_KINDS (csv of kinds, or 'all').
 function kindAllowed(kind: string): boolean {
-  const kinds = (process.env.PROSPECT_SEND_KINDS || 'agronomo,consultoria')
+  // Coops/revendas unlocked 19/jul — their distribution template
+  // (stevi_parceria_coop_v1) is APPROVED; they get THAT pitch, never lead-gen.
+  const kinds = (process.env.PROSPECT_SEND_KINDS || 'agronomo,consultoria,cooperativa,revenda')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
   return kinds.includes('all') || kinds.includes(kind);
 }
 import { alertFounders } from '../alert';
+import { V2_NAME, COOP_NAME, registryParamCount, templateShapeError } from './template';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-dispatch');
 
-// Template selection is env-driven so approving the personalized v2 in
-// WhatsApp Manager upgrades the copy without a deploy (see personalize.ts).
-const TEMPLATE_NAME = process.env.PROSPECT_TEMPLATE_NAME || 'stevi_parceria_v1';
-const TEMPLATE_PARAMS = Number(process.env.PROSPECT_TEMPLATE_PARAMS || '1');
+// Intro template for agronomos/consultorias — env-overridable, default the
+// personalized v2. Param COUNTS are derived from the template registry, never
+// from an env var: PROSPECT_TEMPLATE_PARAMS drifting from the approved shape
+// caused the Jul/13 outage (#132000 on every send → 0% delivery → latch).
+const TEMPLATE_NAME = process.env.PROSPECT_TEMPLATE_NAME || V2_NAME;
 const TEMPLATE_LANG = 'pt_BR';
+
+/** Which template a prospect kind receives. Pure; exported for tests. */
+export function templateForKind(kind: string | null): string {
+  const k = (kind ?? '').toLowerCase();
+  return k === 'cooperativa' || k === 'coop' || k === 'revenda' ? COOP_NAME : TEMPLATE_NAME;
+}
 // Gentle spacing between individual sends in a batch (avoids a burst that spikes
 // the block/report rate). Skipped in dryRun.
 const PER_SEND_DELAY_MS = Math.round(BATCH_DELAY_MS / BATCH_SIZE);
@@ -102,21 +119,29 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   }
 
   // Golden rule (same as bumps): business-initiated sends need an APPROVED
-  // template. Meta can pause/reject a template at any time; without this
-  // pre-flight every send in the batch throws and each prospect gets burned
-  // as send_status='failed'. FAILS CLOSED when the status can't be checked.
+  // template whose LIVE SHAPE matches the params we build. Meta can pause,
+  // reject or re-approve an edited template at any time; without this
+  // pre-flight every send in the batch throws (#132000 and friends) and each
+  // prospect gets burned as send_status='failed'. Both templates the round can
+  // use are checked. FAILS CLOSED when a status can't be verified.
   if (!dryRun) {
     let error: string | null = null;
+    let badTemplate = TEMPLATE_NAME;
     try {
-      const { getTemplateStatus } = await import('./template');
-      const st = await getTemplateStatus(TEMPLATE_NAME);
-      if (st?.status !== 'APPROVED') error = `template_not_approved (${st?.status ?? 'missing'})`;
+      for (const name of [TEMPLATE_NAME, COOP_NAME]) {
+        const reason = await templateShapeError(name);
+        if (reason) {
+          badTemplate = name;
+          error = reason;
+          break;
+        }
+      }
     } catch (e) {
       error = `template_check_failed: ${(e as Error).message.slice(0, 80)}`;
     }
     if (error) {
       log.error('dispatch aborted —', error);
-      await alertFounders(`⛔ Prospecção abortada: template "${TEMPLATE_NAME}" não passou na checagem (${error}). Nenhum envio feito.`);
+      await alertFounders(`⛔ Prospecção abortada: template "${badTemplate}" não passou na checagem (${error}). Nenhum envio feito.`);
       return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [] };
     }
   }
@@ -224,9 +249,15 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
       continue;
     }
     let wamid: string;
-    const params = buildTemplateParams(p, TEMPLATE_PARAMS);
+    // Per-kind routing: coops/revendas get the distribution pitch, everyone
+    // else the intro. Param count comes from the registry for THAT template.
+    const tpl = templateForKind(p.kind);
+    const params =
+      tpl === COOP_NAME
+        ? buildCoopParams(p)
+        : buildTemplateParams(p, registryParamCount(tpl) ?? 3);
     try {
-      ({ wamid } = await sendProspectTemplate(phone, TEMPLATE_NAME, TEMPLATE_LANG, params));
+      ({ wamid } = await sendProspectTemplate(phone, tpl, TEMPLATE_LANG, params));
     } catch (e) {
       // Send itself failed → nothing went out; record + continue is safe.
       await recordSendFailed(p.id);
@@ -241,12 +272,13 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     // risks re-sending this one next run (it still looks unsent). Page ops with
     // the wamid to reconcile by hand.
     try {
-      await recordSend(p.id, { wamid, template: TEMPLATE_NAME });
+      await recordSend(p.id, { wamid, template: tpl });
       recipients.push({ id: p.id, name: p.name, phone, result: 'sent' });
       sent++;
       // Thread completeness: the painel conversation view starts with the
       // template that actually went out. Best-effort — never fails the batch.
-      await logProspectMessage(p.id, 'out', 'text', renderTemplateText(params)).catch(() => {});
+      const threadText = tpl === COOP_NAME ? renderCoopText(params) : renderTemplateText(params);
+      await logProspectMessage(p.id, 'out', 'text', threadText).catch(() => {});
     } catch (e) {
       sent++; // it did send — count it, then abort to avoid a duplicate next run
       recipients.push({ id: p.id, name: p.name, phone, result: 'sent' });
@@ -295,13 +327,10 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
   const now = new Date();
   if (!isBusinessHours(now)) return { skipped: 'outside_hours', due: 0, sent: 0, failed: 0 };
 
-  // Golden rule: approved template or no touch.
+  // Golden rule: approved template WITH the shape our params match, or no touch.
   try {
-    const { getTemplateStatus } = await import('./template');
-    const st = await getTemplateStatus(BUMP_TEMPLATE);
-    if (st?.status !== 'APPROVED') {
-      return { skipped: `template_not_approved (${st?.status ?? 'missing'})`, due: 0, sent: 0, failed: 0 };
-    }
+    const reason = await templateShapeError(BUMP_TEMPLATE);
+    if (reason) return { skipped: reason, due: 0, sent: 0, failed: 0 };
   } catch (e) {
     return { skipped: `template_check_failed: ${(e as Error).message.slice(0, 80)}`, due: 0, sent: 0, failed: 0 };
   }

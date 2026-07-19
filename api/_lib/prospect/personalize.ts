@@ -66,6 +66,36 @@ export function buildTemplateParams(
   return [name.slice(0, 60)];
 }
 
+/** {{2}} of the distribution (coop/revenda) template — "Pra {{2}}, ela funciona
+ * como um filtro…". Pure. */
+export function kindPhrase(kind: string | null): string {
+  switch ((kind ?? '').toLowerCase()) {
+    case 'cooperativa':
+    case 'coop':
+      return 'a cooperativa';
+    case 'revenda':
+      return 'a revenda';
+    default:
+      return 'o time de vocês';
+  }
+}
+
+/** Params for the distribution template (coops/revendas): {{1}}=name, {{2}}=kind phrase. */
+export function buildCoopParams(p: Pick<ProspectRow, 'name' | 'kind'>): string[] {
+  return [shortName(p.name), kindPhrase(p.kind)];
+}
+
+/** Painel-thread rendering of the distribution template — sync with template.ts. */
+export function renderCoopText(params: string[]): string {
+  return (
+    `Oi! Aqui é a Vitória, da Stevi 🌱 Falo com a ${params[0]}? A Stevi é uma assistente gratuita de WhatsApp ` +
+    `que faz triagem agronômica pra cafeicultores — foto de praga, janela de pulverização, alerta de geada. ` +
+    `Pra ${params[1]}, ela funciona como um filtro: atende o produtor na hora e encaminha os casos técnicos ` +
+    `pros SEUS agrônomos e técnicos — não substitui ninguém, devolve o produtor pra vocês com o caso já ` +
+    `organizado. Faz sentido uma conversa rápida?`
+  );
+}
+
 /** Params for the D+3 bump template: {{1}}=name, {{2}}=city. */
 export function buildBumpParams(p: Pick<ProspectRow, 'name' | 'city'>): string[] {
   return [shortName(p.name), (p.city ?? 'Sul de Minas').slice(0, 40)];

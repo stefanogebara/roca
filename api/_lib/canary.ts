@@ -178,18 +178,31 @@ async function templateChecks(): Promise<CanaryCheck[]> {
   // Env-gated: without the Cloud token the check can never pass — omit rather
   // than alarm forever in a sandbox-only environment.
   if (!process.env.WHATSAPP_CLOUD_TOKEN) return [];
-  const names = [
-    process.env.PROSPECT_TEMPLATE_NAME || 'stevi_parceria_v1',
+  const { V2_NAME, COOP_NAME, templateShapeError, registryParamCount, getTemplateStatus } =
+    await import('./prospect/template');
+  // Templates the dispatcher/bump paths SEND — checked for approved status AND
+  // live shape vs the registry's params. An approved-but-reshaped template
+  // fails every send with #132000 while a status-only check stays green — the
+  // exact blind spot behind the Jul/13 outage (0% delivery → health latch).
+  const shapeChecked = [
+    process.env.PROSPECT_TEMPLATE_NAME || V2_NAME,
     process.env.PROSPECT_BUMP_TEMPLATE_NAME || 'stevi_parceria_bump',
-    'stevi_lead_v1',
-    // Distribution template (coops/revendas) — PENDING at Meta since 13/jul.
-    // Watching it here means approval pages the founders as a "recovered"
-    // transition (the signal to wire per-kind routing + open those sends).
-    process.env.PROSPECT_COOP_TEMPLATE_NAME || 'stevi_parceria_coop_v1',
+    process.env.PROSPECT_COOP_TEMPLATE_NAME || COOP_NAME,
   ];
-  const { getTemplateStatus } = await import('./prospect/template');
-  return Promise.all(
-    names.map(async (name): Promise<CanaryCheck> => {
+  const statusOnly = ['stevi_lead_v1']; // lead params vary per lead; status suffices
+  return Promise.all([
+    ...shapeChecked.map(async (name): Promise<CanaryCheck> => {
+      try {
+        const reason =
+          registryParamCount(name) == null
+            ? 'template fora do registry'
+            : await templateShapeError(name);
+        return { check: `template ${name}`, ok: reason == null, detail: reason };
+      } catch (e) {
+        return { check: `template ${name}`, ok: false, detail: (e as Error).message.slice(0, 60) };
+      }
+    }),
+    ...statusOnly.map(async (name): Promise<CanaryCheck> => {
       try {
         const st = await getTemplateStatus(name);
         return {
@@ -200,8 +213,8 @@ async function templateChecks(): Promise<CanaryCheck[]> {
       } catch (e) {
         return { check: `template ${name}`, ok: false, detail: (e as Error).message.slice(0, 60) };
       }
-    })
-  );
+    }),
+  ]);
 }
 
 function modelChecks(): Array<Promise<CanaryCheck>> {

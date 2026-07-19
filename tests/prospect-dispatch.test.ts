@@ -24,7 +24,11 @@ vi.mock('../api/_lib/prospect/db', () => ({
   claimProspectForBump: vi.fn(),
 }));
 vi.mock('../api/_lib/prospect/send', () => ({ sendProspectTemplate: vi.fn() }));
-vi.mock('../api/_lib/prospect/template', () => ({ getTemplateStatus: vi.fn() }));
+vi.mock('../api/_lib/prospect/template', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/_lib/prospect/template')>();
+  // Pure parts (names, registryParamCount) stay real; network checks mocked.
+  return { ...actual, getTemplateStatus: vi.fn(), templateShapeError: vi.fn() };
+});
 vi.mock('../api/_lib/alert', () => ({ alertFounders: vi.fn() }));
 // gradeCap/envCapOverride stay REAL (the ladder is under test); only the db
 // read is mocked.
@@ -58,7 +62,7 @@ import {
   type ProspectRow,
 } from '../api/_lib/prospect/db';
 import { sendProspectTemplate } from '../api/_lib/prospect/send';
-import { getTemplateStatus } from '../api/_lib/prospect/template';
+import { getTemplateStatus, templateShapeError, COOP_NAME } from '../api/_lib/prospect/template';
 import { alertFounders } from '../api/_lib/alert';
 
 const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => ({
@@ -106,6 +110,7 @@ beforeEach(() => {
   vi.mocked(isDispatchLatched).mockResolvedValue(false);
   vi.mocked(recordDispatchPause).mockResolvedValue(undefined);
   vi.mocked(getTemplateStatus).mockResolvedValue({ name: 'x', status: 'APPROVED' });
+  vi.mocked(templateShapeError).mockResolvedValue(null); // approved + shape OK
   vi.mocked(loadOptouts).mockResolvedValue(new Set());
   vi.mocked(countSentSince).mockResolvedValue(0);
   vi.mocked(loadReadyProspects).mockResolvedValue([]);
@@ -120,9 +125,9 @@ beforeEach(() => {
   vi.mocked(alertFounders).mockResolvedValue(undefined);
 });
 
-describe('runDispatch — template pre-flight', () => {
+describe('runDispatch — template pre-flight (status + shape)', () => {
   it('aborts with zero sends when the intro template is not APPROVED', async () => {
-    vi.mocked(getTemplateStatus).mockResolvedValue({ name: 'x', status: 'PAUSED' });
+    vi.mocked(templateShapeError).mockResolvedValue('template_not_approved (PAUSED)');
     vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
     const rep = await runDispatch({ force: true });
     expect(rep.aborted).toBe(true);
@@ -131,8 +136,19 @@ describe('runDispatch — template pre-flight', () => {
     expect(alertFounders).toHaveBeenCalled();
   });
 
+  it('aborts on an approved-but-reshaped template (the Jul/13 #132000 outage)', async () => {
+    vi.mocked(templateShapeError).mockResolvedValue(
+      'template_shape_mismatch (stevi_parceria_v2: aprovado espera 3 params, registry monta 1)'
+    );
+    vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
+    const rep = await runDispatch({ force: true });
+    expect(rep.aborted).toBe(true);
+    expect(rep.error).toMatch(/template_shape_mismatch/);
+    expect(sendProspectTemplate).not.toHaveBeenCalled();
+  });
+
   it('fails closed when the template status cannot be checked', async () => {
-    vi.mocked(getTemplateStatus).mockRejectedValue(new Error('graph down'));
+    vi.mocked(templateShapeError).mockRejectedValue(new Error('graph down'));
     vi.mocked(loadReadyProspects).mockResolvedValue([prospect()]);
     const rep = await runDispatch({ force: true });
     expect(rep.aborted).toBe(true);
@@ -299,30 +315,43 @@ describe('runDispatch — graded cap ramp', () => {
   });
 });
 
-describe('runDispatch — campaign kind gating', () => {
-  it('coops/revendas never receive the lead-gen template under the default gate', async () => {
+describe('runDispatch — per-kind template routing', () => {
+  it('coops dispatch under the default gate but ALWAYS get the distribution template', async () => {
     vi.mocked(loadReadyProspects).mockResolvedValue([
-      prospect({ id: 'p1', kind: 'agronomo', phone: '+5535999990001' }),
-      prospect({ id: 'p2', kind: 'cooperativa', phone: '+5535999990002' }),
-      prospect({ id: 'p3', kind: 'revenda', phone: '+5535999990003' }),
-      prospect({ id: 'p4', kind: 'consultoria', phone: '+5535999990004' }),
+      prospect({ id: 'p2', kind: 'cooperativa', name: 'Cooxupé - Núcleo Machado', phone: '+5535999990002' }),
     ]);
-    // Cap leaves ONE slot: proves eligibility ordering AND avoids the real
-    // inter-send pacing sleep (jitter can exceed the vitest timeout).
+    // Cap leaves ONE slot: avoids the real inter-send pacing sleep.
     vi.mocked(countSentSince).mockResolvedValue(19);
     const rep = await runDispatch({ force: true });
-    expect(rep.eligible).toBe(2); // agronomo + consultoria only
-    const sentTo = vi.mocked(sendProspectTemplate).mock.calls.map((c) => c[0]);
-    expect(sentTo).toEqual(['+5535999990001']); // first eligible; coop/revenda never
+    expect(rep.sent).toBe(1);
+    const [to, tpl, , params] = vi.mocked(sendProspectTemplate).mock.calls[0];
+    expect(to).toBe('+5535999990002');
+    expect(tpl).toBe(COOP_NAME); // never the lead-gen pitch
+    expect(params).toEqual(['Cooxupé', 'a cooperativa']); // {{1}}=name, {{2}}=kind phrase
   });
 
-  it("PROSPECT_SEND_KINDS='all' opens the gate", async () => {
-    process.env.PROSPECT_SEND_KINDS = 'all';
+  it('agronomos/consultorias get the intro template with its 3 registry params', async () => {
+    vi.mocked(loadReadyProspects).mockResolvedValue([
+      prospect({ id: 'p1', kind: 'consultoria', phone: '+5535999990001' }),
+    ]);
+    vi.mocked(countSentSince).mockResolvedValue(19);
+    await runDispatch({ force: true });
+    const [, tpl, , params] = vi.mocked(sendProspectTemplate).mock.calls[0];
+    expect(tpl).toBe('stevi_parceria_v2');
+    expect(params).toHaveLength(3); // derived from the registry, not an env var
+  });
+
+  it('a narrowed PROSPECT_SEND_KINDS still filters kinds out', async () => {
+    process.env.PROSPECT_SEND_KINDS = 'agronomo,consultoria';
     vi.mocked(loadReadyProspects).mockResolvedValue([
       prospect({ id: 'p2', kind: 'cooperativa', phone: '+5535999990002' }),
+      prospect({ id: 'p1', kind: 'agronomo', phone: '+5535999990001' }),
     ]);
+    vi.mocked(countSentSince).mockResolvedValue(19);
     const rep = await runDispatch({ force: true });
-    expect(rep.sent).toBe(1);
+    expect(rep.eligible).toBe(1); // coop filtered by the narrowed gate
+    const sentTo = vi.mocked(sendProspectTemplate).mock.calls.map((c) => c[0]);
+    expect(sentTo).toEqual(['+5535999990001']);
   });
 });
 
@@ -357,5 +386,49 @@ describe('runBumpDispatch — atomic claim', () => {
     expect(rep.skipped).toMatch(/number_health_paused/);
     expect(sendProspectTemplate).not.toHaveBeenCalled();
     expect(alertFounders).not.toHaveBeenCalled();
+  });
+});
+
+// ── Pure shape/routing helpers (the by-construction fix for the Jul/13 outage) ──
+import { templateForKind } from '../api/_lib/prospect/dispatch';
+import { registryParamCount, countBodyParams } from '../api/_lib/prospect/template';
+import { kindPhrase, buildCoopParams } from '../api/_lib/prospect/personalize';
+
+describe('template shape derivation (registry is the single source of truth)', () => {
+  it('registry param counts match the approved templates', () => {
+    expect(registryParamCount('stevi_parceria_v2')).toBe(3);
+    expect(registryParamCount('stevi_parceria_coop_v1')).toBe(2);
+    expect(registryParamCount('stevi_parceria_bump')).toBe(2);
+    expect(registryParamCount('stevi_lead_v1')).toBe(3);
+    expect(registryParamCount('stevi_parceria_v1')).toBeNull(); // retired — not in registry
+  });
+  it('countBodyParams counts {{n}} placeholders', () => {
+    expect(countBodyParams('Oi {{1}}, de {{2}}!')).toBe(2);
+    expect(countBodyParams('sem params')).toBe(0);
+  });
+});
+
+describe('templateForKind (distribution vs intro)', () => {
+  it('coops and revendas route to the distribution template', () => {
+    expect(templateForKind('cooperativa')).toBe('stevi_parceria_coop_v1');
+    expect(templateForKind('coop')).toBe('stevi_parceria_coop_v1');
+    expect(templateForKind('revenda')).toBe('stevi_parceria_coop_v1');
+  });
+  it('everyone else gets the intro (default v2)', () => {
+    expect(templateForKind('agronomo')).toBe('stevi_parceria_v2');
+    expect(templateForKind('consultoria')).toBe('stevi_parceria_v2');
+    expect(templateForKind(null)).toBe('stevi_parceria_v2');
+  });
+});
+
+describe('coop params', () => {
+  it('kindPhrase names the org type', () => {
+    expect(kindPhrase('cooperativa')).toBe('a cooperativa');
+    expect(kindPhrase('revenda')).toBe('a revenda');
+    expect(kindPhrase('outro')).toBe('o time de vocês');
+  });
+  it('buildCoopParams = [shortName, kindPhrase] — exactly the 2 the template takes', () => {
+    expect(buildCoopParams({ name: 'Coopercotton - Cooperativa de MT', kind: 'cooperativa' }))
+      .toEqual(['Coopercotton', 'a cooperativa']);
   });
 });

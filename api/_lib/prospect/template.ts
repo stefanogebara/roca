@@ -101,29 +101,76 @@ export async function resolveWabaId(): Promise<string> {
   return id;
 }
 
+/** {{n}} placeholders in a body text. Pure; exported for tests. */
+export function countBodyParams(body: string): number {
+  return (body.match(/\{\{\d+\}\}/g) ?? []).length;
+}
+
+/**
+ * Body param count our REGISTRY expects for a template (null = template we
+ * don't know). The payload builder derives from this — never from an env var:
+ * the Jul/13 outage was PROSPECT_TEMPLATE_PARAMS drifting from the approved
+ * template (#132000 on every send, 0% delivery, health latch).
+ */
+export function registryParamCount(name: string): number | null {
+  const def = TEMPLATE_DEFS[name];
+  return def ? countBodyParams(def.body) : null;
+}
+
 export interface TemplateStatus {
   name: string;
   status: string; // APPROVED | PENDING | REJECTED | ...
   id?: string;
   rejectedReason?: string | null;
+  /** Param count of the LIVE approved body — the shape guard compares this
+   * against registryParamCount before any send. */
+  liveParamCount?: number | null;
 }
 
 /** Current status of a template by name (null if it doesn't exist yet). */
 export async function getTemplateStatus(name: string): Promise<TemplateStatus | null> {
   const waba = await resolveWabaId();
   const res = await fetch(
-    `${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(name)}&fields=name,status,id,rejected_reason`,
+    `${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(name)}&fields=name,status,id,rejected_reason,components`,
     { headers: { Authorization: `Bearer ${token()}` }, signal: AbortSignal.timeout(TIMEOUT_MS) }
   );
   const json = (await res.json()) as {
-    data?: Array<{ name: string; status: string; id: string; rejected_reason?: string }>;
+    data?: Array<{
+      name: string;
+      status: string;
+      id: string;
+      rejected_reason?: string;
+      components?: Array<{ type?: string; text?: string }>;
+    }>;
     error?: { message: string };
   };
   if (json.error) throw new Error(`template status failed: ${json.error.message}`);
   const hit = (json.data ?? []).find((t) => t.name === name);
-  return hit
-    ? { name: hit.name, status: hit.status, id: hit.id, rejectedReason: hit.rejected_reason ?? null }
-    : null;
+  if (!hit) return null;
+  const body = (hit.components ?? []).find((c) => (c.type ?? '').toUpperCase() === 'BODY');
+  return {
+    name: hit.name,
+    status: hit.status,
+    id: hit.id,
+    rejectedReason: hit.rejected_reason ?? null,
+    liveParamCount: body?.text != null ? countBodyParams(body.text) : null,
+  };
+}
+
+/**
+ * The pre-send shape guard: template must be APPROVED and its live body must
+ * take exactly the params our registry builds. Returns null when safe, else a
+ * human-readable reason. FAILS CLOSED on unknown templates.
+ */
+export async function templateShapeError(name: string): Promise<string | null> {
+  const expected = registryParamCount(name);
+  if (expected == null) return `template desconhecido no registry: ${name}`;
+  const st = await getTemplateStatus(name);
+  if (st?.status !== 'APPROVED') return `template_not_approved (${st?.status ?? 'missing'})`;
+  if (st.liveParamCount != null && st.liveParamCount !== expected) {
+    return `template_shape_mismatch (${name}: aprovado espera ${st.liveParamCount} params, registry monta ${expected})`;
+  }
+  return null;
 }
 
 /**
