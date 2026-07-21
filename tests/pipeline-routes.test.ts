@@ -256,10 +256,20 @@ describe('prices route', () => {
       usdBrl: 5.4,
     } as never);
     const adapter = makeAdapter();
-    // PRICE_INTENT matches "cotação <...> café"; note "quanto tá a saca do café"
-    // does NOT match (the commodity must follow "quanto tá (o|a)" directly), so
-    // it would fall through to reason() — a real edge the regex encodes today.
     await handleInbound(adapter, msgFixture({ text: 'cotação do café hoje?' }));
+
+    expect(reason).not.toHaveBeenCalled();
+    expect(fetchPrices).toHaveBeenCalled();
+    expect(firstSend(adapter).mediaUrl).toContain('type=prices');
+  });
+
+  it('routes "quanto tá a saca do café?" to prices (intervening noun phrase)', async () => {
+    vi.mocked(fetchPrices).mockResolvedValue({
+      quotes: [{ key: 'cafe', label: 'Café arábica', sacaBrl: 2000, weekChangePct: null }],
+      usdBrl: 5.4,
+    } as never);
+    const adapter = makeAdapter();
+    await handleInbound(adapter, msgFixture({ text: 'quanto tá a saca do café?' }));
 
     expect(reason).not.toHaveBeenCalled();
     expect(fetchPrices).toHaveBeenCalled();

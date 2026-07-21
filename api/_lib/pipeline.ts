@@ -139,12 +139,16 @@ export function isHistoryRequest(text: string): boolean {
 }
 
 // Commodity quote asks — "cotação do café", "quanto tá a soja", "preço do
-// milho", bare "cotações". Anchored to the commodities we can quote so
-// "preço do frete" doesn't match.
+// milho", "quanto tá a saca do café", bare "cotações". Anchored to the
+// commodities we can quote so "preço do frete" / "quanto tá o trabalho" don't
+// match.
+// The "quanto tá ..." branch tolerates an optional intervening noun phrase
+// ("a saca do", "o preço da", "a arroba do") before the commodity — but the
+// commodity itself is still required, so "quanto tá a saca de arroz" is out.
 // (no trailing \b after the commodity group: "café" ends in a non-ASCII word
 // char, which JS \b mishandles — accent-aware lookahead instead)
 const PRICE_INTENT =
-  /\bcota[çc][õo]es?\b|\b(cota[çc][ãa]o|pre[çc]o)\b[^.?!]*\b(caf[ée]|soja|milho|d[óo]lar)(?![\wÀ-ÿ])|\bquanto\s+(t[áa]|est[áa]|anda)\s+(o\s+|a\s+)?(caf[ée]|soja|milho|d[óo]lar)(?![\wÀ-ÿ])/i;
+  /\bcota[çc][õo]es?\b|\b(cota[çc][ãa]o|pre[çc]o)\b[^.?!]*\b(caf[ée]|soja|milho|d[óo]lar)(?![\wÀ-ÿ])|\bquanto\s+(t[áa]|est[áa]|anda)\s+((o|a)\s+)?((saca|arroba|pre[çc]o|valor|cota[çc][ãa]o)\s+d[aeo]s?\s+)?(caf[ée]|soja|milho|d[óo]lar)(?![\wÀ-ÿ])/i;
 
 /** Whether a message asks for commodity quotes. */
 export function isPriceRequest(text: string): boolean {

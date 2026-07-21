@@ -71,6 +71,9 @@ describe('isPriceRequest', () => {
       'preço do milho hoje',
       'quanto está o dólar',
       'cotações',
+      'quanto tá a saca do café?', // intervening "saca do" before the commodity
+      'quanto tá a saca do milho',
+      'quanto está o preço da soja',
     ]) {
       expect(isPriceRequest(t), t).toBe(true);
     }
@@ -80,6 +83,8 @@ describe('isPriceRequest', () => {
       'posso pulverizar hoje?',
       'que praga é essa?',
       'o preço do frete subiu', // not a commodity quote ask
+      'quanto tá o trabalho hoje', // "quanto tá <noun>" with no commodity
+      'quanto tá a saca de arroz', // arroz isn't a commodity we quote
       'meu histórico',
     ]) {
       expect(isPriceRequest(t), t).toBe(false);
