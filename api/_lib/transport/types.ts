@@ -65,6 +65,9 @@ export interface TransportAdapter {
   send(msg: OutboundMessage): Promise<void>;
   /** Resolve an inbound media reference (Twilio URL or Cloud media id) to bytes. */
   fetchMedia?(ref: string): Promise<{ base64: string; mime: string }>;
+  /** Mark an inbound as read and show a typing indicator (perceived speed
+   * while the LLM works). Cosmetic — implementations must never throw. */
+  markRead?(messageId: string): Promise<void>;
 }
 
 /** Minimal request surface the adapters need. The webhook reads the raw body

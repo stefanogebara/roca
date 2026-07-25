@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { CloudApiAdapter, verifyCloudChallenge } from '../api/_lib/transport/cloud';
 import type { TransportRequest } from '../api/_lib/transport/types';
@@ -122,5 +122,72 @@ describe('CloudApiAdapter.parseInbound', () => {
 
   it('returns null for malformed JSON (fail-soft)', async () => {
     expect(await adapter.parseInbound(reqOf('{not json'))).toBeNull();
+  });
+});
+
+describe('CloudApiAdapter.send — media fallback contract', () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => {
+    process.env.WHATSAPP_CLOUD_TOKEN = 't';
+    process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID = '123';
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.WHATSAPP_CLOUD_TOKEN;
+    delete process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+  });
+
+  it('a broken media send falls back to plain text (the reply never drops)', async () => {
+    const calls: Array<{ body: any }> = [];
+    globalThis.fetch = (async (_url: any, init: any) => {
+      calls.push({ body: JSON.parse(init.body) });
+      if (calls.length === 1) {
+        return { ok: false, status: 500, text: async () => 'media exploded' } as any;
+      }
+      return { ok: true, text: async () => '' } as any;
+    }) as any;
+
+    const adapter = new CloudApiAdapter();
+    await adapter.send({ to: '+5511999887766', text: 'resposta importante', mediaUrl: 'https://x/card.png' });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body.type ?? 'image').toBe('image');
+    expect(calls[1].body.type).toBe('text');
+    expect(calls[1].body.text.body).toBe('resposta importante');
+  });
+});
+
+describe('CloudApiAdapter.markRead — perceived speed, cosmetic by contract', () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => {
+    process.env.WHATSAPP_CLOUD_TOKEN = 't';
+    process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID = '123';
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.WHATSAPP_CLOUD_TOKEN;
+    delete process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+  });
+
+  it('posts read status + typing indicator for the message', async () => {
+    const bodies: any[] = [];
+    globalThis.fetch = (async (_url: any, init: any) => {
+      bodies.push(JSON.parse(init.body));
+      return { ok: true, text: async () => '' } as any;
+    }) as any;
+    await new CloudApiAdapter().markRead('wamid.XYZ');
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].status).toBe('read');
+    expect(bodies[0].message_id).toBe('wamid.XYZ');
+    expect(bodies[0].typing_indicator).toEqual({ type: 'text' });
+  });
+
+  it('never throws — not on HTTP failure, not on network error', async () => {
+    globalThis.fetch = (async () => ({ ok: false, status: 500, text: async () => 'x' })) as any;
+    await expect(new CloudApiAdapter().markRead('wamid.A')).resolves.toBeUndefined();
+    globalThis.fetch = (async () => {
+      throw new Error('network down');
+    }) as any;
+    await expect(new CloudApiAdapter().markRead('wamid.B')).resolves.toBeUndefined();
   });
 });

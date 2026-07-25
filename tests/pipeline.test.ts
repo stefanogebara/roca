@@ -132,6 +132,7 @@ beforeEach(() => {
   vi.mocked(handleProspectInbound).mockResolvedValue({ handled: false, prospect: null } as never);
   vi.mocked(findPartnerByPhone).mockResolvedValue(null);
   vi.mocked(db.setFarmLocation).mockResolvedValue('farm-1');
+  vi.mocked(db.setFarmCrops).mockResolvedValue(true as never);
   vi.mocked(resolveStatedLocation).mockResolvedValue({ kind: 'no_place' });
   vi.mocked(routeIntent).mockResolvedValue('general');
   vi.mocked(reason).mockResolvedValue('resposta padrão');
@@ -227,14 +228,15 @@ describe('compliance gate vs pest card', () => {
     expect(sent.mediaUrl).toBeUndefined();
   });
 
-  it('ships the pest card when the reply passes the gate', async () => {
+  it('ships the pest card when the reply passes the gate (as the 2nd message)', async () => {
     pestReason('triagem honesta sem dose');
     const adapter = makeAdapter();
 
     await handleInbound(adapter, msgFixture({ text: 'que praga é essa na soja' }));
 
-    const sent = adapter.send.mock.calls[0][0];
-    expect(sent.mediaUrl).toContain('type=pest');
+    // Text-first contract: the diagnosis text lands first, the card follows.
+    expect(adapter.send.mock.calls[0][0].mediaUrl).toBeUndefined();
+    expect(adapter.send.mock.calls[1][0].mediaUrl).toContain('type=pest');
   });
 });
 
@@ -423,6 +425,8 @@ describe('non-field pin never ships a "SUA LAVOURA" card image', () => {
       msgFixture({ kind: 'location', text: null, location: { lat: -21.2, lon: -45.0 } })
     );
 
-    expect(adapter.send.mock.calls[0][0].mediaUrl).toMatch(/type=farm/);
+    // Text-first contract: the words land first, the farm card follows.
+    expect(adapter.send.mock.calls[0][0].mediaUrl).toBeUndefined();
+    expect(adapter.send.mock.calls[1][0].mediaUrl).toMatch(/type=farm/);
   });
 });

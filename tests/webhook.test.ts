@@ -25,7 +25,10 @@ const m = vi.hoisted(() => ({
   parseCloudStatuses: vi.fn(),
   handleInbound: vi.fn(),
   applyProspectStatuses: vi.fn(),
+  alertFounders: vi.fn(),
 }));
+
+vi.mock('../api/_lib/alert', () => ({ alertFounders: m.alertFounders }));
 
 vi.mock('../api/_lib/transport/twilio', () => ({
   TwilioAdapter: class {
@@ -213,12 +216,24 @@ describe('POST processing', () => {
 });
 
 describe('always-ack-on-error (retry-storm guard)', () => {
-  it('still acks (provider format) when the pipeline throws', async () => {
+  it('still acks (provider format) when the pipeline throws — and alerts the founders', async () => {
     m.handleInbound.mockRejectedValue(new Error('boom'));
     const res = makeRes();
     await handler(makeReq({ headers: { 'x-twilio-signature': 'sig' } }), res);
     // No 5xx bubbles out; Twilio still gets its TwiML 200.
     expect(res.out.headers['Content-Type']).toBe('text/xml');
+    expect(res.out.sent).toBe(TWIML);
+    // A swallowed pipeline crash used to be ack-200 + a log nobody reads; the
+    // farmer got no reply and no one knew. Now it pages.
+    expect(m.alertFounders).toHaveBeenCalledTimes(1);
+    expect(String(m.alertFounders.mock.calls[0][0])).toContain('boom');
+  });
+
+  it('an alertFounders failure never breaks the ack', async () => {
+    m.handleInbound.mockRejectedValue(new Error('boom'));
+    m.alertFounders.mockRejectedValue(new Error('whatsapp down too'));
+    const res = makeRes();
+    await handler(makeReq({ headers: { 'x-twilio-signature': 'sig' } }), res);
     expect(res.out.sent).toBe(TWIML);
   });
 

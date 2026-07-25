@@ -10,6 +10,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createLogger } from '../logger';
 import type {
   TransportAdapter,
   TransportRequest,
@@ -19,6 +20,8 @@ import type {
 } from './types';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
+
+const log = createLogger('cloud');
 
 interface CloudMessage {
   from: string;
@@ -258,6 +261,10 @@ export class CloudApiAdapter implements TransportAdapter {
         }),
       });
       if (res.ok) return;
+      // The exact class of the July outages: a degraded send with no trace.
+      // Log status+body loudly, then fall back to text so the reply survives.
+      const failBody = await res.text().catch(() => '');
+      log.error(`media send failed ${res.status}, falling back to text: ${failBody.slice(0, 200)}`);
       await this.send({ to: msg.to, text: msg.text, buttons: msg.buttons });
       return;
     }
@@ -299,10 +306,35 @@ export class CloudApiAdapter implements TransportAdapter {
     if (!res.ok) {
       const body = await res.text();
       if (interactive) {
+        log.error(`interactive send failed ${res.status}, degrading to text: ${body.slice(0, 200)}`);
         await this.send({ to: msg.to, text: msg.text });
         return;
       }
       throw new Error(`Cloud API send failed ${res.status}: ${body.slice(0, 200)}`);
+    }
+  }
+
+  /** Mark the inbound as read + show typing — one POST, fired before the
+   * heavy work. The farmer on 3G sees "read + typing" instead of a mute chat
+   * for 15-30s. Cosmetic by contract: never throws, failures are just logged. */
+  async markRead(messageId: string): Promise<void> {
+    const token = process.env.WHATSAPP_CLOUD_TOKEN;
+    const phoneId = process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+    if (!token || !phoneId) return;
+    try {
+      const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          status: 'read',
+          message_id: messageId,
+          typing_indicator: { type: 'text' },
+        }),
+      });
+      if (!res.ok) log.info(`markRead failed ${res.status} (cosmetic, ignored)`);
+    } catch (e) {
+      log.info(`markRead error (cosmetic, ignored): ${(e as Error).message}`);
     }
   }
 

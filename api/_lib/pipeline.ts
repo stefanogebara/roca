@@ -490,8 +490,14 @@ const cropsOnlyRoute: Route = {
   handle: async (ctx) => {
     const { userId, cropAnswer } = ctx;
     if (userId) {
-      await setFarmCrops(userId, cropAnswer!);
+      const saved = await setFarmCrops(userId, cropAnswer!);
       await setAwaiting(userId, null);
+      if (!saved) {
+        return {
+          replyText:
+            '⚠️ Entendi sua cultura, mas deu um soluço aqui e não consegui anotar. Me manda de novo daqui a pouco, por favor?',
+        };
+      }
     }
     return {
       replyText: `Anotado: você trabalha com ${joinCrops(cropAnswer!)}. 🌱 Agora que sei sua cultura, meus conselhos ficam mais no ponto. Manda foto de praga, pergunta "posso pulverizar hoje?", ou o que precisar.`,
@@ -661,7 +667,15 @@ const applicationLogRoute: Route = {
     });
     if (userId) {
       const farm = await getFarm(userId);
-      await insertApplication(userId, app, farm?.id ?? null);
+      const saved = await insertApplication(userId, app, farm?.id ?? null);
+      if (!saved) {
+        // Never confirm a write that failed — the caderno is the compliance
+        // record; a silent loss behind "Anotado" is the worst failure mode.
+        return {
+          replyText:
+            '⚠️ Deu um soluço aqui do meu lado e NÃO consegui anotar seu registro agora. Manda de novo daqui a pouco, por favor — não quero perder essa aplicação do seu caderno.',
+        };
+      }
     }
     return { replyText: formatApplicationConfirm(app) };
   },
@@ -737,6 +751,15 @@ const referralRoute: Route = {
         topic: effective.text!.slice(0, 280),
         consentVersion: REFERRAL_CONSENT_VERSION,
       });
+      if (!referralId) {
+        // The row is the system of record for the promise "te conecto" — if it
+        // failed to land, saying "Anotei" would be a lie (the founders' painel
+        // would show nothing). Be honest and ask for a retry.
+        return {
+          replyText:
+            '⚠️ Deu um soluço aqui e não consegui registrar seu pedido agora. Manda "quero um agrônomo" de novo daqui a pouco, por favor — não quero te deixar sem resposta.',
+        };
+      }
       if (!alreadyNotified) {
         // Concierge handoff: a human hears about the opt-in immediately —
         // email + WhatsApp ping to the founders' own numbers.
@@ -1118,14 +1141,21 @@ async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<
   );
   if (nudge) finalText += referralNudge(user.name);
 
+  // Text FIRST, card as a second message: the farmer reads the answer in
+  // seconds instead of waiting for the card raster + provider fetch, and a
+  // slow or broken card can no longer delay or drop the words. (Bonus: the
+  // buttons survive — media messages can't carry them on either provider.)
   const sent = await sendOrRecord(
     adapter,
     msg.from,
-    { text: finalText, buttons: buttonsForIntent(intent), mediaUrl },
+    { text: finalText, buttons: buttonsForIntent(intent) },
     userId,
     intent
   );
   if (!sent) return;
+  if (mediaUrl) {
+    await sendOrRecord(adapter, msg.from, { text: '', mediaUrl }, userId, intent);
+  }
   // Consent counts as "notified" only if the notice was actually delivered.
   if (firstContact && userId) await markConsentNotified(userId);
   if (nudge) await markReferralPrompted(userId);

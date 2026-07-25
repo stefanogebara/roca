@@ -15,6 +15,7 @@ import { TwilioAdapter } from './_lib/transport/twilio';
 import { CloudApiAdapter, verifyCloudChallenge, parseCloudStatuses } from './_lib/transport/cloud';
 import { handleInbound } from './_lib/pipeline';
 import type { TransportAdapter, TransportRequest } from './_lib/transport/types';
+import { alertFounders } from './_lib/alert';
 import { createLogger } from './_lib/logger';
 
 // Disable Vercel's automatic body parsing so we can read raw bytes for HMAC.
@@ -112,10 +113,21 @@ export default async function handler(
       ack();
       return;
     }
+    // Perceived speed: flag "read + typing" before the heavy work starts.
+    // Fire-and-forget — markRead is cosmetic and never throws by contract.
+    if (adapter.markRead) void adapter.markRead(msg.messageId);
     await handleInbound(adapter, msg);
     ack();
   } catch (e) {
     log.error('webhook error:', (e as Error).message);
+    // A swallowed crash here means a farmer sent a message and got NOTHING —
+    // ack-200 + a log nobody reads. Page the founders (fail-soft: alerting
+    // trouble must never break the ack that keeps provider retries at bay).
+    try {
+      await alertFounders(`⚠️ Stevi: erro no webhook — ${(e as Error).message.slice(0, 180)}`);
+    } catch (alertErr) {
+      log.error('alertFounders failed too:', (alertErr as Error).message);
+    }
     ack();
   }
 }

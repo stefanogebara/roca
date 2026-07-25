@@ -145,13 +145,18 @@ export async function setAwaiting(userId: string, awaiting: string | null): Prom
   if (error) log.error('setAwaiting failed:', error.message);
 }
 
-/** Persist the crops a farmer grows (upsert the farm row if needed). */
-export async function setFarmCrops(userId: string, crops: string[]): Promise<void> {
+/** Persist the crops a farmer grows (upsert the farm row if needed). Returns
+ * success so the reply never claims "Anotado" for a write that failed. */
+export async function setFarmCrops(userId: string, crops: string[]): Promise<boolean> {
   const db = getDb();
   const { error } = await db
     .from('farms')
     .upsert({ user_id: userId, crop: crops }, { onConflict: 'user_id' });
-  if (error) log.error('setFarmCrops failed:', error.message);
+  if (error) {
+    log.error('setFarmCrops failed:', error.message);
+    return false;
+  }
+  return true;
 }
 
 /** Cache derived soil data per farm (soil is effectively static). */
@@ -458,13 +463,15 @@ export interface ApplicationRow {
   raw_text: string;
 }
 
-/** Store a farmer-declared application. Never throws — a logged error, like the
- * rest of the write path, so a DB hiccup can't take the webhook down. */
+/** Store a farmer-declared application. Never throws — but reports success so
+ * the reply can be honest: the caderno is the compliance record the farmer
+ * takes to the bank/agronomist, and a silent loss confirmed with "Anotado" is
+ * the worst possible failure mode for this product. */
 export async function insertApplication(
   userId: string,
   app: ApplicationRow,
   farmId: string | null = null
-): Promise<void> {
+): Promise<boolean> {
   const db = getDb();
   const { error } = await db.from('applications').insert({
     user_id: userId,
@@ -479,7 +486,11 @@ export async function insertApplication(
     source: app.source,
     raw_text: app.raw_text,
   });
-  if (error) log.error('insertApplication failed:', error.message);
+  if (error) {
+    log.error('insertApplication failed:', error.message);
+    return false;
+  }
+  return true;
 }
 
 /** A user's declared applications, newest first — the report's data source.

@@ -38,6 +38,14 @@ export interface ChatOptions {
    * models/providers that don't cache, or below the minimum cacheable length.
    */
   cacheSystem?: boolean;
+  /**
+   * Hard deadline per attempt, in ms. Default 25s — the only external call
+   * without a deadline used to be this one, and a hung OpenRouter socket ate
+   * the webhook's whole 60s maxDuration (farmer got silence, not even the
+   * fallback reply). 25s leaves room for one retry inside the budget; cheap
+   * router/extraction calls should pass something tighter (~10s).
+   */
+  timeoutMs?: number;
 }
 
 type ContentPart =
@@ -70,7 +78,9 @@ export async function chat(opts: ChatOptions): Promise<string> {
   return withRetry(() => chatOnce(opts), {
     attempts: 2,
     shouldRetry: (e) =>
-      isTransient(e) || (e instanceof Error && e.message.includes('empty completion')),
+      isTransient(e) ||
+      (e instanceof Error &&
+        (e.message.includes('empty completion') || e.message.includes('timeout after'))),
   });
 }
 
@@ -119,21 +129,32 @@ async function chatOnce(opts: ChatOptions): Promise<string> {
 
   const messages = buildMessages(opts);
 
-  const res = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://roca-black.vercel.app',
-      'X-Title': 'Stevi',
-    },
-    body: JSON.stringify({
-      model: opts.model,
-      max_tokens: opts.maxTokens ?? 600,
-      ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
-      messages,
-    }),
-  });
+  const timeoutMs = opts.timeoutMs ?? 25_000;
+  let res: Response;
+  try {
+    res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://roca-black.vercel.app',
+        'X-Title': 'Stevi',
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        max_tokens: opts.maxTokens ?? 600,
+        ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+        messages,
+      }),
+    });
+  } catch (e) {
+    const name = (e as Error).name;
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      throw new Error(`OpenRouter timeout after ${timeoutMs}ms`);
+    }
+    throw e;
+  }
 
   if (!res.ok) {
     const body = await res.text();

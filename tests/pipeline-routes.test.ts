@@ -154,7 +154,8 @@ beforeEach(() => {
   vi.mocked(db.getActivityLog).mockResolvedValue([]);
   vi.mocked(db.hasRecentReferral).mockResolvedValue(false);
   vi.mocked(db.createReferralRequest).mockResolvedValue('ref-1');
-  vi.mocked(db.insertApplication).mockResolvedValue(undefined as never);
+  vi.mocked(db.insertApplication).mockResolvedValue(true as never);
+  vi.mocked(db.setFarmCrops).mockResolvedValue(true as never);
   vi.mocked(db.listApplications).mockResolvedValue([]);
   vi.mocked(handleProspectInbound).mockResolvedValue({ handled: false, prospect: null } as never);
   vi.mocked(findPartnerByPhone).mockResolvedValue(null);
@@ -206,9 +207,12 @@ describe('application_report route', () => {
     await handleInbound(adapter, msgFixture({ text: 'me manda minhas aplicações' }));
 
     expect(reason).not.toHaveBeenCalled();
-    expect(firstSend(adapter).mediaUrl).toContain('/api/card?');
-    expect(adapter.send).toHaveBeenCalledTimes(2);
-    const doc = adapter.send.mock.calls[1][0];
+    // Text-first contract: words land instantly, then the card, then the PDF.
+    expect(firstSend(adapter).mediaUrl).toBeUndefined();
+    expect(firstSend(adapter).text).toBeTruthy();
+    expect(adapter.send).toHaveBeenCalledTimes(3);
+    expect(adapter.send.mock.calls[1][0].mediaUrl).toContain('/api/card?');
+    const doc = adapter.send.mock.calls[2][0];
     expect(doc.mediaType).toBe('document');
     expect(doc.mediaUrl).toContain('/api/report?');
     expect(doc.filename).toBe('caderno-de-aplicacoes.pdf');
@@ -260,7 +264,9 @@ describe('prices route', () => {
 
     expect(reason).not.toHaveBeenCalled();
     expect(fetchPrices).toHaveBeenCalled();
-    expect(firstSend(adapter).mediaUrl).toContain('type=prices');
+    // Text-first contract: reply text lands first, card follows as message 2.
+    expect(firstSend(adapter).mediaUrl).toBeUndefined();
+    expect(adapter.send.mock.calls[1][0].mediaUrl).toContain('type=prices');
   });
 
   it('routes "quanto tá a saca do café?" to prices (intervening noun phrase)', async () => {
@@ -273,7 +279,30 @@ describe('prices route', () => {
 
     expect(reason).not.toHaveBeenCalled();
     expect(fetchPrices).toHaveBeenCalled();
-    expect(firstSend(adapter).mediaUrl).toContain('type=prices');
+    expect(firstSend(adapter).mediaUrl).toBeUndefined();
+    expect(adapter.send.mock.calls[1][0].mediaUrl).toContain('type=prices');
+  });
+});
+
+describe('honest writes — never confirm a write that failed', () => {
+  it('application_log: a failed insert gets an honest retry ask, not "Anotei"', async () => {
+    vi.mocked(parseApplication).mockResolvedValue({ product_name: 'X', crop: 'café' } as never);
+    vi.mocked(db.insertApplication).mockResolvedValue(false as never);
+    const adapter = makeAdapter();
+    await handleInbound(adapter, msgFixture({ text: 'apliquei fox na lavoura ontem' }));
+
+    const sent = firstSend(adapter).text as string;
+    expect(sent).toMatch(/não consegui anotar/i);
+    expect(sent).not.toMatch(/^Anotei/);
+  });
+
+  it('referral: a failed insert gets an honest retry ask, and founders are NOT pinged', async () => {
+    vi.mocked(db.createReferralRequest).mockResolvedValue(null as never);
+    const adapter = makeAdapter();
+    await handleInbound(adapter, msgFixture({ text: 'quero falar com um agrônomo' }));
+
+    expect(firstSend(adapter).text).toMatch(/não consegui registrar/i);
+    expect(sendReferralNotification).not.toHaveBeenCalled();
   });
 });
 
