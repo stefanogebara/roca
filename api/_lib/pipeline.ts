@@ -212,8 +212,9 @@ const CARD_SHARE_PROMPT: Partial<Record<Intent, string>> = {
 /** Caption for the card message: a shareable wa.me deep link (static per TYPE,
  * never per user). Empty when PUBLIC_WA_NUMBER isn't configured. */
 function cardShareCaption(intent: Intent): string {
-  const digits = (process.env.PUBLIC_WA_NUMBER || '').replace(/\D/g, '');
-  if (!digits) return '';
+  // Fallback matches growth.ts/verificar.ts: an unset env can't be allowed to
+  // silently drop the forward's way back (the declared acquisition loop).
+  const digits = (process.env.PUBLIC_WA_NUMBER || '19705509125').replace(/\D/g, '');
   const prompt = CARD_SHARE_PROMPT[intent] ?? 'Oi, Stevi!';
   return `Compartilha à vontade 👉 wa.me/${digits}?text=${encodeURIComponent(prompt)}`;
 }

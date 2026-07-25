@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { waCta } from '../api/_lib/cards/render';
 import { spraySvg } from '../api/_lib/cards/spray';
 import { ndviSvg } from '../api/_lib/cards/ndviCard';
 import { farmSvg } from '../api/_lib/cards/farm';
@@ -156,5 +157,23 @@ describe('svgToPng (rasterizer + bundled fonts)', () => {
     expect(png.length).toBeGreaterThan(1000);
     // PNG magic number: 89 50 4E 47 0D 0A 1A 0A
     expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  });
+});
+
+describe('waCta — the card way back to Stevi', () => {
+  const prev = process.env.PUBLIC_WA_NUMBER;
+  afterEach(() => {
+    if (prev === undefined) delete process.env.PUBLIC_WA_NUMBER;
+    else process.env.PUBLIC_WA_NUMBER = prev;
+  });
+
+  it('always renders a usable wa.me link, even with the env unset', () => {
+    delete process.env.PUBLIC_WA_NUMBER;
+    expect(waCta('cotação')).toMatch(/^wa\.me\/\d+ · manda "cotação"$/);
+  });
+
+  it('uses the configured number and strips formatting', () => {
+    process.env.PUBLIC_WA_NUMBER = '+55 (34) 99988-7766';
+    expect(waCta('geada')).toBe('wa.me/5534999887766 · manda "geada"');
   });
 });

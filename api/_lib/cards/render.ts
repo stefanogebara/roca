@@ -165,8 +165,10 @@ export function sparkline(
  * Stevi that survives a forward (screenshots included). Static per card TYPE —
  * never per user (a per-user link would leak who forwarded it). */
 export function waCta(prompt: string): string {
-  const digits = (process.env.PUBLIC_WA_NUMBER || '').replace(/\D/g, '');
-  return digits ? `wa.me/${digits} · manda "${prompt}"` : `Manda "${prompt}" pra Stevi no WhatsApp.`;
+  // Same fallback as growth.ts/verificar.ts — an unset env must never silently
+  // erase the card's way back to Stevi (that IS the acquisition channel).
+  const digits = (process.env.PUBLIC_WA_NUMBER || '19705509125').replace(/\D/g, '');
+  return `wa.me/${digits} · manda "${prompt}"`;
 }
 
 /** "emitido hoje, dd/mm · HH:mm" stamp (BRT). A verdict card lives on in chats
