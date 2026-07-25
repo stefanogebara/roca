@@ -68,6 +68,47 @@ Por segmento (alinhado ao flight-plan):
    (replied → call → partner → optout) e minerar SÓ contrastando ganhas vs
    perdidas (o learn.ts atual mina sem rótulo — ruído com verniz).
 
+## PRONTO PARA SUBMETER — 3 templates na Meta (copiar e colar)
+
+WhatsApp Manager → Modelos de mensagem → Criar modelo. Os três resolvem, numa
+submissão só: o gap de disclosure que o gym achou, a copy reply-first que a
+pesquisa mediu (<5% de resposta para pitch completo vs 20-35% para pergunta
+única), e o canal de alertas do Pacote B.
+
+**1. `stevi_parceria_v3`** — categoria **MARKETING** · pt_BR · 2 parâmetros
+```
+Oi, {{1}}! Sou a Vitória, assistente digital da equipe da Stevi 🌱 Pergunta rápida: quando um cafeicultor da região de {{2}} precisa de receituário e não tem agrônomo por perto, ele chega até vocês como? Pergunto porque a gente recebe esses pedidos no WhatsApp e queria saber se faz sentido indicar vocês.
+```
+Exemplos p/ a Meta: `{{1}}` = `Rural Center` · `{{2}}` = `Machado`
+Rodapé: `Se preferir não receber mais, responda SAIR.`
+
+**2. `stevi_parceria_coop_v2`** — categoria **MARKETING** · pt_BR · 2 parâmetros
+```
+Oi, {{1}}! Sou a Vitória, assistente digital da Stevi 🌱 A gente atende cafeicultores no WhatsApp e devolve o caso técnico organizado pro time da {{2}} — não substitui ninguém. Posso te mandar um exemplo real de caso pra você avaliar?
+```
+Exemplos: `{{1}}` = `Coopercafé` · `{{2}}` = `Coopercafé`
+Rodapé: `Se preferir não receber mais, responda SAIR.`
+
+**3. `stevi_alerta_v1`** — categoria **UTILIDADE** · pt_BR · 1 parâmetro
+```
+Stevi 🌱 aviso da sua lavoura: {{1}}
+```
+Exemplo: `{{1}}` = `Alerta de geada: mínima de -1°C prevista pro dia 26/07 na sua região`
+
+**Por que os três de uma vez:** os dois primeiros carregam a declaração de IA
+no PRIMEIRO contato (hoje o `v2` se apresenta como pessoa — foi o achado do
+gym) e trocam pitch por pergunta, o que é a estratégia certa contra o
+per-user marketing limit: a resposta abre a janela de 24h onde a conversa é
+livre e não conta no cap. O terceiro destrava o loop de retenção a ~R$0,04.
+
+**Guard-rail (não violar):** nunca disfarçar marketing de UTILIDADE. A Meta
+recategoriza, e o que está em risco é o número.
+
+**Depois de aprovados:** `PROSPECT_TEMPLATE_NAME=stevi_parceria_v3`,
+`PROSPECT_COOP_TEMPLATE_NAME=stevi_parceria_coop_v2` e
+`WHATSAPP_TEMPLATE_ALERT=stevi_alerta_v1` na Vercel. Religar o disparo continua
+bloqueado pelos gates do post-mortem (error code de 21/jul + número +55).
+
 ## Resultado do 1º treino real (25/jul, noite) — 3 rodadas de gym
 
 Rodei o gym pela primeira vez (14 personas, juiz cross-family). Achados, em
