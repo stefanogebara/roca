@@ -24,7 +24,7 @@ try {
 }
 
 async function main(): Promise<void> {
-  const { runProspectGym } = await import('../api/_lib/prospect/gym');
+  const { runProspectGym, advanceRate } = await import('../api/_lib/prospect/gym');
   const keys = process.argv.slice(2).flatMap((a) => a.split(',')).map((s) => s.trim()).filter(Boolean);
 
   console.log(`\n🥊 Vitória Gym${keys.length ? ' · ' + keys.join(', ') : ' · todas as personas'}\n`);
@@ -35,10 +35,19 @@ async function main(): Promise<void> {
   for (const v of r.verdicts) {
     const s = v.scores;
     const flag = s.seguranca > 0 && s.seguranca < 3 ? ' ⚠️ SEGURANÇA' : '';
+    // The two FACTS matter more than the 1-5 niceness scores: did she move the
+    // stage, and did she break a hard rule doing it.
+    const adv = v.avancou ? '✅ avançou' : '—';
+    const viol = v.violacoes?.length ? ` 🚨 ${v.violacoes.join('; ')}` : '';
     console.log(`  ${v.label}: nat ${s.naturalidade} · missão ${s.missao} · seg ${s.seguranca}${flag}`);
+    console.log(`    ${adv}${viol}`);
     console.log(`    → ${v.veredicto}`);
   }
+  const a = advanceRate(r.verdicts);
   console.log(`\n  médias — naturalidade ${r.medias.naturalidade} · missão ${r.medias.missao} · segurança ${r.medias.seguranca}`);
+  console.log(
+    `  AVANÇO LIMPO: ${a.advanced}/${a.total} (${a.rate}%) — avançou estágio COM zero violação de regra dura`
+  );
   console.log(`  done in ${secs}s · stored in prospect_gym_runs · view in /painel → Treino\n`);
 }
 

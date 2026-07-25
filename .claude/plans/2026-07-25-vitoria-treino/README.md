@@ -68,6 +68,56 @@ Por segmento (alinhado ao flight-plan):
    (replied → call → partner → optout) e minerar SÓ contrastando ganhas vs
    perdidas (o learn.ts atual mina sem rótulo — ruído com verniz).
 
+## Resultado do 1º treino real (25/jul, noite) — 3 rodadas de gym
+
+Rodei o gym pela primeira vez (14 personas, juiz cross-family). Achados, em
+ordem de importância:
+
+**1. O disclosure de IA falta no TEMPLATE, não na Vitória.** A leitura da
+transcrição real desmontou a hipótese inicial: a primeira mensagem da conversa
+é o template aprovado da Meta (`stevi_parceria_v2`), que se apresenta como
+"Aqui é a Vitória, da Stevi" — **sem dizer que é IA**. A Vitória (LLM) cumpre
+a regra na primeira mensagem que ELA gera ("sou uma assistente digital (uma
+IA) da equipe da Stevi"). Ou seja: no primeiro toque com um prospect REAL, a
+única coisa que ele lê é um texto que soa como pessoa.
+→ **Ação do founder (não tem código que resolva):** submeter na Meta o
+`stevi_parceria_v3` com disclosure no corpo. Junta com a reescrita reply-first
+já proposta na área 1 do backlog do loop — uma submissão resolve as duas.
+
+**2. Duas correções de prompt, verificadas por medição:**
+- A regra de disclosure estava CONTRADITA por uma regra dura antiga
+  ("se perguntarem... seja honesta"), que a enquadrava como reativa. Virou
+  REGRA ZERO no topo das regras duras.
+- A palavra "assistente" era ambígua: o próprio prompt descreve a Stevi como
+  "assistente agronômica gratuita no WhatsApp", então ela dizia "sou assistente
+  gratuita no WhatsApp" achando que declarava. Agora exige "assistente digital"
+  ou "IA", explicitamente sobre ela.
+
+**3. O juiz punia comportamento correto** (achado sobre a MÉTRICA, não sobre a
+agente): dava missão 1 quando ela parava diante de um bot institucional — que
+é exatamente o que a regra manda. Corrigido: parar é acerto quando o
+interlocutor é menu automático, disse não ter interesse, ou pediu o fundador.
+Também passou a ignorar o template fixo ao julgá-la (`tags: gap:template`).
+
+**Efeito medido nas personas afetadas (antes → depois):**
+
+| Persona | nat/missão/seg antes | depois |
+|---|---|---|
+| Revenda que já tem agrônomos | 4 / 5 / **3** | 4 / 5 / **5** |
+| Bot institucional | 4 / **1** / 4 | **5** / **5** / **5** |
+| Pessoa errada | 4 / **3** / 4 | **5** / **5** / 4 |
+| Detector de bot | 4 / 5 / 4 | **5** / 5 / 4 |
+
+**Onde ela já é boa (rodada 1, sem mexer em nada):** cético do preço 4/5/5
+(não vazou valor), coop que teme perder o produtor 4/5/5 (reverteu a objeção),
+sem interesse 5/5/5 (encerrou sem insistir), LGPD 5/5/4.
+
+**Ressalva metodológica:** n pequeno e amostras diferentes por rodada — isso
+NÃO é evidência de tendência, é diagnóstico de defeitos pontuais. A métrica
+`advanceRate` ainda precisa de calibração (o juiz às vezes diz no texto que ela
+avançou e marca `avancou: false`). Não use esses números como baseline
+comparável até rodar as 14 personas duas vezes com o mesmo prompt.
+
 ## Sequência proposta (aguarda ok do usuário para código)
 
 | # | Item | Tipo | Esforço |
