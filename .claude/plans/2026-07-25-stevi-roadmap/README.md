@@ -74,12 +74,15 @@ flight-plan: engenharia mínima e cirúrgica; o gargalo é campo, não código.
    Insumo novo da auditoria: o lead-gen tem teto estrutural (~R$1k/mês no cenário
    VENTURE do próprio scorecard) e mismatch geográfico observado.
 
-2. **[Fundador] Levantar tração real + falar com as 5 referrals paradas.**
-   Query fresca no Supabase (produtores ativos, D7/W1, conversas/dia) — vira o
-   baseline do gate S4. As 5 referrals soja/milho SP/MT são a única demanda orgânica
-   observada: atendê-las (recrutar 1 agrônomo SP/MT) ou declará-las fora do beachhead
-   — mas parar de coletar demanda e jogá-la fora. *(Claude/OS: preparo as queries e o
-   roteiro de entrevista.)*
+2. **[Fundador] Tração real levantada (25/jul) — e a correção mudou o item.**
+   Baseline feito: `.claude/plans/2026-07-25-tracao-baseline/README.md`. A
+   verificação de identidade matou a narrativa: **as "5 referrals SP/MT" eram
+   teste interno (Simulador + Stefano)**. Existe exatamente **1 usuário externo
+   real** na vida do produto (Gaia Tech, vouchado pelo Michel, 1 msg em 17/jul,
+   nunca voltou). Ação substituta: (a) ler a thread do Gaia Tech no painel e
+   fazer follow-up humano hoje; (b) aceitar que o gate S4 exige começar a
+   aquisição vouchada DO ZERO — kit do técnico + pin-rate, como o flight-plan
+   já mandava.
 
 3. **[Fundador] Postmortem escrito do dispatch (20-21/jul) ANTES de religar.**
    "Credencial re-sincronizada" não explica falha pós-aceite — a assinatura é de

@@ -16,7 +16,7 @@ semanal do agente **PM do Scorecard**.
 | Farms com pin | 3 (2 com cultura) | — |
 | Caderno de aplicações | **0 registros** | o "wedge mais defensável" nunca foi usado por ninguém |
 | Alertas proativos enviados | **0** (vida toda) | o loop de retenção NUNCA disparou uma vez (confirma o achado da auditoria: quebrado por construção) |
-| Referrals | 5 (100% paradas) | ver abaixo |
+| Referrals | 5 — **todas teste interno** (ver correção abaixo) | zero demanda orgânica real |
 | Parceiros | 1 (Michel) | — |
 
 **Coortes D7** (proxy: voltou com nova mensagem entre 24h e 8 dias após o 1º contato):
@@ -34,23 +34,36 @@ ruins; é que **não existem números**. Restam ~48 dias da janela. Nas palavras
 próprio flight-plan: o conserto nunca é mais código — é pin-rate de links
 vouchados, manhãs de armazém e o kit do técnico circulando.
 
-## As 5 referrals paradas (a única demanda orgânica observada)
+## ⚠️ CORREÇÃO (25/jul, mesma tarde): as "5 referrals" eram TESTE INTERNO
 
-| Criada | UF | Cultura | Status | Parceiro notificado | SLA alertado |
-|---|---|---|---|---|---|
-| 08/jul | MT | soja+milho | new | nunca | nunca |
-| 08/jul | SP | — | new | nunca | nunca |
-| 09/jul | SP | — | new | nunca | nunca |
-| 09/jul | SP | soja+milho | novo¹ | nunca | nunca |
-| 10/jul | SP | soja+milho | new | nunca | nunca |
+Verificação de identidade (join com `users`): **1 pedido veio do "Simulador
+Roca" e 4 do próprio Stefano** (testes de 08-10/jul). A narrativa "demanda
+orgânica soja/milho SP/MT descartada" — que a auditoria, o red-team, o roadmap
+e o episódio de 17/jul do lessons.md compraram — era ruído de teste um nível
+mais fundo do que a checagem anterior alcançou. **Não existe demanda orgânica
+de referral. Zero.** O item do roadmap "recrutar agrônomo SP/MT para as 5
+referrals" está MORTO; a implicação real é mais dura: o funil nunca produziu
+um pedido de agrônomo verdadeiro.
 
-¹ Bug menor: status em dois idiomas (`new`/`novo`) — normalizar quando tocar no funil.
+**Decomposição da base inteira de "usuários" (10):**
 
-**15-17 dias esperando.** `partner_id` nulo em todas (nenhuma casa com o raio do
-Michel), `sla_alerted_at` nulo em todas — **o monitor de SLA nunca pageou**, e o
-silêncio dele foi tratado como "tudo bem" (a lição de 17/jul em `tasks/lessons.md`
-previu exatamente isso). Ação do roadmap: recrutar 1 agrônomo soja/milho SP/MT ou
-declarar fora do beachhead e responder honestamente aos 5 produtores.
+| Quem | Qtde | Msgs in | Última |
+|---|---|---|---|
+| Simulador Roca (números de teste) | 6 | 43 | 08/jul |
+| Stefano (founder) | 1 | 38 | 15/jul |
+| Vitória (co-founder) | 1 | 1 | 08/jul |
+| "WhatsApp Business" (número de sistema, +1646…) | 1 | 1 | 09/jul |
+| **Gaia Tech — o ÚNICO externo real** (source=`michel`) | **1** | **1** | **17/jul** |
+
+**Tração real da empresa: 1 contato externo em toda a vida do produto** —
+vouchado pelo Michel, mandou 1 mensagem em 17/jul e nunca voltou. Vale ler essa
+thread no painel: é o único dado de usuário real que existe, e um follow-up
+humano é a ação de campo mais barata disponível. As coortes D7 da tabela acima
+são 100% ruído de teste.
+
+Bug menor real que sobrevive à correção: status de referral em dois idiomas
+(`new`/`novo`) — normalizar quando tocar no funil. E o fato de o SLA nunca ter
+pageado continua sendo um achado válido sobre o monitor (silêncio ≠ saúde).
 
 ## Prospecção (contexto do post-mortem ao lado)
 

@@ -2,6 +2,32 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
+## 2026-07-25 — Fresh queries are not enough: verify WHO the rows belong to before building strategy on them
+
+**Context:** The 25/jul audit + roadmap + traction baseline all treated "5
+referral_requests, soja/milho, SP/MT" as the company's only observed organic
+demand, and derived strategy from it (recruit an SP/MT agronomist; "demand was
+discarded"). A same-day identity join (`referral_requests → users`) showed all
+5 came from the test simulator (1) and the founder himself (4). Deeper still:
+of 10 "users", 6 are the simulator, 2 are the founders, 1 is a WhatsApp system
+number — the product has had exactly ONE real external user (vouched by
+Michel, 1 message, never returned). The 17/jul lesson ("query fresh, don't
+trust compaction") was followed — and was still insufficient, because the
+fresh query aggregated without identifying.
+
+**Rules:**
+- **Any metric used for a strategic claim must be decomposed by identity
+  first**: join to `users`/source, separate founder/test/simulator rows from
+  real ones. An aggregate over a small table is an anecdote, not a metric.
+- Seed test data with an unmistakable marker (name='Simulador', `is_test`
+  flag, reserved number range) and **filter it in every ops/metric query by
+  default**. Add the flag before the next campaign, not after.
+- When n is this small, skip aggregates entirely: read the actual rows. 10
+  users is a page, not a dataset.
+- The compounding failure mode: each verification layer (compaction → fresh
+  query → identity) catches the previous layer's error. Stop at the layer
+  that names WHO, not just HOW MANY.
+
 ## 2026-07-17 — Facts inherited through compaction are hearsay; verify against prod before any outbound promise
 
 **Context:** The "4 leads parados esperando o Michel" narrative rode through
