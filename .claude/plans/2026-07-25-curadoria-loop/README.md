@@ -98,6 +98,13 @@ o usuário interrompe quando quiser — "para o loop" encerra).
 - [seed] Religada bloqueada pelos gates do post-mortem (código de erro 21/jul).
 - [seed] Pesquisar: benchmarks de cold outreach B2B agro no Brasil; alternativas de canal (grupos de WhatsApp de coop, sindicatos, EMATER, feiras); o que muda com número +55 verificado.
 - [seed] 0 replies/29 envios: revisar copy dos templates contra exemplos vencedores de outbound BR.
+- [25/jul] **H1 validada em fonte primária (erro 131049 / per-user marketing limits).** A Meta documenta limite dinâmico por DESTINATÁRIO para templates MARKETING, agregado entre todas as empresas que mensageiam o usuário, calibrado pelo read-rate de marketing dele; a mensagem é aceita na API e bloqueada na entrega (assinatura idêntica a 21/jul), só MARKETING é afetado (utility/auth não), e mensagens dentro da janela de 24h pós-resposta NÃO contam no cap. Brasil está no escopo (excluídos: EEA, UK, Japão, Coreia). Como fechar: Gate 1 do post-mortem — ler o error code de 21/jul no WhatsApp Manager (15 min, founder). — developers.facebook.com "Per-user marketing template message limits" + "Error codes" (acessados 25/jul/2026)
+- [25/jul] **Sub-hipótese nova H1b: erro 130497 — restrição cross-border Brasil/Indonésia (desde 15/set/2025).** Fontes secundárias relatam que WABA registrado fora do Brasil não entrega para +55 ("Business account is restricted from messaging users in this country"), sem workaround além de número/WABA local. NÃO achei página primária da Meta — tratar como não-confirmada. Se o error code de 21/jul for 130497 (e não 131049), cold-WA do número +1 morreu por política, não por copy. As duas hipóteses convergem na mesma ação: número +55. Risco: fontes são vendors. — vmoscloud.com/blog/whatsapp-error-130497 (nov/2025); help.gohighlevel.com art. 155000007285
+- [25/jul] **Número +55 + verificação de negócio: processo e custo mapeados.** Portfólio NÃO-verificado pode ter até 2 números (temos 1 → um +55 cabe no mesmo WABA hoje): WhatsApp Manager → adicionar número → OTP SMS/voz; custo = só o chip/número virtual (~R$20-50), Meta não cobra. Verificação de negócio é GRATUITA, sobe o tier de 250→2.000 destinatários únicos/24h e o cap de números de 2→20 — bloqueada só pelo CNPJ (dependência humana já listada). Segundo número também isola risco de ban (Gate 3 do post-mortem). — developers.facebook.com "Messaging limits" + "Business phone numbers" (25/jul/2026)
+- [25/jul] **Estratégia reply-first no 1º toque.** O objetivo do template frio deve ser RESPOSTA, não call: resposta abre a janela de 24h onde a conversa é livre e não conta no per-user cap. Pitch direto em mensagem fria: <5% de resposta; pergunta provocativa 20-35%; dado de mercado 25-40%; indicação nominal 40-60% (framework mais forte — pedir ao Michel 3 intros nomeadas antes de religar). Guard-rail: NÃO disfarçar marketing de UTILITY — a Meta recategoriza/rejeita e o risco é o número. — koee.com.br "Como abordar lead frio no WhatsApp" (2026); developers.facebook.com per-user limits
+- [25/jul] **Reescrita dos templates (texto pronto, aguarda ok do founder).** Teardown: v2 e coop_v1 são pitch completo + pedido de reunião no 1º toque (anti-padrão <5%), personalização genérica ("atendem produtores no dia a dia"), sem disclosure de IA (habilidade #1 do currículo). Proposta `stevi_parceria_v3` (2 params): "Oi, {{1}}! Sou a Vitória, assistente digital da equipe da Stevi 🌱 Pergunta rápida: quando um cafeicultor da região de {{2}} precisa de receituário e não tem agrônomo por perto, ele chega até vocês como? Pergunto porque a gente recebe esses pedidos no WhatsApp e queria saber se faz sentido indicar vocês." Proposta `stevi_parceria_coop_v2` (2 params): "Oi, {{1}}! Sou a Vitória, assistente digital da Stevi 🌱 A gente atende cafeicultores no WhatsApp e devolve o caso técnico organizado pro time da {{2}} — não substitui ninguém. Posso te mandar um exemplo real de caso pra você avaliar?" Ambos mantêm footer SAIR; ≤3 linhas; 1 pergunta; CTA de micro-compromisso. — koee.com.br (regra das 6 linhas + frameworks); socialhub.pro "Cold message B2B: 12 templates" (2025-2026)
+- [25/jul] **Canal vouchado #1 — Coocafé (Lajinha-MG, 11 mil+ cooperados).** Unidades exatamente no nosso mapa: Manhuaçu, Espera Feliz, Manhumirim, Durandé, Mutum, Ipanema (MG) + Iúna, Ibatiba, Irupi, Brejetuba (ES); faz assistência técnica e dias de campo. Passo 1: visita presencial do founder à unidade de Manhuaçu ou Espera Feliz pedindo 15 min com o responsável técnico — pitch de distribuição (dossiê devolve o produtor pro técnico da coop). Custo: deslocamento. — portal.ocbes.coop.br (perfil Coocafé); portalcaparao.com.br (jul/2026)
+- [25/jul] **Canal vouchado #2 — sindicatos rurais (ATeG Café+Forte) e EMATER-MG, custo zero.** Os técnicos do ATeG Café+Forte (Sistema FAEMG/Senar) em Manhuaçu e Espera Feliz são o ICP agronomo/consultoria, já pagos para atender produtores — a Stevi alimenta o técnico, não compete. Passo 1a: DM no @spr.esperafeliz (Instagram do Sindicato dos Produtores Rurais de Espera Feliz) pedindo o contato do mobilizador do ATeG. Passo 1b: localizar o escritório local da EMATER-MG do município-alvo no diretório oficial (emater.mg.gov.br → Escritórios Locais) e agendar demo com o extensionista de cafeicultura (precedente: startup Algrano entrou via escritório local). Bônus de credibilidade: Simpósio de Cafeicultura das Matas de Minas (Manhuaçu, anual, FAEMG) e chamada Avança Café da Embrapa (a CertifiCafé saiu dela com a Cooxupé como cliente). — revistacafeicultura.com.br + sistemafaemg.org.br; emater.mg.gov.br; agenciaminas.mg.gov.br; embrapa.br (AgriMatching 2025)
 
 ### 2. Estratégia & GTM (4.5)
 - [seed] Memo tese/beachhead ABERTO (founders). Pesquisa de apoio: pricing On Agri hoje, evolução do RAImundo, novos bots agro-WA desde 16/jul.
@@ -122,6 +129,24 @@ o usuário interrompe quando quiser — "para o loop" encerra).
 ---
 
 ## Log de iterações (append)
+
+### Iteração 1 — 25/jul (~15h) — Prospecção & Vitória
+- Lead-check: 0 replies · 0 referrals · 0 usuários novos · 0 msgs in 24h.
+- Smoke pós-deploy: landing/verificar/webhook = 200.
+- Pesquisador de prospecção (125K tokens, 27 tool uses): **H1 confirmada em
+  fonte primária** (per-user marketing limits, #131049, aceita-na-API/bloqueia-
+  na-entrega, Brasil no escopo) e **H1b nova** (#130497, restrição cross-border
+  BR desde 15/set/2025 — vendors, sem fonte primária; discriminador = error
+  code de 21/jul). +55 no WABA atual: cabe hoje (portfólio não-verificado
+  suporta 2 números), custo só do chip; verificação de negócio grátis via CNPJ
+  sobe tier 250→2.000/dia. Copy: templates atuais são pitch-completo (padrão
+  <5% resposta); reescritas v3 reply-first prontas no backlog (pergunta única,
+  disclosure de IA, CTA leve). Canais vouchados com passo 1: Coocafé (Lajinha,
+  11 mil cooperados), FAEMG/ATeG Café+Forte (@spr.esperafeliz), EMATER-MG.
+- Post-mortem atualizado com H1b. 7 propostas appendadas na área 1.
+- **Para o founder:** o Gate 1 (ler o error code, 15 min) agora discrimina
+  H1×H1b — e as duas convergem em "número +55 antes de religar marketing".
+- Próxima: Estratégia & GTM (stevi-pesquisa-mercado) — spawnada em background.
 
 ### Iteração 0 — 25/jul (bootstrap, esta sessão)
 - Lead-quente check: **0 leads reais**. Descoberta: as 5 referrals eram teste

@@ -47,6 +47,18 @@ esse filtro estrangula. Nota: desde 2025 a Meta aplica "per-user marketing messa
 limits" — o destinatário frio pode estar no limite de marketing de OUTROS
 remetentes, e o nosso é o descartado.
 
+**H1b (adicionada 25/jul, iteração 1 do loop) — Restrição cross-border da Meta
+para o Brasil: erro #130497. PLAUSÍVEL, não confirmada em fonte primária.**
+Fontes de vendors (vmoscloud nov/2025; GoHighLevel help) relatam que desde
+15/set/2025 WABA registrado FORA do Brasil não entrega mensagens de marketing
+para números +55 ("Business account is restricted from messaging users in this
+country"), sem workaround além de número/WABA local. Assinatura idêntica à
+observada. Não localizei página primária da Meta — tratar como hipótese até o
+Gate 1. **Discriminador:** o error code de 21/jul — 131049 = H1 (filtro de
+engajamento por usuário), 130497 = H1b (bloqueio total cross-border; cold-WA
+do +1 morreu por política, não por copy). As duas convergem na mesma ação:
+**número +55 antes de qualquer religada de marketing.**
+
 **H2 — Tier/limite do número US não verificado. POSSÍVEL, secundária.**
 Só 16 envios no dia — longe do limite de 250 únicos/24h do tier inicial — mas
 restrições específicas de número não-verificado para tráfego internacional frio
