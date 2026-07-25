@@ -213,6 +213,26 @@ Gaia Tech.
 
 ## Log de iterações (append)
 
+### Iteração 10 — 25/jul (~19h) — manutenção; env documentadas; deploy verificado
+- Lead-check: 0 em tudo (0 replies · 0 referrals · 0 usuários novos · 0 msgs 3h).
+- `.env.example` completo (b6b1533): 45 variáveis, zero lidas em `api/` sem
+  documentação (verificado por diff automático).
+- Bug próprio do pacote (d) corrigido (8c7a455): `waCta`/`cardShareCaption`
+  liam `PUBLIC_WA_NUMBER` sem fallback → env não setada apagava em silêncio o
+  caminho de volta do card. Agora os 3 módulos concordam no mesmo default.
+- Deploy do founder verificado em prod: landing/verificar/webhook 200, card
+  sem sig 403, copy stale 0, 2 links para /verificar, CTA com prefill.
+- `users.channel` ainda NULL em toda a base — esperado: só é carimbado no
+  próximo inbound. **O primeiro inbound real valida a coluna** (e com ela o
+  roteamento de alertas do Pacote B).
+- **Risco a observar:** o cron `monitor` de amanhã (11:00 UTC) é a PRIMEIRA
+  execução em produção do caminho de alertas channel-aware. Sem tráfego e sem
+  pins, deve ser no-op — mas é o run que prova o Pacote B.
+- Honestidade sobre o loop: em manutenção sem tráfego, o valor marginal por
+  iteração é ~zero. O aviso de lead quente NÃO depende do loop (é e-mail
+  automático no reply). O loop segue de hora em hora por baixo custo, mas
+  quem move o ponteiro agora é campo, não código.
+
 ### Iteração 9 — 25/jul (~18h30) — manutenção (sem leads, sem aprovações)
 - Lead-check: 0 replies · 0 referrals · 0 usuários novos · 0 msgs 6h.
 - Tabelas do moat recém-criadas seguem vazias (0 triage_events, 0
