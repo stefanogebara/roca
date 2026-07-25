@@ -109,6 +109,12 @@ o usuário interrompe quando quiser — "para o loop" encerra).
 ### 2. Estratégia & GTM (4.5)
 - [seed] Memo tese/beachhead ABERTO (founders). Pesquisa de apoio: pricing On Agri hoje, evolução do RAImundo, novos bots agro-WA desde 16/jul.
 - [seed] Canais nunca avaliados: EMATER/ATER, revendas como distribuição, rádio rural.
+- [25/jul] **On Agri: preço mantido (R$147,90 Start), mas o delta é o CANAL — parceria Clube Broto (Banco do Brasil), anunciada 27/fev/2026.** Planos atuais: Start R$147,90/mês até 1.000 ha · Basic R$297,90 · Advanced R$497,90 — a régua "até 1.000 ha" confirma que a On Agri mira produtor grande, não 5-50 ha. Assinantes do Clube Broto (R$14,90/mês, clube de benefícios do BB com meta de 100 mil produtores) acessam o "engenheiro agrônomo digital" da On Agri via cadastro simples (grau de inclusão vs desconto não divulgado — verificar). Implicação pro memo: a âncora de preço direto-ao-produtor desabou de R$147 para R$14,90-via-clube; "assinatura vendida ao produtor abaixo de R$147" ficou muito mais fraca como tese — se houver assinatura, o comprador natural é agrônomo/coop/clube, não o produtor. Ação: memo trata bundle B2B2C (clube/coop) como o comparável real de pricing. — onagri.com.br (acessado 25/jul/2026); noticias.broto.com.br "Consultoria agronômica por WhatsApp" (27/fev/2026); club.broto.com.br + theagribiz.com (R$14,90/mês, meta 100 mil)
+- [25/jul] **RAImundo: NENHUMA tração pública nova desde jul/2025 — sinal fraco de estagnação.** Últimos números públicos: 2.900 interações em beta (Band, 18/jul/2025); versão definitiva/freemium prometida para o 2º semestre/2025 sem qualquer evidência pública de lançamento; meta de 100 mil usuários/ano-1 sem confirmação; investimento AZap.AI modesto (R$100 mil + até R$500 mil). Buscas de 25/jul/2026 não acharam balanço 2026. Delta vs 16/jul: a linha de base tratava RAImundo como ameaça "grátis do governo"; hoje a evidência sugere projeto sub-capitalizado e sem momentum público — mas ausência de notícia não é prova (marcar como sinal fraco, 1 rodada de fontes). Ação: memo não deve tratar RAImundo como bloqueador de GTM; monitorar trimestralmente. — band.com.br (18/jul/2025); revistarpanews.com.br + portal.agrosummit.com.br (mai/2025); buscas 25/jul/2026 sem resultados novos
+- [25/jul] **Entrante novo desde a linha de base: Aegrozap (Aegro), lançado 19/mar/2026 — captura conversacional de registros por voz/texto no WhatsApp.** Faz exatamente o conceito do nosso caderno (áudio → registro estruturado, "eliminando a barreira entre a operação em campo e o registro administrativo"), mas acoplado ao SaaS de gestão pago da Aegro (produtor profissionalizado, já usuário de sistema). Valida a tese "captura conversacional mata a morte por digitação" por um player estabelecido; risco real se a Aegro descer de mercado. Ação: copy do Stevi reivindica já o nicho "caderno no zap SEM sistema de gestão, sem cadastro, sem mensalidade de software" — diferencial que a Aegro estruturalmente não ataca sem canibalizar o SaaS. — seguroruralbrasil.com.br (18/mar/2026, lançamento no Aegro Conecta 19/mar/2026)
+- [25/jul] **Vento a favor por política da Meta: chatbots de IA de propósito geral banidos do WhatsApp desde 15/jan/2026** (ChatGPT, Perplexity etc. saíram do canal; bots de negócio/domínio seguem permitidos). O argumento do flight-plan "vs ChatGPT" ganhou uma linha objetiva: o ChatGPT não PODE mais estar no zap do produtor; um assistente de domínio cercado, com agrônomo CREA por trás, pode. Ação: 1 linha nova no pitch e na página /verificar. — portaltela.com (23/out/2025, vigência 15/jan/2026)
+- [25/jul] **Evidência de monetização converge: produtor 5-50 ha comprovadamente NÃO paga assinatura; quem paga é instituição — e lead-gen R$50 não tem comp público (mercado aberto).** Pró-instituição: ATeG/Senar = assistência mensal GRATUITA ao produtor por 24 meses, paga pelo sistema (cnabrasil.org.br); ManejeBem = projetos patrocinados por indústria/coop (Nespresso-style), produtor não paga, NPS 9,26 (manejebem.com); RAImundo = grátis (governo); Clube Broto = R$14,90/mês subsidiado pela lógica de aquisição do BB. Contra/risco lead-gen: nenhum benchmark público de R$/lead aceito para agrônomo/consultoria agro BR foi encontrado (proxy mais próximo: CPC médio ~R$12,50 em campanhas agro — adlocal.com.br 2026); consultores precificam por diária/sacas, sem tabela pública (aegro.com.br/blog). Implicação: R$50/lead é hipótese SEM comp de mercado — o teste do Michel (lead nº 3, já roteirizado no flight-plan) é o único gerador de evidência que existe; o memo deve pré-registrá-lo como o experimento decisivo da tese de receita, não como detalhe. — fontes acima, acessadas 25/jul/2026
+- [25/jul] **Caso quantificado pró canal-extensionista (kit do técnico): Farmer.Chat/Digital Green — 12.000 agentes de extensão adotaram, servindo 500 mil produtores (Índia/Quênia/Nigéria); estudo 60 Decibels 2025: 70% dos produtores aplicaram recomendações em 30 dias, 73% acessavam advisory digital pela 1ª vez.** O modelo que escala é a ferramenta NA MÃO do agente de confiança, não app direto ao produtor — mesma tese do nosso kit do técnico/ATeG Café+Forte (área 1). No BR: WhatsApp já é "a ferramenta mais usada" na ATER remota da Emater-MG (caso estrutural, 2021; página oficial do Ater Digital fora do ar por período eleitoral em 25/jun/2026 — sem números 2026). Ação: memo posiciona o técnico ATeG/EMATER como usuário-distribuidor primário do beachhead café, citando Farmer.Chat como precedente quantificado. — digitalgreen.org + openai.com/index/digital-green (2025); agrolink.com.br nº 446771 (2/mar/2021)
 
 ### 3. APIs & dados agro (5.5)
 - [seed] Verificação empírica NDVI (offset BOA +1000) + máscara SCL.
@@ -129,6 +135,29 @@ o usuário interrompe quando quiser — "para o loop" encerra).
 ---
 
 ## Log de iterações (append)
+
+### Iteração 2 — 25/jul (~15h20) — Estratégia & GTM
+- Pesquisador de mercado (123K tokens, 31 tool uses); 6 propostas na área 2.
+- **Deltas vs 16/jul:** (1) On Agri entrou no Clube Broto/Banco do Brasil
+  (27/fev/2026) — agrônomo digital por **R$14,90/mês via clube**: a âncora de
+  preço direto-ao-produtor desabou de R$147→R$14,90. (2) RAImundo estagnado
+  (2.900 interações, freemium prometido sem lançamento). (3) Entrante:
+  **Aegrozap** (Aegro, mar/2026) — áudio→registro estruturado no WhatsApp;
+  valida o caderno conversacional, mas preso ao SaaS pago. (4) **Vento a
+  favor: Meta baniu chatbots de IA de propósito geral do WhatsApp
+  (15/jan/2026)** — "por que não o ChatGPT?" morreu por política; bot de
+  domínio cercado segue permitido.
+- **Monetização:** evidência converge em "produtor 5-50 ha não paga;
+  instituição paga" (ATeG/Senar grátis pro produtor; ManejeBem por projetos
+  patrocinados; Broto subsidiado pelo BB). Pró lead-gen: nicho vazio, ninguém
+  monetiza lead de agrônomo. Contra: zero comp público de R$/lead no agro —
+  o teste R$50 do Michel é o único gerador de evidência.
+- **Distribuição:** Farmer.Chat/Digital Green — 12.000 extensionistas → 500
+  mil produtores; 70% aplicam recomendações em 30 dias (60 Decibels 2025).
+  O modelo que escala é ferramenta na mão do agente de confiança.
+- Implicação honesta pro memo: enfraquece "assinatura de caderno ao
+  produtor"; fortalece lead-gen-como-experimento + B2B2C institucional.
+- Próxima: APIs & dados agro (stevi-pesquisa-infra-apis).
 
 ### Iteração 1 — 25/jul (~15h) — Prospecção & Vitória
 - Lead-check: 0 replies · 0 referrals · 0 usuários novos · 0 msgs in 24h.
