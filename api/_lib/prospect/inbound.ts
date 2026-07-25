@@ -18,6 +18,7 @@ import {
 } from './db';
 import { AGENT_NAME, needsEscalation, buildAgentReply, extractQualification } from './agent';
 import { alertFounders } from '../alert';
+import { sendProspectReplyNotification } from '../notify';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-inbound');
@@ -63,7 +64,31 @@ export async function handleProspectInbound(
 
   // A prospect engaged — valuable signal. The pipeline routes it to the
   // conversation agent (or, with agent_enabled=false, leaves it to the founder).
+  const firstReply = prospect.status !== 'replied';
   await markProspectReplied(prospect.id);
+
+  // First reply = the hottest lead the funnel produces. Email both founders +
+  // WhatsApp ping so a human can take over fast (painel → Assumir). Fail-soft:
+  // notification trouble must never break the reply flow.
+  if (firstReply) {
+    const masked = `+•• ••••${(prospect.phone ?? '').slice(-4)}`;
+    try {
+      await sendProspectReplyNotification({
+        name: prospect.name ?? null,
+        kind: prospect.kind,
+        city: prospect.city ?? null,
+        uf: prospect.uf ?? null,
+        maskedPhone: masked,
+        replyText: text ?? '(mensagem sem texto)',
+      });
+      await alertFounders(
+        `🔥 Prospect respondeu: ${prospect.name ?? 'sem nome'} (${prospect.kind}) — assumir no painel`
+      );
+    } catch (e) {
+      log.error('prospect-reply notification failed:', (e as Error).message);
+    }
+  }
+
   return { handled: false, reply: null, prospect };
 }
 

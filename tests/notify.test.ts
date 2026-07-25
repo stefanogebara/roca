@@ -1,5 +1,40 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { formatReferralEmail, pingFoundersWhatsApp } from '../api/_lib/notify';
+import { formatReferralEmail, formatProspectReplyEmail, pingFoundersWhatsApp } from '../api/_lib/notify';
+
+describe('formatProspectReplyEmail', () => {
+  it('carries name, kind, region, masked phone, reply excerpt and the painel link', () => {
+    const { subject, body } = formatProspectReplyEmail({
+      name: 'Cooperativa Serrana',
+      kind: 'cooperativa',
+      city: 'Patrocínio',
+      uf: 'MG',
+      maskedPhone: '+55 ••••7766',
+      replyText: 'Interessante, como funciona a parceria de vocês?',
+    });
+    expect(subject).toContain('respondeu');
+    expect(subject).toContain('Cooperativa Serrana');
+    expect(body).toContain('cooperativa');
+    expect(body).toContain('Patrocínio');
+    expect(body).toContain('••••7766');
+    expect(body).toContain('como funciona a parceria');
+    expect(body).toContain('/painel');
+    expect(body).not.toMatch(/\d{8,}/); // never a raw phone
+  });
+
+  it('truncates long replies and survives missing fields', () => {
+    const { subject, body } = formatProspectReplyEmail({
+      name: null,
+      kind: 'revenda',
+      city: null,
+      uf: null,
+      maskedPhone: '••••',
+      replyText: 'x'.repeat(500),
+    });
+    expect(subject).toContain('revenda');
+    expect(body.length).toBeLessThan(900);
+    expect(body).toContain('…');
+  });
+});
 
 describe('formatReferralEmail', () => {
   it('carries UF, crops, topic and the masked phone — never a raw number', () => {

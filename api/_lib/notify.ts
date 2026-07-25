@@ -82,31 +82,99 @@ export async function pingFoundersWhatsApp(
 }
 
 /**
+ * A prospect's first reply — the hottest lead the outbound funnel produces.
+ * The founders take over the conversation directly (painel → Assumir), so the
+ * email carries everything needed to act, with the phone masked (full number
+ * stays in the ops console — same LGPD posture as the referral notice).
+ */
+export interface ProspectReplyNotice {
+  name: string | null;
+  kind: string;
+  city: string | null;
+  uf: string | null;
+  maskedPhone: string;
+  replyText: string;
+}
+
+/** Subject + plain-text body for the prospect-reply email. Pure — unit-tested. */
+export function formatProspectReplyEmail(n: ProspectReplyNotice): { subject: string; body: string } {
+  const name = n.name?.trim() || 'Prospect sem nome';
+  const region = [n.city, n.uf].filter(Boolean).join(' · ') || 'região não informada';
+  const excerpt = n.replyText.length > 240 ? `${n.replyText.slice(0, 240)}…` : n.replyText;
+  return {
+    subject: `🔥 Stevi: prospect respondeu — ${name} (${n.kind})`,
+    body: [
+      'Um prospect respondeu ao primeiro toque — lead quente, a hora de assumir é AGORA.',
+      '',
+      `Quem: ${name} (${n.kind})`,
+      `Região: ${region}`,
+      `Contato: ${n.maskedPhone}`,
+      '',
+      `Resposta: "${excerpt}"`,
+      '',
+      `Assuma a conversa no painel (botão Assumir): ${PAINEL_URL}`,
+      'A Vitória segura a conversa até lá — mas resposta humana em minutos fecha, em horas esfria.',
+    ].join('\n'),
+  };
+}
+
+/** Comma-separated founder inbox list; nodemailer accepts the string as-is. */
+function founderRecipients(fallback: string): string {
+  return process.env.FOUNDER_NOTIFY_TO || process.env.REFERRAL_NOTIFY_TO || fallback;
+}
+
+/** Shared Gmail-SMTP send for founder notifications. Throws on failure. */
+async function sendFounderEmail(subject: string, body: string): Promise<boolean> {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) {
+    log.error('GMAIL_USER/GMAIL_APP_PASSWORD not set — founder email skipped (the event IS in the DB/painel)');
+    return false;
+  }
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user, pass },
+  });
+  await withRetry(
+    () =>
+      transporter.sendMail({
+        from: `Stevi <${user}>`,
+        to: founderRecipients(user),
+        subject,
+        text: body,
+      }),
+    { attempts: 2 }
+  );
+  return true;
+}
+
+/**
  * Send the referral notice to the founders. Fail-soft: a mail failure never
  * blocks the farmer's reply, but it is logged and alerted — never silent.
  */
 export async function sendReferralNotification(n: ReferralNotice): Promise<void> {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  const to = process.env.REFERRAL_NOTIFY_TO || user;
-  if (!user || !pass) {
-    log.error('GMAIL_USER/GMAIL_APP_PASSWORD not set — referral email skipped (referral IS in the DB/painel)');
-    return;
-  }
   const { subject, body } = formatReferralEmail(n);
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user, pass },
-    });
-    await withRetry(() => transporter.sendMail({ from: `Stevi <${user}>`, to, subject, text: body }), {
-      attempts: 2,
-    });
-    log.info('referral notification emailed');
+    if (await sendFounderEmail(subject, body)) log.info('referral notification emailed');
   } catch (e) {
     log.error('referral email failed:', (e as Error).message);
     await alertFounders(`⚠️ Stevi: email de referral falhou — ${(e as Error).message.slice(0, 200)}`);
+  }
+}
+
+/**
+ * Email both founders that a prospect replied (first reply only — the caller
+ * gates on the status transition). Fail-soft with a loud log: the reply flow
+ * must never break because SMTP hiccuped.
+ */
+export async function sendProspectReplyNotification(n: ProspectReplyNotice): Promise<void> {
+  const { subject, body } = formatProspectReplyEmail(n);
+  try {
+    if (await sendFounderEmail(subject, body)) log.info('prospect-reply notification emailed');
+  } catch (e) {
+    log.error('prospect-reply email failed:', (e as Error).message);
+    await alertFounders(`⚠️ Stevi: email de lead quente falhou — ${(e as Error).message.slice(0, 200)}`);
   }
 }
