@@ -213,6 +213,26 @@ Gaia Tech.
 
 ## Log de iterações (append)
 
+### Iteração 11 — 25/jul (~20h) — sonda das dependências externas
+- Lead-check: 0 em tudo (3ª iteração consecutiva sem sinal).
+- Sondei as 5 fontes externas ao vivo (o canário só roda de novo às 11:00 UTC;
+  uma queda noturna atingiria o produtor antes do alerta):
+  **open-meteo 200 · soilgrids 200 · STAC Sentinel-2 200 · titiler 200 ·
+  Yahoo 429**.
+- **O 429 do Yahoo foi FALSO ALARME meu** — investiguei antes de reportar:
+  sem User-Agent (curl padrão) o Yahoo devolve 429; com `Mozilla/5.0` — o UA
+  que `prices.ts:54` já envia — devolve 200, inclusive para `BRL=X`. O código
+  está protegido. Lição de método: sondar com um cliente diferente do de
+  produção produz falso positivo; sondar SEMPRE com os mesmos headers.
+- Dois fatos úteis que a investigação deixou:
+  1. A sensibilidade a UA é real (429 sem UA, 200 com) — confirma a
+     fragilidade da fonte não-oficial: se a Yahoo endurecer (crumb/cookie),
+     quebra sem aviso. Reforça a proposta B3 D-1 (grátis para redistribuir).
+  2. **O símbolo `kc.f` do stooq NÃO existe** (a página responde "does not
+     exist"). O fallback proposto na iteração 3 precisa do símbolo correto
+     ANTES de virar código — a proposta estava incompleta.
+- Guard-rail das 3 iterações disparado (ver nota ao fim do log).
+
 ### Iteração 10 — 25/jul (~19h) — manutenção; env documentadas; deploy verificado
 - Lead-check: 0 em tudo (0 replies · 0 referrals · 0 usuários novos · 0 msgs 3h).
 - `.env.example` completo (b6b1533): 45 variáveis, zero lidas em `api/` sem
