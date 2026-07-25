@@ -128,7 +128,7 @@ export function verifierHtml(cfg: VerifierConfig): string {
       <p>A Stevi guarda só o necessário pra te ajudar — sua localização e o histórico da conversa — com seu consentimento na primeira mensagem. Você pode pedir <strong>"apaga meus dados"</strong> a qualquer hora, e a gente apaga.${lgpdContact}</p>
     </section>
 
-    <a class="cta" href="https://wa.me/${digits}">Falar com a Stevi no WhatsApp</a>
+    <a class="cta" href="https://wa.me/${digits}?text=${encodeURIComponent('Oi, Stevi! Vi a página de verificação.')}">Falar com a Stevi no WhatsApp</a>
     <footer>Stevi — assistente do cafeicultor. Esta página existe pra você verificar antes de confiar.</footer>
   </div>
 </body>

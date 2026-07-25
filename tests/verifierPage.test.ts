@@ -18,7 +18,9 @@ describe('verifierHtml', () => {
     expect(h).toMatch(/receituário/i);
     expect(h).toMatch(/\+1/); // the +1 explanation
     expect(h).toContain('+19705509125');
-    expect(h).toContain('https://wa.me/19705509125');
+    // CTA must open the chat with a prefilled message (attribution: veio da
+    // página de verificação), never an empty chat at the moment of highest intent.
+    expect(h).toContain('https://wa.me/19705509125?text=');
     expect(h).toMatch(/apaga meus dados/i); // LGPD right
   });
 
