@@ -213,6 +213,22 @@ Gaia Tech.
 
 ## Log de iterações (append)
 
+### Iteração 9 — 25/jul (~18h30) — manutenção (sem leads, sem aprovações)
+- Lead-check: 0 replies · 0 referrals · 0 usuários novos · 0 msgs 6h.
+- Tabelas do moat recém-criadas seguem vazias (0 triage_events, 0
+  ndvi_readings) — esperado: dependem de conversa real. Serão o primeiro
+  sinal de que o produto voltou a ser usado.
+- Auditoria de cobertura da assinatura de card (risco de regressão do
+  pacote d): as 7 URLs construídas no código estão cobertas — frostCardUrl
+  assina na origem, e as 6 do pipeline passam por `appendCardSig` no
+  `finalizeAndSend`. **Fragilidade estrutural:** a cobertura depende de um
+  ponto único; um caminho de envio novo escaparia em silêncio (o card
+  simplesmente não renderiza). Proposta (não aplicada): teste de guarda que
+  falha se alguma URL /api/card sair sem `sig=`.
+- Efeito colateral conhecido do (d): cards enviados ANTES do deploy têm URL
+  sem assinatura → 403 se o WhatsApp for rebuscar a imagem. Sem impacto
+  prático (o app já baixou), mas registrado.
+
 ### Iteração 8 — 25/jul (~18h) — EXECUÇÃO da fila (a)-(f) aprovada
 Todos os 6 pacotes shipados em master, cada um com TDD e suíte verde
 (562 → 580 testes). Smoke pós-deploy: landing/verificar 200, card sem
