@@ -91,6 +91,60 @@ o usuário interrompe quando quiser — "para o loop" encerra).
 
 ---
 
+## SÍNTESE EXECUTIVA — Rodada 1 completa (6 áreas, 25/jul ~17h)
+
+O que ~730K tokens de pesquisa com fonte primária mudam nas decisões:
+
+1. **Prospecção: o caminho da religada é ÚNICO.** H1 confirmada (per-user
+   marketing limits/#131049) e H1b plausível (#130497 cross-border BR) —
+   ambas convergem: **+55 antes de qualquer marketing** (cabe no WABA hoje,
+   custo de um chip). Templates reescritos reply-first prontos; canais
+   vouchados mapeados com passo 1 (Coocafé, FAEMG/ATeG, EMATER-MG). Cold-WA
+   do +1 está morto ou moribundo por política — não por copy.
+2. **Memo tese: a evidência externa pesou.** Produtor 5-50 ha não paga
+   (âncora Broto R$14,90); instituição paga (ATeG, patrocínio, clube).
+   Lead-gen é nicho vazio SEM comp de preço → o teste R$50 do Michel é o
+   experimento decisivo, e `referral_requests.outcome` é o instrumento de
+   medida. Rota de escala provável: B2B2C institucional (precedente
+   Farmer.Chat: 12 mil extensionistas → 500 mil produtores).
+3. **Retenção tem receita com custo:** follow-ups clicáveis (>45% das
+   interações no Farmer.Chat) + nudge temporalmente relevante + loop D0/D1/
+   +48h/D7 a **R$0,50-2,50/produtor/mês**. Pré-requisito técnico: Pacote B
+   (alertas channel-aware + templates UTILITY a R$0,04). Botões junto com
+   card deixou de ser cosmético — é retenção.
+4. **Infra: mais barata e mais segura do que se temia.** NDVI atual CORRETO
+   (teste empírico; bomba-relógio só na migração p/ c1 → golden-lock).
+   titiler próprio US$6/mês; Open-Meteo US$29/mês; **B3 D-1 grátis para
+   redistribuir** (mata o risco jurídico do card de preços).
+5. **Cards/landing: conversão barata esperando.** 3 copy fixes de 15 min
+   (sandbox/"ele"/link verificar) confirmados EM PRODUÇÃO; wa.me?text= por
+   tipo fecha o viral loop com atribuição grátis; /verificar já mostra o
+   CREA mas o CTA abre chat vazio; seção B2B com Michel como âncora
+   (referências Aegro/ManejeBem).
+6. **Dados: não vender o mapa de praga** (Consórcio Antiferrugem faz grátis).
+   O ativo vendável é o par **observação→ação→desfecho no mesmo produtor**
+   (o que a Kynetec compra por entrevista cara). O caderno vira documento
+   com 5 colunas a mais + retenção de 5 anos (orgânico exige; hoje messages
+   morre em 365d). Não construir prova-EUDR (CONAB lançou grátis em fev/2026).
+
+**Fila de código consolidada (AGUARDANDO OK DO USUÁRIO, em ordem):**
+(a) 3 copy fixes da landing + prefill no CTA do /verificar — 30 min;
+(b) Pacote A confiabilidade (timeout LLM, alertFounders no catch-all, logs
+    cloud.ts, texto-antes-do-card, "Anotado" honesto) — 1-2 dias;
+(c) Pacote B retenção (canal por usuário, templates UTILITY geada/fogo,
+    dedup por nível) + botões com card via interactive+image header;
+(d) wa.me?text= + carimbo de validade nos cards + HMAC nas URLs;
+(e) SQL mínimo do moat (triage_events c/ outcome, spray_verdicts, 5 colunas
+    em applications, retenção 5 anos do caderno, outcome_code em referrals);
+(f) Vitória: prompt versionado em packs + 6 personas + juiz cross-family.
+
+**Dependências humanas (inalteradas, seguem bloqueando):** error code de
+21/jul (15 min, discrimina H1×H1b) · chip +55 · CNPJ · memo tese/beachhead ·
+Michel (acordo + golden set) · `FOUNDER_NOTIFY_TO` na Vercel · follow-up
+Gaia Tech.
+
+---
+
 ## Backlog por área (semeado 25/jul; o loop appenda `[data] proposta — fonte`)
 
 ### 1. Prospecção & Vitória (4.5) — PRIORIDADE
@@ -147,10 +201,37 @@ o usuário interrompe quando quiser — "para o loop" encerra).
 ### 6. Dados & moat (6.5)
 - [seed] triage_events + ndvi_readings append-only (aguarda ok).
 - [seed] Pesquisar: quem compra dado de pressão de praga regional (coops? seguradoras? indústria de defensivos?) e em que formato.
+- [25/jul] **Quem REALMENTE paga por dado agro agregado no BR: painel amostral longitudinal (Kynetec) e patrocínio de levantamento (Rally da Safra) — não "mapa de praga em tempo real", que já existe DE GRAÇA (Consórcio Antiferrugem).** Casos reais: (1) **Kynetec Brasil** vende assinatura de painel à indústria de defensivos, revendas e cooperativas — FarmTrak (ex.: 13.000 entrevistas presenciais com produtores só na onda de bioinsumos), Agrindexes/IPP-Defensivos (indicador mensal de preço pago), 26 culturas cobrindo >95% do potencial de mercado; o formato que eles compram é *cultura × região × produto × área tratada × preço pago*, repetido safra a safra com a MESMA base amostral (comparabilidade é o produto; preço não é público). (2) **Agroconsult/Rally da Safra**: 2.200+ fazendas avaliadas em campo, ~104 mil km, 14 estados — monetizado por PATROCÍNIO nomeado (Santander, BASF/Credenz/SoyTech, xarvio como "plataforma digital oficial", OCP, Biotrop, JDT Seguros, TIM, Mitsubishi) + relatórios; quem paga é indústria/banco/seguradora que quer o número da safra antes do mercado. (3) **Agrotools** vende inteligência territorial a seguradoras e bancos (monitoramento de apólice, predição de perda, corte de perícia presencial), com parcerias nomeadas Serasa Experian (conformidade socioambiental) e B3 — formato por CPF/CNPJ/polígono, on-demand + contínuo. (4) **Contra-evidência decisiva:** o **Consórcio Antiferrugem** (Embrapa Soja, desde 2004; ~100 laboratórios cadastrados, ~60 pesquisadores públicos+privados, focos com coordenadas em tempo real, app grátis) mostra que "pressão de doença regional" é bem público financiado por consórcio indústria-pesquisa — vender ISSO é competir com grátis. Implicação para o moat: nosso ativo vendável não é o mapa, é o **par observação→ação→desfecho no MESMO produtor ao longo do tempo** (o que Kynetec compra por entrevista caríssima e o Consórcio não tem). — agfeed.com.br + maissoja.com.br (Kynetec FarmTrak/bioinsumos, 2025-26); agrindexes.kynetec.com; rallydasafra.com.br + livemarketing.com.br (patrocinadores 2026); agrotools.com.br/segments/seguradora + serasaexperian.com.br (parceria AgroTools); embrapa.br/soja/ferrugem/consorcioantiferrugem — todos acessados 25/jul/2026
+- [25/jul] **`triage_events` com município IBGE (nunca lat/lon cru) + `outcome` do "resolveu?" na MESMA linha — é o par que vale e a única captura que nenhum concorrente tem.** Dado: cultura × praga × município × semana × confiança × desfecho. Quem usa/paga: (a) comitês de resistência e indústria — o IRAC-BR declara que a alta dispersão dos insetos exige "recomendações de manejo em nível regional", e sinal de FALHA DE CONTROLE regional (nosso `outcome='piorou'` após aplicação declarada) é exatamente o que programas de monitoramento de resistência tentam prever; (b) painel tipo Kynetec, que hoje compra isso por entrevista presencial; (c) uso interno imediato — âncora de verdade do golden set (auditoria: 0/36 casos assinados) e mineração de conversas reais. SQL mínimo HOJE: `create table public.triage_events (id uuid primary key default gen_random_uuid(), user_id uuid references public.users(id) on delete set null, farm_id uuid references public.farms(id) on delete set null, crop text, pest text not null, confidence text, evidence text, source text not null default 'vision', ibge_municipio text, outcome text check (outcome in ('melhorou','igual','piorou')), outcome_at timestamptz, created_at timestamptz not null default now());` + `create index triage_events_agg_idx on public.triage_events (crop, pest, ibge_municipio, created_at desc);` + `alter table public.triage_events enable row level security;`. Escrita: 1 insert no mesmo ponto do pipeline que monta o card de praga (pipeline.ts:255-263) e 1 update no handler do follow-up de 48h (desenho da it.4). Detalhe LGPD deliberado: `on delete set null` (não cascade) — o direito de eliminação do titular apaga o vínculo e o fato agregado sobrevive já anonimizado; `ibge_municipio` derivado do pin, o pin NUNCA entra na tabela de evento. Guard-rail de publicação/venda: k≥5 fazendas distintas por município×semana, senão agrega para microrregião. Base legal: execução do serviço pedido pelo titular (art. 7º V) para a linha identificada; o agregado sai do escopo da LGPD por deixar de ser dado pessoal. — irac-br.org (manejo em nível regional); auditoria área Dados finding #1; it.4 (follow-up "resolveu?")
+- [25/jul] **`spray_verdicts` NÃO é produto de dado — é PROVA de que a recomendação existiu, e o comprador dessa prova é o Proagro/crédito.** A perícia do Proagro ficou mais dura exatamente nesse eixo: a Comunicação de Perdas (COP) exige anexar mapa de localização OU coordenadas geodésicas e "a tecnologia recomendada para o empreendimento quando vinculada a prestação de assistência técnica"; e a mudança do CMN vigente em **10/jul/2026** passou a exigir no RCP protocolo digital com mínimo de 3 fotos coloridas, método de amostragem, tecnologia que ateste a presença do perito na área, e campos comparando as observações técnicas com o decreto ZARC e as recomendações de ATER. Ou seja: o produtor que tem carimbo de "a Stevi me disse em 12/01 que não pulverizasse com vento de 18 km/h e eu segui" entra na perícia com evidência datada — valor para o PRODUTOR (não venda de dado), e argumento de venda para coop/banco que quer sinistro defensável. SQL: `create table public.spray_verdicts (id uuid primary key default gen_random_uuid(), user_id uuid references public.users(id) on delete cascade, farm_id uuid references public.farms(id) on delete set null, verdict text not null, reason text, wind_kmh numeric, rain_mm_24h numeric, temp_c numeric, rh_pct numeric, source text not null default 'open-meteo', created_at timestamptz not null default now()); alter table public.spray_verdicts enable row level security;` — escrita no mesmo ponto que monta o spray card. Risco LGPD: baixo (dado do próprio titular, sem terceiro); retenção alinhada ao caderno (5 anos, ver proposta de retenção), não aos 365d de `messages`. — bcb.gov.br MCR 16-2 (COP: coordenadas + tecnologia recomendada) e MCR 16-3 (RCP); agrimidia.com.br "CMN simplifica perícia do Proagro e aperta cerco contra fraudes" (26/jun/2026, vigência 10/jul/2026)
+- [25/jul] **O que faz o caderno VALER para certificação: talhão + data + produto + dose + alvo + responsável — e os prazos de guarda são 18 meses (INC 02/2018) e 5 anos (orgânico). Comprador nomeado no beachhead café: exportador/coop sob EUDR e Certifica Minas.** Requisitos primários: (1) **INC 02/2018 (MAPA+ANVISA)** — o produtor primário deve manter registro dos insumos usados, DATA de uso, a recomendação técnica/receituário emitido por profissional habilitado e a identificação do lote correspondente, disponíveis à fiscalização por **18 meses** após a validade/expedição; (2) **orgânico BR** — IN 46/2011 (alterada pela IN 17/2014) exige documentos e registros de TODAS as operações, guarda mínima de **5 anos** (o "caderno de campo" é o instrumento canônico, com folha separada de registro de aplicações); (3) **Certifica Minas Café** (IMA/Seapa, 1º selo público do país, 2006; **900+ cafeicultores**): >100 itens, aprovação exige 80% do total + 100% dos obrigatórios, com uso controlado de insumos e rastreabilidade de lote — e a EMATER-MG acompanha a adequação (o mesmo canal da área 1); (4) **Rainforest Alliance 2020** — rastreabilidade online obrigatória (cap. 2) e os detentores de certificado que usam ingredientes ativos da lista precisam **enviar seus dados de uso à RA anualmente** (janela 1/jan-31/dez, entrega nos 2 primeiros meses do ano seguinte): precedente de que dado de aplicação agregado JÁ sobe do produtor para a certificadora; (5) **EUDR** — exige geolocalização da parcela; cronograma após dois adiamentos: grandes/médios **30/dez/2026**, micro/pequenos **30/jun/2027**; o Brasil foi 21,8% do café comprado pela UE em 2024. Contra-aviso honesto: a **CONAB lançou em fev/2026, com a UFMG, a Plataforma Parque Cafeeiro — GRATUITA** — que cruza as coordenadas da fazenda com bases oficiais e emite a declaração de conformidade EUDR: **não construir "prova de desmatamento zero"**, que já é grátis e estatal; construir o que ela não tem (histórico de manejo por talhão). SQL barato HOJE (sem criar tabela `fields`, que a auditoria mandou postergar): `alter table public.applications add column if not exists field_label text; add column if not exists lat double precision; add column if not exists lon double precision; add column if not exists responsible text; add column if not exists recommendation_ref text;` — `field_label` é o que o produtor JÁ fala ("talhão da beira do córrego"), migra limpo para `fields.id` depois. Risco LGPD: `responsible` pode ser nome de trabalhador (dado de TERCEIRO) — só gravar quando o produtor declara espontaneamente, aceitar iniciais/função, e a base legal é cumprimento de obrigação legal do produtor (INC 02/2018) com a Stevi como operadora; nunca usar `responsible` em nenhum agregado. — in.gov.br INC nº 2 de 7/2/2018 + cnabrasil.org.br "Rastreabilidade de Frutas e Hortaliças — Perguntas & Respostas" (guarda 18 meses); ciorganicos.com.br + legisweb IN MAPA 46/2011 e 17/2014 (5 anos); ima.mg.gov.br/certificacao/certifica-minas + mg.gov.br (900+ cafeicultores, 80% + obrigatórios); knowledge.rainforest-alliance.org (rastreabilidade cap. 2 + relatório anual de pesticidas); cncafe.com.br + agenciabrasil.ebc.com.br (adiamento EUDR: 30/dez/2026 e 30/jun/2027); noticias.broto.com.br (Parque Cafeeiro/Conab+UFMG, 26/fev/2026)
+- [25/jul] **Benchmark de data moat: FieldView e xarvio provam que dado de campo NÃO se monetiza como dataset — vira gate de programa e assinatura por hectare via canal institucional.** Climate FieldView: **250 milhões de acres assinados em 23 países**, mais da metade da área de milho/soja/algodão dos EUA — e o que efetivamente monetiza é o produto acoplado: **a conta FieldView é REQUISITO para entrar no ForGround/Bayer Carbon Program** (28 estados, pagamento por acre por cover crop/plantio direto). Busquei ativamente evidência pública de receita por VENDA de dado ou de recuo/monetização frustrada e **não achei nenhuma** (sinal fraco, não prova de ausência) — o observável é: escala de dado convertida em canal, não em licenciamento. xarvio/BASF: monetização declarada = **assinatura anual** (FIELD MANAGER For Fruits & Veggies desde set/2025; For AgBusiness lançando em Argentina e Brasil na safra 2025/26), meta BASF de 400 mi ha cumulativos até 2030, e distribuição via evento/canal (é a "plataforma digital oficial" do Rally da Safra). Syngenta Digital: cobra **por hectare** e entra pela revenda/cooperativa ("Controle Certo"), com o Cropwise Protector já usado como caderno digital por cafeicultores (Coamo, Cocamar, Integrada). Implicação direta para o memo (converge com a it.2 "instituição paga, produtor não"): o moat não é vender o dado — é o dado tornar a Stevi **infraestrutura obrigatória de um pagamento que já existe** (lead do agrônomo, prêmio de seguro, prova de certificação, bônus de qualidade da coop). E o flanco que nenhum deles cobre: todos cobram por hectare do produtor profissionalizado — 5-50 ha não paga assinatura de software. — climate.com/bayer.com (250 mi acres, 23 países); bayerforground.com (conta FieldView exigida no Carbon Program, 28 estados); basf.com press releases 2025/02 e 2025/09 (assinatura anual, Brasil 2025/26) + meta 400 mi ha (2021); syngentadigital.ag + gazetadopovo (cobrança por hectare, Cropwise Protector no café); buscas de 25/jul/2026 sem evidência de venda de dado
+- [25/jul] **Retenção do caderno = 5 anos, declarada e derivada da lei (não dos 365d de `messages`) + catálogo de base legal por tabela; e `applications`/`triage_events`/`spray_verdicts` FORA do array de purga.** Hoje `purgeExpiredRows` (db.ts:700-722) apaga `messages` em 365d — e `caderno.ts` lê 180d de mensagens: qualquer registro que viva só como prosa em `messages.raw` morre antes do prazo em que ele VALE (18 meses INC 02/2018; 5 anos orgânico). Proposta: comentário padronizado de migration em cada tabela de dado de produtor declarando *(base legal · finalidade · retenção)*, `applications` explicitamente fora da purga com nota "retenção 5 anos por valor probatório (IN 46/2011); eliminação a pedido do titular via rota dedicada", e — item independente que fecha o buraco mais grave — incluir na purga o que a auditoria apontou: `prospects` descartados/inválidos >180d, `prospect_messages` >365d, `gym_runs`/`prospect_gym_runs` >90d, preservando `prospect_optouts` para sempre (é a prova legal do opt-out). Por que isso é MOAT e não burocracia: cooperativa e certificadora compram "compliance como feature" — o catálogo executável é o anexo que a coop pede antes de recomendar a Stevi aos cooperados, e é o que a Kynetec/Agrotools já têm montado. — auditoria área Dados (findings de retenção/`consent_lgpd_at`); prazos legais das fontes da proposta de certificação acima; LGPD art. 7º V e 18 (eliminação)
+- [25/jul] **`referral_requests.outcome` virar enum com carimbo + `graded_by` — é o ÚNICO dataset que gera o comp de preço do lead que não existe no mercado (it.2).** A it.2 fechou que não há benchmark público de R$/lead para agrônomo/consultoria no Brasil: então o dataset de qualidade de lead por parceiro/região É a evidência de pricing, e hoje são duas colunas `text` livres, sem enum e sem timestamp de quando o parceiro respondeu (migration 0026). Quem usa/paga: o próprio parceiro (Michel primeiro, depois coop/ATeG) — "de 10 leads que te mandei, 6 atendidos, 2 fechados, tempo médio de resposta 9h" é a conversa que precede qualquer cobrança de R$50/lead. SQL: `alter table public.referral_requests add column if not exists outcome_code text check (outcome_code in ('atendido','fechado','nao_respondeu','recusado')); add column if not exists outcome_at timestamptz; add column if not exists graded_by text;` (mantém `outcome`/`lead_grade` legados intactos; `partner_id` já existe da migration 0020). Risco LGPD: nenhum novo — não adiciona dado do produtor, só rotula o handoff já consentido (`share_consent_at`). Ligação com o experimento decisivo: é o instrumento de medida do teste do lead nº 3 do Michel; sem ele o teste gera anedota, não evidência. — it.2 (ausência de comp público de R$/lead); auditoria área Dados, movimento estratégico #4; migrations 0020 e 0026
 
 ---
 
 ## Log de iterações (append)
+
+### Iterações 6 e 7 — 25/jul (~17h) — Dados & moat + Síntese executiva
+- It6 (dados/moat, 160K tokens, 39 tool uses; 7 propostas na área 6):
+  compradores reais mapeados (Kynetec vende painel cultura×região×produto à
+  indústria; Agroconsult monetiza por patrocínio; Agrotools serve seguradora/
+  banco). **Contra-evidência importante:** mapa de pressão de praga já é
+  público e grátis (Consórcio Antiferrugem/Embrapa) — o ativo vendável é
+  obs→ação→desfecho longitudinal no mesmo produtor. Caderno vale quando
+  atende INC 02/2018 (18 meses), orgânico (5 anos!), Certifica Minas
+  (EMATER audita — mesmo canal da área 1), RA 2020 (dado de aplicação sobe
+  anual à certificadora) e o novo RCP do Proagro (endurecido 10/jul/2026).
+  EUDR: NÃO construir (CONAB lançou grátis fev/2026); micro/pequenos têm até
+  jun/2027. FieldView monetiza dado como GATE de programa, não como dataset.
+  SQL mínimo proposto com pagador nomeado em cada tabela.
+- It7 (síntese, inline): seção "SÍNTESE EXECUTIVA" adicionada acima com a
+  fila de código consolidada aguardando ok.
+- **Loop entra em cadência de MANUTENÇÃO** (guard-rail anti-papel): rodada 1
+  cobriu as 6 áreas; sem reação dos founders ao material, mais pesquisa vira
+  papel. Próximas iterações (1×/hora): lead-check + vigilância de deltas +
+  execução imediata do que o usuário aprovar da fila (a)-(f).
 
 ### Iteração 5 — 25/jul (~16h30) — Cards & UI (com QA ao vivo)
 - Pesquisador de design (157K tokens, 29 tool uses); 5 propostas na área 5.
