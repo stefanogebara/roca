@@ -161,6 +161,27 @@ export function sparkline(
 }
 
 /** 1px hairline separator. */
+/** Bold-green share CTA content for card footers: the typable way back to
+ * Stevi that survives a forward (screenshots included). Static per card TYPE —
+ * never per user (a per-user link would leak who forwarded it). */
+export function waCta(prompt: string): string {
+  const digits = (process.env.PUBLIC_WA_NUMBER || '').replace(/\D/g, '');
+  return digits ? `wa.me/${digits} · manda "${prompt}"` : `Manda "${prompt}" pra Stevi no WhatsApp.`;
+}
+
+/** "emitido hoje, dd/mm · HH:mm" stamp (BRT). A verdict card lives on in chats
+ * and forwards — without a timestamp, "agora" reads as forever. */
+export function issuedStamp(now: Date = new Date()): string {
+  const s = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(now);
+  return `emitido hoje, ${s.replace(', ', ' · ')}`;
+}
+
 export function hairline(x1: number, x2: number, y: number): string {
   return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${C.line}" stroke-width="1"/>`;
 }

@@ -25,6 +25,7 @@ import {
   getLastInboundAt,
 } from './db';
 import { withRetry } from './retry';
+import { appendCardSig } from './cardSign';
 import { createLogger } from './logger';
 
 const log = createLogger('alerts');
@@ -263,7 +264,7 @@ export function frostCardUrl(days: FrostDay[]): string | undefined {
     .slice(0, 4)
     .map((x) => `${x.date}:${x.minC}:${x.risk}`)
     .join('|');
-  return `${PUBLIC_BASE}/api/card?${new URLSearchParams({ type: 'frost', d }).toString()}`;
+  return appendCardSig(`${PUBLIC_BASE}/api/card?${new URLSearchParams({ type: 'frost', d }).toString()}`);
 }
 
 export async function runFrostAlerts(sender: ProactiveSender): Promise<AlertRunResult> {

@@ -6,7 +6,7 @@
  */
 
 import { type HourAssessment, DELTA_T_MIN, DELTA_T_MAX } from '../tools/deltaT';
-import { C, T, esc, cardShell, brandHeader, hairline } from './render';
+import { C, T, esc, cardShell, brandHeader, hairline, issuedStamp } from './render';
 
 const W = 900;
 const H = 520;
@@ -75,6 +75,7 @@ export function spraySvg(hours: HourAssessment[], bestUpcoming: HourAssessment |
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   ${cardShell(W, H)}
   ${brandHeader(padX, 92, 'Janela de pulverização')}
+  <text x="${W - padX}" y="92" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}" text-anchor="end">${esc(issuedStamp())}</text>
 
   <circle cx="${padX + 22}" cy="158" r="22" fill="${v.color}"/>
   ${verdictMark(now.verdict, padX + 22, 158)}

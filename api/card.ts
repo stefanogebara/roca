@@ -9,6 +9,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { verifyCardQuery } from './_lib/cardSign';
 import { svgToPng } from './_lib/cards/render';
 import { spraySvg } from './_lib/cards/spray';
 import { ndviSvg } from './_lib/cards/ndviCard';
@@ -44,6 +45,14 @@ function num(v: unknown): number | null {
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const type = String(req.query.type ?? '');
+  // Forgery guard: every card URL the pipeline builds is HMAC-signed; an
+  // unsigned/tampered request renders nothing (someone could otherwise forge
+  // a "GEADA -5°C" in Stevi's visual identity and spread it in rural groups).
+  // type=applications keeps its own stronger token check (userId+exp).
+  if (type !== 'applications' && !verifyCardQuery(req.query as Record<string, unknown>)) {
+    res.status(403).json({ error: 'assinatura inválida' });
+    return;
+  }
   // Cap per-IP before any external fetch or rasterization. The public data cards
   // (spray/farm/ndvi) fire weather/soil/geo calls and vary by lat/lon, so a
   // single source can bypass the CDN cache and drain upstream quota + CPU.

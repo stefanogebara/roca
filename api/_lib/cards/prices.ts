@@ -10,7 +10,7 @@
  */
 
 import type { CommodityQuote } from '../tools/prices';
-import { C, T, esc, cardShell, brandHeader, trendChip, sparkline, hairline } from './render';
+import { C, T, esc, cardShell, brandHeader, trendChip, sparkline, hairline, waCta } from './render';
 
 const W = 900;
 
@@ -77,6 +77,6 @@ export function pricesSvg(
 
   ${hairline(M, W - M, footY)}
   <text x="${M}" y="${footY + 32}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">${esc(`${dolar}referência internacional convertida — o preço na sua praça varia com frete e qualidade`)}</text>
-  <text x="${M}" y="${footY + 58}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">Quer todo dia? Manda "cotação" pra Stevi no WhatsApp.</text>
+  <text x="${M}" y="${footY + 58}" font-family="DM Sans" font-size="${T.small}" font-weight="800" fill="${C.green}">${esc(waCta('cotação'))}</text>
 </svg>`;
 }

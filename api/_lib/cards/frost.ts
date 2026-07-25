@@ -6,7 +6,7 @@
  */
 
 import type { FrostDay } from '../tools/frost';
-import { C, T, esc, cardShell, brandHeader, hairline } from './render';
+import { C, T, esc, cardShell, brandHeader, hairline, waCta } from './render';
 
 const W = 900;
 const H = 520;
@@ -70,6 +70,6 @@ export function frostSvg(days: FrostDay[]): string {
 
   ${hairline(M, W - M, H - 104)}
   <text x="${M}" y="${H - 68}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">Vale proteger mudas e talhões baixos, e conversar com seu técnico sobre irrigação na véspera.</text>
-  <text x="${M}" y="${H - 42}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">Previsão pra localização da SUA lavoura — manda um "oi" pra Stevi no WhatsApp pra receber o aviso.</text>
+  <text x="${M}" y="${H - 42}" font-family="DM Sans" font-size="${T.small}" font-weight="800" fill="${C.green}">${esc(waCta('geada'))} — aviso pra SUA lavoura</text>
 </svg>`;
 }

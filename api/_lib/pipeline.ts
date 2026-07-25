@@ -5,6 +5,7 @@
  */
 
 import type { TransportAdapter, InboundMessage } from './transport/types';
+import { appendCardSig, roundCoord } from './cardSign';
 import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
 import { buildFarmCard, isFarmConfirmYes } from './farmcard';
@@ -196,6 +197,25 @@ const RECEITUARIO_NOTE =
  * of reason() — no change to reason()'s contract. Returns undefined when there's
  * nothing visual to add (or the underlying data isn't available).
  */
+/** wa.me prefill phrase per card type — each phrase routes on its fast-path,
+ * so a forward that converts shows up in the message log by intent. */
+const CARD_SHARE_PROMPT: Partial<Record<Intent, string>> = {
+  prices: 'cotação',
+  spray_window: 'posso pulverizar hoje?',
+  field_health: 'como está minha lavoura?',
+  pest_triage: 'Oi, Stevi! Vi um card de praga.',
+  onboarding: 'Oi, Stevi! Quero testar.',
+};
+
+/** Caption for the card message: a shareable wa.me deep link (static per TYPE,
+ * never per user). Empty when PUBLIC_WA_NUMBER isn't configured. */
+function cardShareCaption(intent: Intent): string {
+  const digits = (process.env.PUBLIC_WA_NUMBER || '').replace(/\D/g, '');
+  if (!digits) return '';
+  const prompt = CARD_SHARE_PROMPT[intent] ?? 'Oi, Stevi!';
+  return `Compartilha à vontade 👉 wa.me/${digits}?text=${encodeURIComponent(prompt)}`;
+}
+
 async function cardUrlFor(
   intent: Intent,
   msg: InboundMessage,
@@ -203,14 +223,17 @@ async function cardUrlFor(
 ): Promise<string | undefined> {
   try {
     // Pin drop → the farm card (soil + spray + vazio) as the onboarding payback.
+    // Coords rounded to 3 decimals (~110 m): plenty for km-scale weather/soil
+    // grids, and the exact pin stops travelling in a public URL.
     if (msg.kind === 'location' && msg.location) {
       const { lat, lon } = msg.location;
-      return `${PUBLIC_BASE}/api/card?type=farm&lat=${lat}&lon=${lon}`;
+      return `${PUBLIC_BASE}/api/card?type=farm&lat=${roundCoord(lat)}&lon=${roundCoord(lon)}`;
     }
     if (intent === 'spray_window') {
       let coords = msg.location;
       if (!coords && userId) coords = await getFarmLocation(userId);
-      if (coords) return `${PUBLIC_BASE}/api/card?type=spray&lat=${coords.lat}&lon=${coords.lon}`;
+      if (coords)
+        return `${PUBLIC_BASE}/api/card?type=spray&lat=${roundCoord(coords.lat)}&lon=${roundCoord(coords.lon)}`;
     } else if (intent === 'field_health' && userId) {
       const farm = await getFarm(userId);
       // A city-precision location is a municipal centroid, not the talhão — the
@@ -1154,7 +1177,18 @@ async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<
   );
   if (!sent) return;
   if (mediaUrl) {
-    await sendOrRecord(adapter, msg.from, { text: '', mediaUrl }, userId, intent);
+    // Cards are signed (forgery guard on /api/card) and captioned with a
+    // shareable wa.me deep link — the forward's way back to Stevi. The link
+    // is static per TYPE, never per user (a per-user link would leak who
+    // forwarded it), and the prefill is the intent phrase that already routes
+    // on the fast-path — free forward→conversation attribution in the logs.
+    await sendOrRecord(
+      adapter,
+      msg.from,
+      { text: cardShareCaption(intent), mediaUrl: appendCardSig(mediaUrl) },
+      userId,
+      intent
+    );
   }
   // Consent counts as "notified" only if the notice was actually delivered.
   if (firstContact && userId) await markConsentNotified(userId);

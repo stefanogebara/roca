@@ -8,7 +8,7 @@
  */
 
 import type { SprayVerdict } from '../tools/deltaT';
-import { C, esc, cardShell } from './render';
+import { C, esc, cardShell, issuedStamp } from './render';
 
 const W = 900;
 const H = 600;
@@ -81,6 +81,7 @@ export function farmSvg(data: FarmCardData): string {
   ${pin(74, 92, C.leaf)}
   <text x="104" y="90" font-family="Instrument Serif" font-size="46" fill="${C.green}">Sua lavoura</text>
   <text x="104" y="122" font-family="DM Sans" font-size="20" fill="${C.muted}">Stevi · ${esc(where)}</text>
+  <text x="${W - 56}" y="90" font-family="DM Sans" font-size="19" fill="${C.muted}" text-anchor="end">${esc(issuedStamp())}</text>
 
   <line x1="56" y1="156" x2="${W - 56}" y2="156" stroke="${C.line}" stroke-width="1"/>
 
