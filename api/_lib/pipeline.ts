@@ -958,7 +958,7 @@ async function resolveUserOrFailClosed(
   adapter: TransportAdapter,
   msg: InboundMessage
 ): Promise<PipelineUser | null> {
-  const user = await upsertUser(msg.from, msg.profileName);
+  const user = await upsertUser(msg.from, msg.profileName, adapter.provider);
   if (user) return user;
   const claimed = await claimInbound(null, {
     kind: msg.kind,

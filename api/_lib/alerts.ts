@@ -22,6 +22,7 @@ import {
   listFarmsWithCoords,
   claimFarmerAlert,
   releaseFarmerAlert,
+  getLastInboundAt,
 } from './db';
 import { withRetry } from './retry';
 import { createLogger } from './logger';
@@ -54,9 +55,64 @@ export function buildVazioAlertText(t: CalendarTransition): string {
   );
 }
 
-/** One frost alert per farmer per forecast date. */
+/** One frost alert per farmer per forecast date AND severity level. The level
+ * is part of the key so an escalation re-alerts: "risco" (3°C) on Tuesday must
+ * NOT silence "geada" (0°C) on Wednesday — the upgrade is the difference
+ * between watching and acting, and missing it is the worst trust-killer. */
 export function frostDedupKey(day: FrostDay): string {
-  return `frost:${day.date}`;
+  return `frost:${day.date}:${day.risk}`;
+}
+
+/** How to deliver a proactive push to this farmer, per Meta's rules:
+ * - Twilio (sandbox era): free-form is the only path — unchanged.
+ * - Cloud within the 24h service window: free-form is allowed and free.
+ * - Cloud outside the window: only an approved UTILITY template delivers;
+ *   without one configured, the honest answer is to skip loudly (a free-form
+ *   attempt would be rejected by the API anyway).
+ */
+export type AlertPlan = 'freeform' | 'template' | 'skip';
+export function alertSendPlan(opts: {
+  channel: string | null;
+  lastInboundAt: string | null;
+  now: Date;
+  templateConfigured: boolean;
+}): AlertPlan {
+  if (opts.channel !== 'cloud') return 'freeform';
+  const last = opts.lastInboundAt ? Date.parse(opts.lastInboundAt) : 0;
+  const within24h = opts.now.getTime() - last < 24 * 60 * 60 * 1000;
+  if (within24h) return 'freeform';
+  return opts.templateConfigured ? 'template' : 'skip';
+}
+
+/** Channel-aware delivery bound by the caller (cron). `freeform` routes by the
+ * target's channel; `template` (optional) is the Cloud UTILITY-template path. */
+export interface ProactiveSender {
+  freeform: (target: { waId: string; channel: string | null }, text: string, mediaUrl?: string) => Promise<void>;
+  template?: (target: { waId: string; channel: string | null }, text: string) => Promise<void>;
+}
+
+/** Resolve the plan and dispatch one alert accordingly. Throws on send failure
+ * (caller releases the claim); throws a distinctive error on 'skip'. */
+async function deliverAlert(
+  sender: ProactiveSender,
+  target: { userId: string; waId: string; channel: string | null },
+  text: string,
+  mediaUrl?: string
+): Promise<void> {
+  const plan = alertSendPlan({
+    channel: target.channel,
+    lastInboundAt: await getLastInboundAt(target.userId),
+    now: new Date(),
+    templateConfigured: !!sender.template,
+  });
+  if (plan === 'skip') {
+    throw new Error('fora da janela de 24h e sem template UTILITY configurado (WHATSAPP_TEMPLATE_ALERT)');
+  }
+  if (plan === 'template') {
+    await sender.template!(target, text);
+    return;
+  }
+  await sender.freeform(target, text, mediaUrl);
 }
 
 function fmtDayBr(iso: string): string {
@@ -120,7 +176,7 @@ export interface AlertRunResult {
  */
 export async function runVazioAlerts(
   transitions: CalendarTransition[],
-  send: (to: string, text: string) => Promise<void>
+  sender: ProactiveSender
 ): Promise<AlertRunResult> {
   const result: AlertRunResult = { transitions: transitions.length, candidates: 0, sent: 0, failed: 0 };
   for (const t of transitions) {
@@ -132,7 +188,7 @@ export async function runVazioAlerts(
       const claimed = await claimFarmerAlert(f.userId, t.kind, key);
       if (!claimed) continue;
       try {
-        await withRetry(() => send(f.waId, text), { attempts: 2 });
+        await withRetry(() => deliverAlert(sender, f, text), { attempts: 2 });
         result.sent++;
       } catch (e) {
         result.failed++;
@@ -159,9 +215,7 @@ const FIRE_RADIUS_KM = 10;
  * against every farm pin. One alert per farmer per day; the claim is released
  * on a failed send so the same day's run (or a retry) can try again.
  */
-export async function runFireAlerts(
-  send: (to: string, text: string) => Promise<void>
-): Promise<AlertRunResult> {
+export async function runFireAlerts(sender: ProactiveSender): Promise<AlertRunResult> {
   const farms = await listFarmsWithCoords();
   const result: AlertRunResult = { transitions: 0, candidates: farms.length, sent: 0, failed: 0 };
   if (farms.length === 0) return result;
@@ -176,7 +230,7 @@ export async function runFireAlerts(
     const claimed = await claimFarmerAlert(f.userId, 'fire', key);
     if (!claimed) continue;
     try {
-      await withRetry(() => send(f.waId, buildFireAlertText(near)), { attempts: 2 });
+      await withRetry(() => deliverAlert(sender, f, buildFireAlertText(near)), { attempts: 2 });
       result.sent++;
     } catch (e) {
       result.failed++;
@@ -212,9 +266,7 @@ export function frostCardUrl(days: FrostDay[]): string | undefined {
   return `${PUBLIC_BASE}/api/card?${new URLSearchParams({ type: 'frost', d }).toString()}`;
 }
 
-export async function runFrostAlerts(
-  send: (to: string, text: string, mediaUrl?: string) => Promise<void>
-): Promise<AlertRunResult> {
+export async function runFrostAlerts(sender: ProactiveSender): Promise<AlertRunResult> {
   const farms = await listFarmsWithCoords();
   const result: AlertRunResult = { transitions: 0, candidates: farms.length, sent: 0, failed: 0 };
   const forecastCache = new Map<string, FrostDay[]>();
@@ -239,7 +291,7 @@ export async function runFrostAlerts(
     if (!claimed) continue;
     try {
       const days = risky;
-      await withRetry(() => send(f.waId, buildFrostAlertText(worst), frostCardUrl(days)), {
+      await withRetry(() => deliverAlert(sender, f, buildFrostAlertText(worst), frostCardUrl(days)), {
         attempts: 2,
       });
       result.sent++;

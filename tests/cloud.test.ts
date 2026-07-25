@@ -191,3 +191,35 @@ describe('CloudApiAdapter.markRead — perceived speed, cosmetic by contract', (
     await expect(new CloudApiAdapter().markRead('wamid.B')).resolves.toBeUndefined();
   });
 });
+
+describe('CloudApiAdapter.sendTemplate — the outside-24h path', () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => {
+    process.env.WHATSAPP_CLOUD_TOKEN = 't';
+    process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID = '123';
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.WHATSAPP_CLOUD_TOKEN;
+    delete process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+  });
+
+  it('posts the template with the alert text flattened into one body param', async () => {
+    const bodies: any[] = [];
+    globalThis.fetch = (async (_url: any, init: any) => {
+      bodies.push(JSON.parse(init.body));
+      return { ok: true, text: async () => '' } as any;
+    }) as any;
+    await new CloudApiAdapter().sendTemplate('+55349', 'stevi_alerta_v1', 'Linha 1\n\nLinha 2\tfim');
+    expect(bodies[0].type).toBe('template');
+    expect(bodies[0].template.name).toBe('stevi_alerta_v1');
+    expect(bodies[0].template.language.code).toBe('pt_BR');
+    const param = bodies[0].template.components[0].parameters[0].text;
+    expect(param).toBe('Linha 1 · Linha 2 fim'); // no newlines/tabs — Meta rejects them
+  });
+
+  it('throws on failure so the alert claim is released for a retry', async () => {
+    globalThis.fetch = (async () => ({ ok: false, status: 400, text: async () => 'template paused' })) as any;
+    await expect(new CloudApiAdapter().sendTemplate('+55349', 'x', 'y')).rejects.toThrow(/template send failed 400/);
+  });
+});

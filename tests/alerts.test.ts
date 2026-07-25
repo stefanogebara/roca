@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildVazioAlertText, alertDedupKey } from '../api/_lib/alerts';
+import { buildVazioAlertText, alertDedupKey, alertSendPlan } from '../api/_lib/alerts';
 import type { CalendarTransition } from '../api/_lib/tools/calendar';
 
 const start: CalendarTransition = { uf: 'MT', kind: 'vazio_start', date: '2026-06-08', daysAway: 3 };
@@ -40,5 +40,28 @@ describe('alertDedupKey', () => {
     expect(alertDedupKey(start)).toBe(alertDedupKey({ ...start, daysAway: 1 }));
     expect(alertDedupKey(start)).not.toBe(alertDedupKey(end));
     expect(alertDedupKey(start)).not.toBe(alertDedupKey({ ...start, kind: 'vazio_end' }));
+  });
+});
+
+describe('alertSendPlan — Meta 24h window rules per channel', () => {
+  const now = new Date('2026-07-25T12:00:00Z');
+  const hoursAgo = (h: number) => new Date(now.getTime() - h * 3600_000).toISOString();
+
+  it('twilio (sandbox era) is always freeform', () => {
+    expect(alertSendPlan({ channel: 'twilio', lastInboundAt: null, now, templateConfigured: false })).toBe('freeform');
+    expect(alertSendPlan({ channel: null, lastInboundAt: null, now, templateConfigured: true })).toBe('freeform');
+  });
+
+  it('cloud inside the 24h service window is freeform (free)', () => {
+    expect(alertSendPlan({ channel: 'cloud', lastInboundAt: hoursAgo(3), now, templateConfigured: false })).toBe('freeform');
+  });
+
+  it('cloud outside the window uses the UTILITY template when configured', () => {
+    expect(alertSendPlan({ channel: 'cloud', lastInboundAt: hoursAgo(48), now, templateConfigured: true })).toBe('template');
+  });
+
+  it('cloud outside the window with NO template skips honestly (never a doomed freeform)', () => {
+    expect(alertSendPlan({ channel: 'cloud', lastInboundAt: hoursAgo(48), now, templateConfigured: false })).toBe('skip');
+    expect(alertSendPlan({ channel: 'cloud', lastInboundAt: null, now, templateConfigured: false })).toBe('skip');
   });
 });

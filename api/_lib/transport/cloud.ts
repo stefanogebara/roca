@@ -314,6 +314,38 @@ export class CloudApiAdapter implements TransportAdapter {
     }
   }
 
+  /** Send an approved UTILITY template with the alert text as its single body
+   * parameter — the only path Meta delivers outside the 24h service window.
+   * Template params reject newlines/tabs, so the text is flattened. Throws on
+   * failure (the alert runner releases its claim and retries tomorrow). */
+  async sendTemplate(to: string, templateName: string, paramText: string): Promise<void> {
+    const token = process.env.WHATSAPP_CLOUD_TOKEN;
+    const phoneId = process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+    if (!token || !phoneId) {
+      throw new Error('WHATSAPP_CLOUD_TOKEN / WHATSAPP_CLOUD_PHONE_NUMBER_ID not configured');
+    }
+    const flat = paramText.replace(/\s*\n+\s*/g, ' · ').replace(/\t/g, ' ').trim().slice(0, 1024);
+    const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: 'pt_BR' },
+          components: [{ type: 'body', parameters: [{ type: 'text', text: flat }] }],
+        },
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Cloud template send failed ${res.status}: ${body.slice(0, 200)}`);
+    }
+  }
+
   /** Mark the inbound as read + show typing — one POST, fired before the
    * heavy work. The farmer on 3G sees "read + typing" instead of a mute chat
    * for 15-30s. Cosmetic by contract: never throws, failures are just logged. */

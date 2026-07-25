@@ -19,8 +19,10 @@ import {
   runFrostAlerts,
   runFireAlerts,
   type AlertRunResult,
+  type ProactiveSender,
 } from '../_lib/alerts';
 import { TwilioAdapter } from '../_lib/transport/twilio';
+import { CloudApiAdapter } from '../_lib/transport/cloud';
 import { getDb, purgeExpiredRows } from '../_lib/db';
 import { createLogger } from '../_lib/logger';
 
@@ -64,17 +66,32 @@ export default async function handler(
   // WhatsApp heads-up per transition (DB-claimed dedup — the same transition
   // showing up 7 days in a row alerts each farmer once). Fail-soft: an alert
   // problem never fails the monitoring run itself.
+  // Channel-aware delivery: each farmer is alerted through the transport they
+  // actually talk to Stevi on (users.channel). The audit found this stage
+  // hard-coding TwilioAdapter — a Cloud-acquired farmer got alerts from a
+  // different number, or nothing at all. Outside the Meta 24h window, Cloud
+  // recipients need the approved UTILITY template (WHATSAPP_TEMPLATE_ALERT).
+  const twilio = new TwilioAdapter();
+  const cloud = new CloudApiAdapter();
+  const alertTemplate = process.env.WHATSAPP_TEMPLATE_ALERT;
+  const sender: ProactiveSender = {
+    freeform: (t, text, mediaUrl) =>
+      (t.channel === 'cloud' ? cloud : twilio).send({ to: t.waId, text, mediaUrl }),
+    ...(alertTemplate
+      ? { template: (t: { waId: string }, text: string) => cloud.sendTemplate(t.waId, alertTemplate, text) }
+      : {}),
+  };
+
   let alerts: AlertRunResult | null = null;
   let frost: AlertRunResult | null = null;
   try {
-    const adapter = new TwilioAdapter();
-    alerts = await runVazioAlerts(transitions, (to, text) => adapter.send({ to, text }));
+    alerts = await runVazioAlerts(transitions, sender);
     if (alerts.sent > 0 || alerts.failed > 0) {
       findings.push(`Alertas de vazio: ${alerts.sent} enviado(s), ${alerts.failed} falha(s).`);
     }
     // Frost (geada) alerts — daily min forecast per farm pin, July–Aug matters
     // most for MG coffee. Same dedup discipline as vazio.
-    frost = await runFrostAlerts((to, text, mediaUrl) => adapter.send({ to, text, mediaUrl }));
+    frost = await runFrostAlerts(sender);
     if (frost.sent > 0 || frost.failed > 0) {
       findings.push(`Alertas de geada: ${frost.sent} enviado(s), ${frost.failed} falha(s).`);
     }
@@ -86,8 +103,7 @@ export default async function handler(
   // the frost/vazio stages down with it (and vice versa).
   let fire: AlertRunResult | null = null;
   try {
-    const adapter = new TwilioAdapter();
-    fire = await runFireAlerts((to, text) => adapter.send({ to, text }));
+    fire = await runFireAlerts(sender);
     if (fire.sent > 0 || fire.failed > 0) {
       findings.push(`Alertas de queimada: ${fire.sent} enviado(s), ${fire.failed} falha(s).`);
     }

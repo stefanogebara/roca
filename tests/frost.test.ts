@@ -63,9 +63,17 @@ describe('buildFrostAlertText', () => {
 });
 
 describe('frostDedupKey', () => {
-  it('is per forecast date', () => {
+  it('is per forecast date AND severity level', () => {
     expect(frostDedupKey({ date: '2026-07-12', minC: 0.2, risk: 'geada' })).toBe(
-      'frost:2026-07-12'
+      'frost:2026-07-12:geada'
     );
+  });
+
+  it('an escalation risco→geada gets a NEW key — the upgrade must re-alert', () => {
+    // "risco" (3°C) on Tuesday must not silence "geada" (0°C) on Wednesday:
+    // that's the difference between watching and acting.
+    const risco = frostDedupKey({ date: '2026-07-12', minC: 2.8, risk: 'risco' });
+    const geada = frostDedupKey({ date: '2026-07-12', minC: 0.2, risk: 'geada' });
+    expect(risco).not.toBe(geada);
   });
 });

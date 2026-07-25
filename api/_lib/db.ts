@@ -37,12 +37,13 @@ export interface UserRow {
 /** Upsert a user by WhatsApp id, returning the row. */
 export async function upsertUser(
   waId: string,
-  name: string | null
+  name: string | null,
+  channel?: string
 ): Promise<UserRow | null> {
   const db = getDb();
   const { data, error } = await db
     .from('users')
-    .upsert({ wa_id: waId, name }, { onConflict: 'wa_id' })
+    .upsert({ wa_id: waId, name, ...(channel ? { channel } : {}) }, { onConflict: 'wa_id' })
     .select()
     .single();
   if (error) {
@@ -606,6 +607,8 @@ export async function setTwilioContentSid(
 export interface AlertTarget {
   userId: string;
   waId: string;
+  /** Transport the farmer talks to Stevi on ('twilio' | 'cloud'; null = legacy → Twilio). */
+  channel: string | null;
 }
 
 /** Soy growers with a farm in the given UF — targets for vazio alerts. */
@@ -613,7 +616,7 @@ export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
   const db = getDb();
   const { data, error } = await db
     .from('farms')
-    .select('user_id, crop, users!inner(id, wa_id, state)')
+    .select('user_id, crop, users!inner(id, wa_id, state, channel)')
     .eq('users.state', uf.toUpperCase())
     .contains('crop', ['soja']);
   if (error) {
@@ -622,8 +625,8 @@ export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
   }
   return (data ?? [])
     .map((r) => {
-      const u = r.users as unknown as { id: string; wa_id: string } | null;
-      return u ? { userId: u.id, waId: u.wa_id } : null;
+      const u = r.users as unknown as { id: string; wa_id: string; channel: string | null } | null;
+      return u ? { userId: u.id, waId: u.wa_id, channel: u.channel ?? null } : null;
     })
     .filter((x): x is AlertTarget => x !== null);
 }
@@ -638,7 +641,7 @@ export async function listFarmsWithCoords(): Promise<FarmPin[]> {
   const db = getDb();
   const { data, error } = await db
     .from('farms')
-    .select('lat, lon, users!inner(id, wa_id)')
+    .select('lat, lon, users!inner(id, wa_id, channel)')
     .not('lat', 'is', null)
     .not('lon', 'is', null);
   if (error) {
@@ -647,12 +650,31 @@ export async function listFarmsWithCoords(): Promise<FarmPin[]> {
   }
   return (data ?? [])
     .map((r) => {
-      const u = r.users as unknown as { id: string; wa_id: string } | null;
+      const u = r.users as unknown as { id: string; wa_id: string; channel: string | null } | null;
       return u && r.lat != null && r.lon != null
-        ? { userId: u.id, waId: u.wa_id, lat: r.lat as number, lon: r.lon as number }
+        ? { userId: u.id, waId: u.wa_id, channel: u.channel ?? null, lat: r.lat as number, lon: r.lon as number }
         : null;
     })
     .filter((x): x is FarmPin => x !== null);
+}
+
+/** Timestamp of the user's last inbound message — the Meta 24h service window
+ * anchor for proactive sends. Null = never wrote (or query failed: treat as
+ * outside the window, the conservative read). */
+export async function getLastInboundAt(userId: string): Promise<string | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from('messages')
+    .select('created_at')
+    .eq('user_id', userId)
+    .eq('direction', 'in')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) {
+    log.error('getLastInboundAt failed:', error.message);
+    return null;
+  }
+  return (data?.[0]?.created_at as string | undefined) ?? null;
 }
 
 /**
