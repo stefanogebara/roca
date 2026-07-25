@@ -213,6 +213,29 @@ Gaia Tech.
 
 ## Log de iterações (append)
 
+### Iteração 8 — 25/jul (~18h) — EXECUÇÃO da fila (a)-(f) aprovada
+Todos os 6 pacotes shipados em master, cada um com TDD e suíte verde
+(562 → 580 testes). Smoke pós-deploy: landing/verificar 200, card sem
+assinatura **403** (forgery fechado), copy stale = 0 ocorrências.
+
+| # | Commit | O que mudou de verdade |
+|---|---|---|
+| a | e9a9905 | Landing sem "código/sandbox", Stevi é "ela", /verificar linkado, CTA com prefill |
+| b | b4c47b9 | Timeout no LLM, crash do webhook pagina, sends Cloud observáveis, texto-antes-do-card, "Anotado" honesto, typing indicator |
+| c | 2c5eae9 | users.channel + alertas channel-aware, template UTILITY fora da janela 24h, dedup de geada por NÍVEL |
+| d | 4235a20 | HMAC anti-forgery nos cards, wa.me?text= por tipo, carimbo de validade, coords a 3 casas |
+| e | f7e63ae | triage_events + ndvi_readings + campos de caderno + outcomes + awaiting_set_at + purgas LGPD (migrations em prod) |
+| f | 6621b66 | Vitória: disclosure proativa, avanço de estágio, 6 personas de currículo, juiz cross-family (goldeneval + prospect-gym) |
+
+**Novas dependências humanas criadas por este trabalho:**
+- `FOUNDER_NOTIFY_TO` na Vercel (e-mail de lead quente) — sem isso o e-mail
+  cai no GMAIL_USER.
+- `WHATSAPP_TEMPLATE_ALERT`: criar/submeter um template UTILITY de alerta no
+  WhatsApp Manager; sem ele, alerta fora da janela de 24h é pulado (honesto,
+  mas pulado).
+- `REPORT_URL_SECRET`: confirmar setado em prod (agora assina os cards; sem
+  ele o /api/card aceita qualquer URL).
+
 ### Iterações 6 e 7 — 25/jul (~17h) — Dados & moat + Síntese executiva
 - It6 (dados/moat, 160K tokens, 39 tool uses; 7 propostas na área 6):
   compradores reais mapeados (Kynetec vende painel cultura×região×produto à
