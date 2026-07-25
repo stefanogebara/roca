@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildHistoryReply, type ActivityRow } from '../api/_lib/caderno';
 import { isHistoryRequest } from '../api/_lib/pipeline';
+import { isAwaitingFresh } from '../api/_lib/db';
 
 describe('isHistoryRequest', () => {
   it('detects history asks', () => {
@@ -66,5 +67,24 @@ describe('buildHistoryReply', () => {
     const t = buildHistoryReply({ uf: 'MG', crop: ['cafe'] }, rows);
     expect(t).not.toMatch(/\d+\s?(l|ml|kg|g)\s?\/\s?ha/i);
     expect(t).not.toMatch(/aplique/i);
+  });
+});
+
+describe('isAwaitingFresh — a pending prompt expires', () => {
+  const now = new Date('2026-07-25T12:00:00Z');
+  const hoursAgo = (h: number) => new Date(now.getTime() - h * 3600_000).toISOString();
+
+  it('a fresh prompt (2h ago) is still honoured', () => {
+    expect(isAwaitingFresh(hoursAgo(2), now)).toBe(true);
+  });
+
+  it('a three-week-old prompt is stale — "sim" must not answer it', () => {
+    expect(isAwaitingFresh(hoursAgo(21 * 24), now)).toBe(false);
+  });
+
+  it('legacy rows without a timestamp stay fresh (no conversation dropped)', () => {
+    expect(isAwaitingFresh(null, now)).toBe(true);
+    expect(isAwaitingFresh(undefined, now)).toBe(true);
+    expect(isAwaitingFresh('not-a-date', now)).toBe(true);
   });
 });

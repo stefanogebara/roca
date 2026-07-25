@@ -48,6 +48,8 @@ import {
   getRecentTurns,
   insertApplication,
   listApplications,
+  insertTriageEvent,
+  isAwaitingFresh,
 } from './db';
 import {
   isApplicationLog,
@@ -458,7 +460,13 @@ type RouteContextBase = Omit<
  * message can still route normally instead of being swallowed by onboarding.
  */
 async function buildRouteContext(base: RouteContextBase): Promise<RouteContext> {
-  const { effective, user, userId } = base;
+  const { effective, userId } = base;
+  // A pending prompt expires: a farmer answering "sim" three weeks after
+  // "qual sua cultura?" is starting a new conversation, not finishing that one.
+  const user =
+    base.user && !isAwaitingFresh(base.user.awaiting_set_at)
+      ? { ...base.user, awaiting: null }
+      : base.user;
 
   const cropAnswer =
     user?.awaiting === 'crop' &&
@@ -909,6 +917,19 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
   } catch (e) {
     log.error('reasoning failed:', (e as Error).message);
     replyText = FALLBACK_REPLY;
+  }
+  // Moat capture: the triage verdict used to exist only inside a card URL and
+  // prose. Structured now — crop × pest × region × date is the dataset that
+  // compounds (and the "resolveu?" follow-up will stamp the outcome onto it).
+  if (pestCard?.pest) {
+    const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
+    void insertTriageEvent({
+      userId,
+      crop: pestCard.crop ?? profile.crop?.[0] ?? null,
+      pest: pestCard.pest,
+      confidence: pestCard.confidence ?? null,
+      uf: profile.uf,
+    });
   }
   return { intent, replyText, pestCard };
 }

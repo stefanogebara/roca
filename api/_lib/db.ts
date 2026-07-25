@@ -28,6 +28,8 @@ export interface UserRow {
   state: string | null;
   consent_lgpd_at: string | null;
   awaiting: string | null;
+  /** When `awaiting` was set — a pending prompt goes stale after ~48h. */
+  awaiting_set_at?: string | null;
   /** Acquisition attribution ("vim pelo josé") — first-wins, set once. */
   source: string | null;
   /** Last referral-nudge timestamp (≥14d cooldown in growth.ts). */
@@ -142,8 +144,27 @@ export async function setUserState(userId: string, uf: string): Promise<void> {
 /** Set/clear what Stevi is waiting for from this user (e.g. 'crop'). */
 export async function setAwaiting(userId: string, awaiting: string | null): Promise<void> {
   const db = getDb();
-  const { error } = await db.from('users').update({ awaiting }).eq('id', userId);
+  // Stamped so a stale prompt can expire: a "sim" three weeks after "qual sua
+  // cultura?" must not be read as the answer to that question.
+  const { error } = await db
+    .from('users')
+    .update({ awaiting, awaiting_set_at: awaiting ? new Date().toISOString() : null })
+    .eq('id', userId);
   if (error) log.error('setAwaiting failed:', error.message);
+}
+
+/** Whether a pending `awaiting` prompt is still fresh enough to honour.
+ * Pure — unit-tested. Legacy rows without a timestamp are treated as fresh
+ * (the column was added 25/jul; no reason to drop existing conversations). */
+export function isAwaitingFresh(
+  setAt: string | null | undefined,
+  now: Date = new Date(),
+  maxHours = 48
+): boolean {
+  if (!setAt) return true;
+  const t = Date.parse(setAt);
+  if (!Number.isFinite(t)) return true;
+  return now.getTime() - t < maxHours * 3600_000;
 }
 
 /** Persist the crops a farmer grows (upsert the farm row if needed). Returns
@@ -207,6 +228,52 @@ export async function setCachedNdvi(
     ndvi_fetched_at: new Date().toISOString(),
   });
   if (error) log.error('setCachedNdvi failed:', error.message);
+
+  // Append-only history alongside the 1-row cache: the upsert above destroys
+  // the previous reading, and season-long vigor evolution is the input for
+  // "sua lavoura caiu 15% vs mês passado". Fail-soft — history is a bonus,
+  // the cache is the contract.
+  const { error: histErr } = await db.from('ndvi_readings').insert({
+    farm_id: farmId,
+    ndvi: reading.ndvi,
+    scene_date: reading.date,
+    std: reading.std ?? null,
+    samples: reading.samples ?? null,
+  });
+  if (histErr) log.error('ndvi_readings insert failed:', histErr.message);
+}
+
+/** Append a pest-triage event — the moat dataset (crop × pest × region × date,
+ * later paired with the "resolveu?" outcome). Fail-soft: never blocks a reply. */
+export async function insertTriageEvent(e: {
+  userId: string | null;
+  farmId?: string | null;
+  crop?: string | null;
+  pest: string;
+  confidence?: string | null;
+  uf?: string | null;
+}): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('triage_events').insert({
+    user_id: e.userId,
+    farm_id: e.farmId ?? null,
+    crop: e.crop ?? null,
+    pest: e.pest,
+    confidence: e.confidence ?? null,
+    uf: e.uf ?? null,
+  });
+  if (error) log.error('insertTriageEvent failed:', error.message);
+}
+
+/** Append a spray-window verdict — dated evidence the farmer can show a
+ * Proagro/insurance inspection ("Stevi disse pra não pulverizar"). */
+export async function insertSprayVerdict(
+  userId: string | null,
+  verdict: 'pode' | 'atencao' | 'nao' | 'indefinido'
+): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('spray_verdicts').insert({ user_id: userId, verdict });
+  if (error) log.error('insertSprayVerdict failed:', error.message);
 }
 
 /** Read cached NDVI if fresh (within maxAgeDays); else null to refetch. */
@@ -737,6 +804,12 @@ export async function purgeExpiredRows(): Promise<Record<string, number>> {
     { table: 'farmer_alerts', days: 90 },
     { table: 'ops_login_attempts', days: 30 },
     { table: 'monitor_runs', days: 180 },
+    // Third-party data (scraped prospects) grew forever — the schema's own
+    // comment calls it "the most sensitive third-party data". Opt-outs are
+    // NEVER purged (prospect_optouts is the legal proof they asked out).
+    { table: 'prospect_messages', days: 365 },
+    { table: 'gym_runs', days: 90 },
+    { table: 'prospect_gym_runs', days: 90 },
   ];
   const purged: Record<string, number> = {};
   for (const t of targets) {
