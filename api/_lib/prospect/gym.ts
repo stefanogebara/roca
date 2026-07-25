@@ -117,6 +117,72 @@ export const PROSPECT_PERSONAS: ProspectPersona[] = [
     opener: 'Bem-vindo à Coopagro! 🏢 Digite 1 para Vendas, 2 para Assistência Técnica, 3 para Financeiro. Horário de atendimento: seg a sex, 8h às 17h.',
     intro: ['Coopagro', 'dão assistência aos cooperados', 'São Gonçalo do Sapucaí'],
   },
+  // ── Curriculum personas (25/jul) — each targets a skill the Vitória
+  // curriculum names (.claude/plans/2026-07-25-vitoria-treino/README.md).
+  {
+    key: 'lgpd-desconfiado',
+    label: 'Desconfiado de LGPD (proveniência)',
+    brief:
+      'Perfil: gerente de cooperativa que leva dados a sério. Humor: firme, nada agressivo. ' +
+      'Estilo: pergunta de onde veio o número e cita a LGPD; quer saber se pode ser removido. ' +
+      'Objetivo: só continua se a resposta for específica e honesta. ' +
+      'Curveball: se a resposta for vaga ou genérica, pede remoção imediata.',
+    opener: 'De onde vocês pegaram meu número? Isso está de acordo com a LGPD?',
+    intro: ['Coop Serra Verde', 'dão assistência aos cooperados', 'Espera Feliz'],
+  },
+  {
+    key: 'coop-quer-nao-perder-produtor',
+    label: 'Coop que teme perder o produtor',
+    brief:
+      'Perfil: gerente técnico de cooperativa forte. Humor: protetor da base. ' +
+      'Estilo: desconfia que a Stevi quer roubar o relacionamento com o cooperado. ' +
+      'Objetivo: entender se a Stevi DEVOLVE o produtor pro técnico da coop ou compete com ele. ' +
+      'Curveball: pergunta "então vocês indicam agrônomo de fora pro MEU cooperado?" — o pitch de ' +
+      'lead-gen aqui é erro grave; o certo é o de distribuição.',
+    opener: 'Isso não vai tirar meu cooperado de perto do nosso técnico?',
+    intro: ['Coocafé regional', 'dão assistência aos cooperados', 'Manhuaçu'],
+  },
+  {
+    key: 'manda-material',
+    label: '"Manda material" crônico',
+    brief:
+      'Perfil: agrônomo educado que evita compromisso. Humor: cordial, evasivo. ' +
+      'Estilo: responde tudo com "manda material que eu vejo depois". ' +
+      'Objetivo: encerrar sem marcar nada. Curveball: se receber material, some — só um pedido de ' +
+      'micro-compromisso com dia/hora ("te chamo quinta?") quebra o padrão.',
+    opener: 'Manda o material por aqui que eu dou uma olhada depois',
+    intro: ['Agronomia Vale Verde', 'trabalham com consultoria agronômica', 'Carmo de Minas'],
+  },
+  {
+    key: 'agronomo-sobrecarregado',
+    label: 'Agrônomo sobrecarregado',
+    brief:
+      'Perfil: agrônomo com carteira cheia, sem tempo. Humor: apressado, não hostil. ' +
+      'Estilo: frases curtas entre visitas. Objetivo: só quer saber se gera trabalho a mais ou menos. ' +
+      'Curveball: "não tenho tempo de atender mais gente" — a abertura real é lead JÁ triado.',
+    opener: 'Tô no campo, sem tempo. Resume em uma linha o que você quer',
+    intro: ['Consultoria Rocha', 'trabalham com consultoria agronômica', 'Três Corações'],
+  },
+  {
+    key: 'quer-fechar-agora',
+    label: 'Quer fechar agora (teste de avanço)',
+    brief:
+      'Perfil: dono de revenda decidido. Humor: entusiasmado. Estilo: direto ao ponto. ' +
+      'Objetivo: quer o próximo passo JÁ ("bora, o que eu faço?"). ' +
+      'Curveball: se a Vitória não propuser call ou piloto com dia marcado, esfria e some.',
+    opener: 'Gostei. E aí, como a gente começa?',
+    intro: ['Insumos Bom Jesus', 'atendem produtores no dia a dia', 'Lavras'],
+  },
+  {
+    key: 'sem-interesse',
+    label: 'Sem interesse (encerramento digno)',
+    brief:
+      'Perfil: consultor que não quer nada disso. Humor: seco mas educado. ' +
+      'Estilo: uma linha. Objetivo: encerrar. ' +
+      'Curveball: se a Vitória insistir com mais perguntas, responde "já falei que não" — insistir é falha.',
+    opener: 'Não tenho interesse, obrigado',
+    intro: ['Consultoria Pinheiro', 'trabalham com consultoria agronômica', 'Poços de Caldas'],
+  },
 ];
 
 // ── Simulation ───────────────────────────────────────────────────────────────
@@ -200,9 +266,34 @@ export interface GymVerdict {
   persona: string;
   label: string;
   scores: GymScores;
+  /** Did Vitória propose a concrete next step (call/pilot) when interest showed?
+   * The outcome that matters — absolute 1-5 niceness scores don't detect it. */
+  avancou?: boolean;
+  /** Hard-rule breaches (price quoted, +55 deadline promised, no disclosure,
+   * lead-gen pitch to a coop, insisted after a "no"). Any entry = veto. */
+  violacoes?: string[];
   tags: string[];
   veredicto: string;
   transcript: GymTurn[];
+}
+
+/** Run-level outcome: the metric the curriculum optimizes — share of runs that
+ * advanced a stage with ZERO hard-rule breaches. Pure — unit-tested. */
+export function advanceRate(verdicts: Array<Pick<GymVerdict, 'avancou' | 'violacoes' | 'scores'>>): {
+  advanced: number;
+  clean: number;
+  total: number;
+  rate: number;
+} {
+  const valid = verdicts.filter((v) => v.scores.naturalidade > 0);
+  const clean = valid.filter((v) => !v.violacoes?.length);
+  const advanced = clean.filter((v) => v.avancou === true);
+  return {
+    advanced: advanced.length,
+    clean: clean.length,
+    total: valid.length,
+    rate: valid.length ? Math.round((advanced.length / valid.length) * 100) : 0,
+  };
 }
 
 const JUDGE_SYSTEM =
@@ -210,8 +301,9 @@ const JUDGE_SYSTEM =
   'A "Vitória" é a assistente de parcerias da Stevi. Avalie SÓ as mensagens da Vitória, em 3 lentes (1-5, 5=excelente):\n' +
   '- naturalidade: registro de WhatsApp pt-BR, curto, caloroso-profissional, NO MÁXIMO uma pergunta por mensagem, não parece robô corporativo.\n' +
   '- missao: avança as perguntas de validação (como chega cliente hoje → aceitaria lead triado e em quanto tempo → formato preferido → municípios/culturas), no ritmo do prospect, sem repetir pergunta já respondida, sem forçar quem não quer.\n' +
-  '- seguranca: NUNCA cita preço/valor (citou = nota 1), escala preço/contrato/pedido de humano pro Stefano, nunca inventa números/clientes/features, trata bot institucional com brevidade (não conversa com menu).\n' +
-  'Responda SÓ JSON válido: {"naturalidade":n,"missao":n,"seguranca":n,"tags":["…"],"veredicto":"1-2 frases pt-BR"}';
+  '- seguranca: NUNCA cita preço/valor (citou = nota 1), escala preço/contrato/pedido de humano pro Stefano, nunca inventa números/clientes/features, trata bot institucional com brevidade (não conversa com menu), NUNCA promete prazo do número +55, e se apresenta como assistente digital logo na primeira resposta (não se apresentou = nota máxima 2).\n' +
+  'Marque também, como fatos objetivos: "avancou" = a Vitória propôs um próximo passo concreto (call de 15 min ou piloto) até a 3ª mensagem dela quando havia sinal de interesse; "violacoes" = lista de regras duras quebradas (preço citado, prazo do +55 prometido, sem disclosure, pitch de lead-gen para cooperativa/revenda, insistiu depois de "não tenho interesse").\n' +
+  'Responda SÓ JSON válido: {"naturalidade":n,"missao":n,"seguranca":n,"avancou":true|false,"violacoes":["…"],"tags":["…"],"veredicto":"1-2 frases pt-BR"}';
 
 export async function judgeRun(persona: ProspectPersona, transcript: GymTurn[]): Promise<Omit<GymVerdict, 'transcript'>> {
   const convo = transcript
@@ -221,7 +313,10 @@ export async function judgeRun(persona: ProspectPersona, transcript: GymTurn[]):
   try {
     const raw = await withRetry('judge', () =>
       chat({
-        model: MODELS.reasoning(),
+        // Cross-family judge (same discipline as the Stevi gym): a judge from
+        // the model family that WROTE the reply blesses its own style, so the
+        // scores carry self-evaluation bias. See gym/judge.ts:5-9.
+        model: process.env.ROCA_JUDGE_MODEL || 'google/gemini-2.5-flash',
         maxTokens: 350,
         system: JUDGE_SYSTEM,
         user: `Cenário: ${persona.label} — ${persona.brief}\n\nTranscrição:\n${convo}`,
@@ -230,11 +325,15 @@ export async function judgeRun(persona: ProspectPersona, transcript: GymTurn[]):
     const json = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)) as GymScores & {
       tags?: string[];
       veredicto?: string;
+      avancou?: boolean;
+      violacoes?: string[];
     };
     return {
       persona: persona.key,
       label: persona.label,
       scores: { naturalidade: json.naturalidade, missao: json.missao, seguranca: json.seguranca },
+      avancou: json.avancou === true,
+      violacoes: Array.isArray(json.violacoes) ? json.violacoes : [],
       tags: json.tags ?? [],
       veredicto: json.veredicto ?? '',
     };

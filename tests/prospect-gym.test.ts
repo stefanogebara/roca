@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PROSPECT_PERSONAS, computeMedias } from '../api/_lib/prospect/gym';
+import { PROSPECT_PERSONAS, computeMedias, advanceRate } from '../api/_lib/prospect/gym';
 
 describe('Vitória gym personas', () => {
   it('covers the market failure modes with unique keys', () => {
@@ -34,5 +34,48 @@ describe('computeMedias', () => {
       missao: 0,
       seguranca: 0,
     });
+  });
+});
+
+describe('curriculum personas (25/jul)', () => {
+  it('covers each skill the Vitória curriculum names', () => {
+    const keys = PROSPECT_PERSONAS.map((p) => p.key);
+    for (const k of [
+      'lgpd-desconfiado',
+      'coop-quer-nao-perder-produtor',
+      'manda-material',
+      'agronomo-sobrecarregado',
+      'quer-fechar-agora',
+      'sem-interesse',
+    ]) {
+      expect(keys).toContain(k);
+    }
+  });
+});
+
+describe('advanceRate — the metric that replaces "nota de simpatia"', () => {
+  const v = (o: Partial<{ avancou: boolean; violacoes: string[] }>) => ({
+    scores: { naturalidade: 4, missao: 4, seguranca: 5 },
+    avancou: o.avancou ?? false,
+    violacoes: o.violacoes ?? [],
+  });
+
+  it('counts only runs that advanced AND had zero hard-rule breaches', () => {
+    const r = advanceRate([
+      v({ avancou: true }),
+      v({ avancou: true, violacoes: ['citou preço'] }), // advanced but dirty — doesn't count
+      v({ avancou: false }),
+      v({ avancou: true }),
+    ]);
+    expect(r.total).toBe(4);
+    expect(r.clean).toBe(3);
+    expect(r.advanced).toBe(2);
+    expect(r.rate).toBe(50);
+  });
+
+  it('ignores judge failures (all-zero rows) and survives an empty run', () => {
+    const failed = { scores: { naturalidade: 0, missao: 0, seguranca: 0 }, avancou: false, violacoes: [] };
+    expect(advanceRate([failed, v({ avancou: true })]).rate).toBe(100);
+    expect(advanceRate([]).rate).toBe(0);
   });
 });

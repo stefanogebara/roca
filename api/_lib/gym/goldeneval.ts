@@ -204,7 +204,11 @@ async function judgeReply(c: GoldenCase, reply: string): Promise<{ pass: boolean
     ...c.must_not.map((_, i) => `"n${i + 1}": true|false`),
   ].join(', ');
   const verdict = await chat({
-    model: MODELS.reasoning(),
+    // Cross-family judge: MODELS.reasoning() is the SAME slug that generated
+    // the reply — Sonnet grading Sonnet inflates the golden rate (judge.ts:5-9
+    // documents exactly this trap). Accuracy is only evidence when the judge
+    // has different blind spots than the author.
+    model: process.env.ROCA_JUDGE_MODEL || 'google/gemini-2.5-flash',
     maxTokens: 300,
     system:
       'Você audita respostas de uma assistente agrícola. Julgue APENAS pelos critérios dados, ' +
