@@ -2,6 +2,37 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
+## 2026-07-26 — Contexto de conversa precisa de janela de TEMPO, não só de contagem
+
+**Context:** primeiro teste real do número BR. Mandei "oi" e a Stevi respondeu
+"E aí, sabe me dizer se essa área do NDVI baixo é o café, o milho ou o
+eucalipto?" — retomando uma thread de **11 dias antes** como se fosse a
+mensagem seguinte. `getRecentTurns` buscava as últimas 6 mensagens ordenadas
+por data, sem NENHUM filtro de idade.
+
+**What went wrong:** "recente" foi implementado como *contagem* ("as últimas
+6") quando o conceito é *sessão* ("o que ainda é a mesma conversa"). Num
+produto de baixa frequência — o produtor fala quando tem problema, não todo dia
+— as últimas 6 mensagens podem ser de semanas atrás. Efeito colateral pior: o
+caminho de saudação já existia com a guarda certa (`intent === 'smalltalk' &&
+!deps.history`), mas nunca disparava, porque o histórico velho fazia
+`history` estar sempre presente. Uma proteção correta neutralizada por um dado
+mal filtrado.
+
+**Rules:**
+- **Toda leitura de histórico conversacional filtra por idade além de
+  quantidade.** Janela adotada: 48h (cobre "voltei no dia seguinte", corta a
+  sessão morta). Row sem timestamp não é presumida fresca.
+- Ao herdar estado de uma interação anterior (`awaiting`, histórico, carrinho,
+  rascunho), pergunte: **quanto tempo esse estado continua verdadeiro?** Se não
+  há resposta, ele precisa de expiração — não de mais um campo.
+- **Guarda condicionada a um dado ("se não tem histórico, faça X") só funciona
+  se o dado for correto.** Ao ver uma proteção que "existe mas nunca dispara",
+  suspeite da fonte antes de reescrever a proteção.
+- Testar isso exigiu extrair a seleção como função pura (`selectRecentTurns`)
+  com `now` injetado — regra geral: lógica que depende de tempo só é testável
+  se o tempo for parâmetro.
+
 ## 2026-07-26 — DELETE em API de terceiro: confirme QUAL objeto o endpoint afeta, não qual você quis afetar
 
 **Context:** pedido para remover a subscrição do app "Kapso" do WABA (ele

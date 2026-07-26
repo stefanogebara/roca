@@ -481,6 +481,58 @@ export async function getActivityLog(
  * context. Excludes the newest inbound row when it matches the message being
  * processed (it was already claimed/logged before reasoning runs).
  */
+/** A message row as the history selector sees it. */
+export interface TurnRow {
+  direction: 'in' | 'out';
+  raw: string | null;
+  transcript: string | null;
+  provider_message_id: string | null;
+  created_at: string | null;
+}
+
+/**
+ * How far back a conversation still counts as "the same conversation".
+ *
+ * 48h covers the real pattern of coming back the next morning ("e a ferrugem,
+ * melhorou?") and cuts the one that bit us in production: a bare "oi" after 11
+ * days inherited an old NDVI thread, so Stevi asked the farmer about "essa área
+ * do NDVI baixo" — a question he had no way to place. Beyond the window it is a
+ * new session, and the farmer gets a clean start instead of a stranger's
+ * context.
+ */
+const TURN_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Pick the turns that belong to the CURRENT conversation. Pure — unit-tested.
+ * Input rows are newest-first (as queried); output is oldest-first, ready for
+ * the prompt.
+ */
+export function selectRecentTurns(
+  rows: TurnRow[],
+  opts: { now?: Date; currentMessageId?: string; limit?: number; windowMs?: number } = {}
+): Array<{ role: 'produtor' | 'stevi'; text: string }> {
+  const now = opts.now ?? new Date();
+  const limit = opts.limit ?? 6;
+  const windowMs = opts.windowMs ?? TURN_WINDOW_MS;
+  const cutoff = now.getTime() - windowMs;
+
+  return rows
+    .filter((r) => !(opts.currentMessageId && r.provider_message_id === opts.currentMessageId))
+    // No timestamp → don't assume it's fresh (a row we can't date can't be
+    // proven to belong to this conversation).
+    .filter((r) => {
+      const t = r.created_at ? Date.parse(r.created_at) : NaN;
+      return Number.isFinite(t) && t >= cutoff;
+    })
+    .slice(0, limit)
+    .reverse()
+    .map((r) => ({
+      role: r.direction === 'in' ? ('produtor' as const) : ('stevi' as const),
+      text: (r.transcript ?? r.raw ?? '').trim(),
+    }))
+    .filter((t) => t.text.length > 0);
+}
+
 export async function getRecentTurns(
   userId: string,
   currentMessageId: string | undefined,
@@ -489,7 +541,7 @@ export async function getRecentTurns(
   const db = getDb();
   const { data, error } = await db
     .from('messages')
-    .select('direction, raw, transcript, provider_message_id')
+    .select('direction, raw, transcript, provider_message_id, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit + 1);
@@ -497,21 +549,7 @@ export async function getRecentTurns(
     log.error('getRecentTurns failed:', error.message);
     return [];
   }
-  const rows = (data ?? []) as Array<{
-    direction: 'in' | 'out';
-    raw: string | null;
-    transcript: string | null;
-    provider_message_id: string | null;
-  }>;
-  return rows
-    .filter((r) => !(currentMessageId && r.provider_message_id === currentMessageId))
-    .slice(0, limit)
-    .reverse()
-    .map((r) => ({
-      role: r.direction === 'in' ? ('produtor' as const) : ('stevi' as const),
-      text: (r.transcript ?? r.raw ?? '').trim(),
-    }))
-    .filter((t) => t.text.length > 0);
+  return selectRecentTurns((data ?? []) as TurnRow[], { currentMessageId, limit });
 }
 
 /**
