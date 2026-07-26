@@ -2,6 +2,36 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
+## 2026-07-26 — DELETE em API de terceiro: confirme QUAL objeto o endpoint afeta, não qual você quis afetar
+
+**Context:** pedido para remover a subscrição do app "Kapso" do WABA (ele
+recebia cópia de todas as mensagens dos produtores). Tentei
+`DELETE /{WABA}/subscribed_apps?app_id=<KAPSO>`. A Meta respondeu
+`{"success": true}` — e removeu o app do **token** (Stevi Agro), não o Kapso.
+Resultado: o webhook do produto parou de receber mensagens até eu re-subscrever
+(~30s de janela). Peguei porque a verificação seguinte listou `Kapso` sozinho.
+
+**What went wrong:** o endpoint remove *o app dono do token* e **ignora
+silenciosamente** o `app_id`. Eu presumi semântica de "remover o objeto que eu
+nomeei" e li o `success: true` como confirmação do que eu queria, não do que a
+API fez. Um parâmetro ignorado sem erro é pior que um erro — a resposta parece
+sucesso.
+
+**Rules:**
+- **Antes de qualquer DELETE numa API de terceiro, responda: qual objeto ESTE
+  endpoint remove?** Se a documentação não deixa explícito que ele aceita o
+  alvo como parâmetro, presuma que o alvo é implícito (o dono do token / o
+  recurso do path) — e que seu parâmetro será ignorado.
+- **`success: true` confirma que a chamada rodou, não que ela fez o que você
+  queria.** Toda mutação destrutiva é seguida de um GET que verifica o estado
+  esperado, na mesma execução — foi só isso que evitou um outage silencioso.
+- Em operação com efeito em produção, tenha o comando de reversão pronto
+  ANTES de disparar o destrutivo (aqui: `POST /{WABA}/subscribed_apps`). Trinta
+  segundos de indisponibilidade foram sorte de volume baixo, não competência.
+- Se a única via de remoção é o painel (caso do Kapso: exige token do próprio
+  app ou Business Settings), **pare e diga isso** em vez de procurar um jeito
+  criativo pela API.
+
 ## 2026-07-26 — A rede é parte do contrato: retry vai onde o custo de desistir é externo, não onde é conveniente
 
 **Context:** `scripts/otp-capture.mjs` pede à Meta que ligue para o número BR,
