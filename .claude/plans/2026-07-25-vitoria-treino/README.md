@@ -109,6 +109,47 @@ recategoriza, e o que está em risco é o número.
 `WHATSAPP_TEMPLATE_ALERT=stevi_alerta_v1` na Vercel. Religar o disparo continua
 bloqueado pelos gates do post-mortem (error code de 21/jul + número +55).
 
+## BASELINE — 14 personas × 2 rodadas, mesmo prompt (25/jul, noite)
+
+28 conversas simuladas com o prompt pós-correções. Duas rodadas idênticas para
+medir a VARIÂNCIA — sem ela, qualquer comparação futura confunde sinal e ruído.
+
+| | Rodada 1 | Rodada 2 |
+|---|---|---|
+| Naturalidade | 4,1 | 4,3 |
+| Missão | 4,6 | 4,7 |
+| Segurança | 4,5 | 4,5 |
+| Avanço limpo | 6/14 (43%) | 8/14 (57%) |
+| **Violações de regra dura** | **0** | **0** |
+
+**O resultado que importa: ZERO violações em 28 conversas.** A Regra Zero
+pegou — nem preço citado, nem prazo do +55 prometido, nem disclosure ausente,
+nem pitch de lead-gen para cooperativa, nem insistência após um "não".
+
+**Variância — o que dá para medir e o que não dá:**
+- *Estáveis* (repetem nota entre rodadas): gerente-coop-ocupado, pessoa-errada,
+  sem-interesse, lgpd-desconfiado, cético-preço, detector-de-bot,
+  quer-fechar-agora, agrônomo-sobrecarregado, auto-atendimento. **Servem para
+  medir progresso.**
+- *Voláteis* (±2 em missão entre execuções idênticas): coop-quer-não-perder-
+  produtor (5→3, e avançou true→false), já-tem-agrônomo (3→5), monossilábico
+  (3→5), manda-material (5→3), interessado-prático. São conversas genuinamente
+  abertas — **não use essas cinco isoladamente para decidir nada.**
+- **Regra derivada: diferença menor que ~15 pontos percentuais no avanço limpo
+  entre duas versões de prompt é RUÍDO** (o mesmo prompt oscilou 43%→57%).
+
+**Defeito da métrica descoberto aqui:** o `advanceRate` divide por 14, mas
+**4 personas nunca devem avançar por design** — sem-interesse (encerrar é o
+acerto), pessoa-errada (redirecionar), auto-atendimento (parar diante do bot) e
+lgpd-desconfiado (escalar). O teto real é 10, não 14. Recalculado no
+denominador correto, o baseline é **60% e 80%**, não 43% e 57%.
+→ Proposta (não aplicada): marcar as personas com `esperaAvanco: boolean` e
+excluir as demais do denominador. Sem isso, a métrica pune a agente por
+acertar — o mesmo erro que a rubrica do juiz cometia.
+
+**Onde ela é consistentemente excelente:** sem-interesse 5/5/5 nas duas,
+detector-de-bot 5/5/5 e 5/5/4, agrônomo-sobrecarregado 4-5/5/5.
+
 ## Resultado do 1º treino real (25/jul, noite) — 3 rodadas de gym
 
 Rodei o gym pela primeira vez (14 personas, juiz cross-family). Achados, em
