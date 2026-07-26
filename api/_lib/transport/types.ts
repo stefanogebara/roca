@@ -18,6 +18,11 @@ export interface InboundMessage {
   mediaUrl: string | null;
   /** Media MIME type, when the provider supplies it. */
   mediaMime: string | null;
+  /** Which of our numbers received this message (Cloud API
+   * `metadata.phone_number_id`). With more than one number on the WABA, the
+   * reply MUST go out through the same one — otherwise the farmer gets an
+   * answer from a stranger's number. Null on providers that don't report it. */
+  toPhoneId?: string | null;
   /** Parsed coordinates for location messages. */
   location: { lat: number; lon: number } | null;
   /** WhatsApp profile display name, if provided. */

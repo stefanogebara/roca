@@ -223,3 +223,61 @@ describe('CloudApiAdapter.sendTemplate — the outside-24h path', () => {
     await expect(new CloudApiAdapter().sendTemplate('+55349', 'x', 'y')).rejects.toThrow(/template send failed 400/);
   });
 });
+
+describe('CloudApiAdapter — responde pelo número que recebeu (multi-número no WABA)', () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => {
+    process.env.WHATSAPP_CLOUD_TOKEN = 't';
+    process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID = 'DEFAULT_ID';
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.WHATSAPP_CLOUD_TOKEN;
+    delete process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+  });
+
+  const envelopeWithMeta = (phoneId: string) => ({
+    object: 'whatsapp_business_account',
+    entry: [
+      {
+        changes: [
+          {
+            value: {
+              metadata: { display_phone_number: '5511502819', phone_number_id: phoneId },
+              contacts: [{ profile: { name: 'Seu Antônio' } }],
+              messages: [{ from: '5534999', id: 'w9', type: 'text', text: { body: 'oi' } }],
+            },
+            field: 'messages',
+          },
+        ],
+      },
+    ],
+  });
+
+  it('a resposta sai pelo MESMO número que recebeu, não pela env', async () => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: any) => {
+      urls.push(String(url));
+      return { ok: true, text: async () => '' } as any;
+    }) as any;
+
+    const adapter = new CloudApiAdapter();
+    const inbound = await adapter.parseInbound(reqOf(envelopeWithMeta('BR_NUMBER_ID')));
+    expect(inbound!.toPhoneId).toBe('BR_NUMBER_ID');
+
+    await adapter.send({ to: '+5534999', text: 'resposta' });
+    expect(urls[0]).toContain('/BR_NUMBER_ID/messages');
+    expect(urls[0]).not.toContain('DEFAULT_ID');
+  });
+
+  it('sem inbound (crons proativos) usa a env — comportamento antigo preservado', async () => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: any) => {
+      urls.push(String(url));
+      return { ok: true, text: async () => '' } as any;
+    }) as any;
+
+    await new CloudApiAdapter().send({ to: '+5534999', text: 'alerta de geada' });
+    expect(urls[0]).toContain('/DEFAULT_ID/messages');
+  });
+});

@@ -115,6 +115,12 @@ export class CloudApiAdapter implements TransportAdapter {
   readonly provider = 'cloud';
   readonly isSync = false;
 
+  /** Number that received the current inbound (set by parseInbound). The WABA
+   * holds more than one number, so replying through the env default would
+   * answer a farmer from a number they never wrote to. Null in cron contexts
+   * (no inbound), where the env default is the right choice. */
+  private inboundPhoneId: string | null = null;
+
   /** HMAC-SHA256 of the raw body, keyed by the app secret; compared to header. */
   async verifySignature(req: TransportRequest): Promise<boolean> {
     const appSecret = process.env.WHATSAPP_APP_SECRET;
@@ -130,12 +136,14 @@ export class CloudApiAdapter implements TransportAdapter {
   private firstMessage(req: TransportRequest): {
     msg: CloudMessage | null;
     profileName: string | null;
+    toPhoneId: string | null;
   } {
     try {
       const data = JSON.parse(req.rawBody.toString('utf8')) as {
         entry?: Array<{
           changes?: Array<{
             value?: {
+              metadata?: { phone_number_id?: string };
               messages?: CloudMessage[];
               contacts?: Array<{ profile?: { name?: string } }>;
             };
@@ -145,15 +153,19 @@ export class CloudApiAdapter implements TransportAdapter {
       const value = data.entry?.[0]?.changes?.[0]?.value;
       const msg = value?.messages?.[0] ?? null;
       const profileName = value?.contacts?.[0]?.profile?.name ?? null;
-      return { msg, profileName };
+      const toPhoneId = value?.metadata?.phone_number_id ?? null;
+      return { msg, profileName, toPhoneId };
     } catch {
-      return { msg: null, profileName: null };
+      return { msg: null, profileName: null, toPhoneId: null };
     }
   }
 
   async parseInbound(req: TransportRequest): Promise<InboundMessage | null> {
-    const { msg, profileName } = this.firstMessage(req);
+    const { msg, profileName, toPhoneId } = this.firstMessage(req);
     if (!msg || !msg.from) return null; // e.g. status callbacks carry no message
+    // Remember which of our numbers this arrived on, so send() replies through
+    // the same one (one adapter instance per request — see api/webhook.ts).
+    this.inboundPhoneId = toPhoneId;
 
     let kind: InboundKind = 'text';
     let text: string | null = null;
@@ -225,12 +237,15 @@ export class CloudApiAdapter implements TransportAdapter {
       mediaMime,
       location,
       profileName,
+      toPhoneId,
     };
   }
 
   async send(msg: OutboundMessage): Promise<void> {
     const token = process.env.WHATSAPP_CLOUD_TOKEN;
-    const phoneId = process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+    // Reply through the number that received the message; fall back to the env
+    // default for proactive sends (crons), which have no inbound.
+    const phoneId = this.inboundPhoneId ?? process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
     if (!token || !phoneId) {
       throw new Error('WHATSAPP_CLOUD_TOKEN / WHATSAPP_CLOUD_PHONE_NUMBER_ID not configured');
     }
@@ -320,7 +335,7 @@ export class CloudApiAdapter implements TransportAdapter {
    * failure (the alert runner releases its claim and retries tomorrow). */
   async sendTemplate(to: string, templateName: string, paramText: string): Promise<void> {
     const token = process.env.WHATSAPP_CLOUD_TOKEN;
-    const phoneId = process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+    const phoneId = this.inboundPhoneId ?? process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
     if (!token || !phoneId) {
       throw new Error('WHATSAPP_CLOUD_TOKEN / WHATSAPP_CLOUD_PHONE_NUMBER_ID not configured');
     }
@@ -351,7 +366,9 @@ export class CloudApiAdapter implements TransportAdapter {
    * for 15-30s. Cosmetic by contract: never throws, failures are just logged. */
   async markRead(messageId: string): Promise<void> {
     const token = process.env.WHATSAPP_CLOUD_TOKEN;
-    const phoneId = process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+    // Must be the number that received the message — marking read through a
+    // different number of the same WABA is rejected.
+    const phoneId = this.inboundPhoneId ?? process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
     if (!token || !phoneId) return;
     try {
       const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
