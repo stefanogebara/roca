@@ -2,6 +2,40 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
+## 2026-07-26 — Infra compartilhada: enumere os CONSUMIDORES antes de opinar sobre remover
+
+**Context:** achei um segundo app (Kapso) subscrito na WABA do Stevi recebendo
+cópia de todos os webhooks dos produtores. Levantei como risco de privacidade e
+disse ao fundador: *"pelo que vi no código do Stevi, nada aponta para o Kapso,
+então o risco de remover é baixo"*. Ele autorizou a remoção. Antes de executar,
+o print do painel mostrou que **a WABA se chama "TwinMe"** — é compartilhada
+entre dois produtos. Consultei o banco do TwinMe: **306 envios via `kapso`, o
+mais recente naquele mesmo dia.** Remover teria derrubado o WhatsApp do TwinMe,
+num projeto onde eu nem estava trabalhando e sem eu saber que quebrei.
+
+**What went wrong:** eu verifiquei o consumidor que estava na minha frente (o
+repo do Stevi) e generalizei para um recurso que não pertence a ele. A pergunta
+que respondi foi "o Stevi usa isso?"; a pergunta certa era "**quem** usa isso?".
+Num recurso compartilhado, ausência de referência no meu código é evidência
+sobre mim, não sobre o recurso. Detalhe agravante: o nome do recurso ("TwinMe")
+gritava a resposta e eu só olhei o ID, que era o que eu procurava.
+
+**Rules:**
+- **Antes de afirmar que remover/alterar um recurso de infra é seguro,
+  enumere os consumidores** — não pergunte "meu projeto usa?", pergunte "quem
+  usa?". Recursos tipicamente compartilhados entre projetos do mesmo dono:
+  WABA/número de WhatsApp, projeto Vercel, app Meta/OAuth, bucket, chave de
+  API, banco, domínio.
+- **Leia os NOMES dos recursos, não só os IDs.** Um ID confirma que você achou
+  o objeto certo; o nome frequentemente revela de quem ele é. "TwinMe" numa
+  conta que eu tratava como do Stevi era o aviso, e passou batido.
+- Quando o dono autoriza uma remoção com base numa avaliação SUA, a avaliação
+  passa a ser responsabilidade sua — **verifique antes de executar, mesmo já
+  autorizado**. Autorização não transfere a checagem.
+- Mesma família do erro do `DELETE /subscribed_apps` no mesmo dia: destrutivo
+  sem enumerar o que depende. Custo aqui seria maior (outro produto, sem
+  reversão óbvia, sem eu perceber).
+
 ## 2026-07-26 — Contexto de conversa precisa de janela de TEMPO, não só de contagem
 
 **Context:** primeiro teste real do número BR. Mandei "oi" e a Stevi respondeu

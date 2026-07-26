@@ -145,6 +145,25 @@ flight-plan: engenharia mínima e cirúrgica; o gargalo é campo, não código.
   follow-up que JÁ acontece (não "quando a rede estiver pronta").
 
 **Pacote E — Prospecção sustentável:**
+- **WABA PRÓPRIA para o Stevi (descoberto 26/jul — sobe de prioridade).** A
+  conta de WhatsApp que o Stevi usa é a **`1247524677467078`, chamada
+  "TwinMe"** — compartilhada com o outro produto, que envia por ela ativamente
+  (306 envios via Kapso, o último no mesmo dia da descoberta). Consequências,
+  todas resolvidas pelo mesmo movimento:
+  1. **Privacidade:** o app **Kapso** (`1087358919742996`) está subscrito na
+     WABA e recebe cópia de TODOS os webhooks dos produtores — fotos de
+     lavoura, localizações. Ele é do TwinMe; **não pode ser removido** sem
+     quebrar aquele produto (verificado antes de executar — ver lessons.md).
+  2. **Risco cruzado de ban:** uma denúncia contra qualquer um dos dois
+     produtos atinge a conta dos dois.
+  3. **Ruído de diagnóstico:** o histórico de qualidade/entrega da conta mistura
+     tráfego de dois produtos — foi por isso que o post-mortem de 21/jul teve
+     que trabalhar com sinal sujo.
+  Ação: abrir WABA própria (exige o CNPJ, que já está no caminho crítico) e
+  migrar o +55 para ela.
+- **Enquanto a WABA for compartilhada:** declarar o Kapso como operador no
+  aviso de privacidade do `/verificar` e na LIA — hoje um terceiro processa
+  dado de produtor sem estar declarado. É o mínimo honesto, e é barato.
 - Segundo número no WABA para prospecção (separar do número do produto).
 - Decisão honesta: cold-WA sobrevive à tese "nunca número frio"? Alternativa
   desenhada pelo red-team: primeiro toque B2B vira intro vouchada/voz, Vitória vira
