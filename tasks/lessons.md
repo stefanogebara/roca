@@ -20,6 +20,20 @@ minutos) já foi gasto — ali desistir é jogar fora o que já se pagou. Retry
 uniforme, ou nenhum, ignora essa assimetria. Bônus: `request_code` é o único
 lugar onde retry seria ATIVAMENTE nocivo (dispararia uma segunda ligação).
 
+**Adendo (mesmo dia, 30 min depois):** o script ad-hoc que escrevi para
+CONFERIR o resultado da correção morreu com o mesmo
+`UND_ERR_CONNECT_TIMEOUT` — porque eu não usei o helper que acabara de criar.
+Reescrito com `fetchJsonWithRetry`, aguentou 3 timeouts seguidos e entregou o
+dado. Regra: **script descartável que fala com API externa usa o mesmo helper
+do script "de verdade"** — a rede não sabe que o seu script é temporário.
+
+**Adendo 2 — versão da Graph API não é detalhe:** o `POST /register` do número
+BR falhava com "(#200) does not exist / missing permissions" na `v21.0` (o
+padrão do repo) e funcionou de primeira na `v23.0`, com o MESMO token e os
+mesmos escopos. Erro de permissão da Meta pode ser, na verdade, endpoint não
+suportado naquela versão. **Antes de concluir "falta permissão", teste a
+versão mais nova** — e desconfie de mensagem de erro genérica da Graph API.
+
 **Rules:**
 - **Antes de escrever retry, pergunte por chamada: "se eu desistir aqui, o que
   já foi consumido e não volta?"** Recurso externo já gasto (chamada feita,

@@ -87,13 +87,18 @@ o código foi recuperado por fora. **Correção pendente no script:** retry +
 timeout maior nas chamadas à Twilio; hoje uma falha de rede queima o cooldown
 da Meta à toa.
 
-**Falta 1 passo, e ele NÃO passa por aqui:** o `POST /register` (que conecta o
-número à Cloud API) devolveu `(#200) permissão insuficiente` e o número segue
-`status: PENDING` com `platform_type: NOT_APPLICABLE`. O token atual não tem
-escopo para registrar número novo. Caminhos:
-- **Painel (recomendado, poucos cliques):** WhatsApp Manager → Configurações
-  da API → selecionar o +55 → Registrar, usando a PIN de dois fatores.
-- Ou gerar um token de sistema com `whatsapp_business_management` sobre a WABA.
+**✅ REGISTRADO (26/jul, 03:2x UTC).** Estado final na WABA:
+
+```
++55 11 5028-1932 · Stevi Agro · CONNECTED · VERIFIED · CLOUD_API
+```
+
+O `POST /register` falhava com `(#200) does not exist / missing permissions` na
+`v21.0` — **e funcionou de primeira na `v23.0`**, com o mesmo token e os mesmos
+escopos (`whatsapp_business_management` sobre a WABA, confirmado no
+debug_token). Ou seja: não era permissão, era endpoint não suportado naquela
+versão da Graph API. A mensagem de erro da Meta era enganosa. PIN usada: a
+`WHATSAPP_BR_2FA_PIN` do `.env`.
 
 **A PIN de dois fatores foi gerada e salva em `.env` como
 `WHATSAPP_BR_2FA_PIN`** (arquivo gitignored, confirmado). A Meta pede essa PIN
