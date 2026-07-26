@@ -68,7 +68,27 @@ Por segmento (alinhado ao flight-plan):
    (replied → call → partner → optout) e minerar SÓ contrastando ganhas vs
    perdidas (o learn.ts atual mina sem rótulo — ruído com verniz).
 
-## PRONTO PARA SUBMETER — 3 templates na Meta (copiar e colar)
+## ✅ SUBMETIDOS (25/jul, noite) — aguardando aprovação da Meta
+
+Os três foram submetidos via Graph API na WABA `1247524677467078`:
+
+| Template | ID | Categoria | Status |
+|---|---|---|---|
+| `stevi_parceria_v3` | 2130435884517337 | MARKETING | PENDING |
+| `stevi_parceria_coop_v2` | 1058490883508785 | MARKETING | PENDING |
+| `stevi_alerta_v1` | 1294531529225441 | UTILITY | PENDING |
+
+**Regra da Meta aprendida na rejeição:** variável não pode ficar no fim do
+corpo ("As variáveis não podem estar no início ou no fim do modelo"). O
+`stevi_alerta_v1` foi corrigido para terminar com um convite — que ainda por
+cima serve à estratégia reply-first (resposta abre a janela de 24h):
+`Stevi 🌱 aviso da sua lavoura: {{1}}. Me chama aqui se quiser entender o que dá pra fazer.`
+
+**Quando aprovarem**, setar na Vercel: `PROSPECT_TEMPLATE_NAME=stevi_parceria_v3`,
+`PROSPECT_COOP_TEMPLATE_NAME=stevi_parceria_coop_v2`,
+`WHATSAPP_TEMPLATE_ALERT=stevi_alerta_v1`.
+
+## Texto submetido (referência)
 
 WhatsApp Manager → Modelos de mensagem → Criar modelo. Os três resolvem, numa
 submissão só: o gap de disclosure que o gym achou, a copy reply-first que a

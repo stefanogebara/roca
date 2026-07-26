@@ -71,6 +71,36 @@ para testar — cap=0 no mesmo dia).
 **H4 — Template pausado/reprovado. REFUTADA.** Dois templates distintos falharam
 simultaneamente; canário de shape e status dos 4 templates está verde desde então.
 
+## Evidência nova da Graph API (25/jul, noite) — muda o quadro
+
+Sondei a conta ao vivo (somente leitura). O que apareceu:
+
+| Número | Nome | Status | name_status | Verificação |
+|---|---|---|---|---|
+| **+55 11 5028-1932** | Stevi Agro | **PENDING** | DECLINED | **NOT_VERIFIED** |
+| +1 970-550-9125 (produção) | Stevi Agro | CONNECTED | **DECLINED** | **EXPIRED** |
+| +1 555-943-4487 | Twin Me AI | CONNECTED | DECLINED | VERIFIED |
+
+1. **O número +55 JÁ EXISTE na WABA** (id `1183924088140958` — o mesmo
+   hardcoded em `scripts/otp-capture.mjs`). Ele foi comprado e registrado, e
+   o processo parou na **verificação por OTP**. O "chip +55" que o roadmap
+   listava como pendência de semanas é, na verdade, **um OTP de distância**.
+2. O número de produção está com **`name_status: DECLINED`** (confirma os 3
+   pedidos recusados de display name registrados no plano de prospecção) e
+   **`code_verification_status: EXPIRED`** — a verificação venceu.
+3. `quality_rating` GREEN e `status` CONNECTED: nada aqui indica punição por
+   qualidade — o que **enfraquece H2** (limite/tier) e mantém H1/H1b de pé.
+4. Analytics de 19-22/jul voltou **sem data points**: nenhuma conversa cobrada
+   foi aberta no período — consistente com mensagens que não chegaram a ser
+   entregues.
+
+**Não consegui recuperar o error code de 21/jul pela API** — a Cloud API não
+expõe o histórico de erro por mensagem depois do fato; o webhook era o único
+canal e o sistema o descartava (por isso a correção nº 1 abaixo). O painel do
+WhatsApp Manager segue sendo o caminho, mas as descobertas acima já reordenam
+o plano: **completar o OTP do +55 é ação de minutos e é o pré-requisito comum
+a H1 e H1b.**
+
 ## O que falta para fechar (diagnóstico de 15 minutos, fundador)
 
 1. **Ler o código de erro real**: Meta Business Manager → WhatsApp Manager →
