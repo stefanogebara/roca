@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fetchJsonWithRetry } from './otp-net.mjs';
 
 function loadEnv() {
   const envPath = join(dirname(fileURLToPath(import.meta.url)), '..', '.env');
@@ -41,17 +42,26 @@ async function warm() {
   await Promise.all([0, 0, 0, 0].map(() => fetch(TWIML).catch(() => {})));
 }
 
+const onRetry = ({ label, attempt, attempts, problem }) =>
+  log(`  ↻ ${label}: ${problem} (tentativa ${attempt}/${attempts})`);
+
 async function requestCode() {
   const body = new URLSearchParams({ code_method: 'VOICE', language: 'en_US', access_token: META_TOKEN });
-  const r = await fetch(`https://graph.facebook.com/v21.0/${PNID}/request_code`, { method: 'POST', body });
-  return r.json();
+  // No retry here on purpose: a second request_code would burn Meta's cooldown.
+  // A transport failure before the call is placed is safe to surface.
+  return fetchJsonWithRetry(
+    `https://graph.facebook.com/v21.0/${PNID}/request_code`,
+    { method: 'POST', body },
+    { attempts: 1, timeoutMs: 30000, label: 'meta request_code' }
+  );
 }
 
 async function latestRecordingAfter(sinceMs) {
-  const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TW_SID}/Recordings.json?PageSize=3`, {
-    headers: { Authorization: twAuth },
-  });
-  const j = await r.json();
+  const j = await fetchJsonWithRetry(
+    `https://api.twilio.com/2010-04-01/Accounts/${TW_SID}/Recordings.json?PageSize=3`,
+    { headers: { Authorization: twAuth } },
+    { label: 'twilio recordings', onRetry }
+  );
   const recs = j.recordings || [];
   for (const rec of recs) {
     const created = Date.parse(rec.date_created);
@@ -61,11 +71,11 @@ async function latestRecordingAfter(sinceMs) {
 }
 
 async function transcriptionText(recSid) {
-  const r = await fetch(
+  const j = await fetchJsonWithRetry(
     `https://api.twilio.com/2010-04-01/Accounts/${TW_SID}/Recordings/${recSid}/Transcriptions.json`,
-    { headers: { Authorization: twAuth } }
+    { headers: { Authorization: twAuth } },
+    { label: 'twilio transcription', onRetry }
   );
-  const j = await r.json();
   const t = (j.transcriptions || [])[0];
   return t ? { status: t.status, text: t.transcription_text || '' } : null;
 }
@@ -79,14 +89,30 @@ function extractCode(text) {
 
 async function captureAfterCall(reqMs) {
   // Meta places the call within ~30s; recording + transcription follow.
+  //
+  // Past this point the call ALREADY happened: the code exists in a recording,
+  // and abandoning on a network error means burning Meta's cooldown for
+  // nothing (that's exactly what happened on 26/07). So every poll is wrapped
+  // — transport failures cost one iteration, never the run.
   for (let i = 1; i <= 25; i++) {
     await sleep(15000);
-    const rec = await latestRecordingAfter(reqMs);
+    let rec, tr;
+    try {
+      rec = await latestRecordingAfter(reqMs);
+    } catch (e) {
+      log(`  capture ${i}: rede falhou ao listar gravações (${e.message}) — segue tentando`);
+      continue;
+    }
     if (!rec) {
       log(`  capture ${i}: no fresh recording yet`);
       continue;
     }
-    const tr = await transcriptionText(rec.sid);
+    try {
+      tr = await transcriptionText(rec.sid);
+    } catch (e) {
+      log(`  capture ${i}: rede falhou na transcrição (${e.message}) — segue tentando`);
+      continue;
+    }
     if (!tr) {
       log(`  capture ${i}: rec ${rec.sid} (dur ${rec.duration}s) transcription not created yet`);
       continue;
@@ -122,7 +148,19 @@ async function main() {
     log(`attempt ${attempt}: warming + request_code`);
     await warm();
     const reqMs = Date.now();
-    const res = await requestCode();
+    let res;
+    try {
+      res = await requestCode();
+    } catch (e) {
+      // Transport failure BEFORE the call was placed: nothing was consumed on
+      // Meta's side, so a short spacing and another try is safe.
+      log(`request_code não saiu (rede): ${e.message}`);
+      if (attempt < 5) {
+        log('esperando 2 min e tentando de novo...');
+        await sleep(2 * 60 * 1000);
+      }
+      continue;
+    }
     if (res.success) {
       log('request_code SUCCESS — Meta is calling the number now');
       const code = await captureAfterCall(reqMs);
