@@ -2,6 +2,47 @@
 
 Append-only log of mistakes and the rules that prevent them. Newest first.
 
+## 2026-07-26 — A rede é parte do contrato: retry vai onde o custo de desistir é externo, não onde é conveniente
+
+**Context:** `scripts/otp-capture.mjs` pede à Meta que ligue para o número BR,
+espera a Twilio gravar/transcrever a chamada e extrai o código de 6 dígitos.
+Um único `UND_ERR_CONNECT_TIMEOUT` (deadline de 10s do undici, sem retry)
+escapou do loop de poll e matou o processo — **depois** de a Meta já ter
+ligado. O código existia numa gravação que ninguém leu; a chamada foi
+recuperada na mão consultando a Twilio por fora, e o cooldown da Meta queimou
+à toa.
+
+**What went wrong:** o script tratava toda chamada de rede como igual. Mas o
+custo de desistir muda radicalmente ao longo do fluxo: ANTES da ligação, uma
+falha de rede não consome nada externo (dá para tentar de novo em 2 min);
+DEPOIS da ligação, o recurso escasso (o cooldown, e um código com validade de
+minutos) já foi gasto — ali desistir é jogar fora o que já se pagou. Retry
+uniforme, ou nenhum, ignora essa assimetria. Bônus: `request_code` é o único
+lugar onde retry seria ATIVAMENTE nocivo (dispararia uma segunda ligação).
+
+**Rules:**
+- **Antes de escrever retry, pergunte por chamada: "se eu desistir aqui, o que
+  já foi consumido e não volta?"** Recurso externo já gasto (chamada feita,
+  cobrança lançada, cooldown iniciado, token de uso único emitido) ⇒ a partir
+  daquele ponto, falha de transporte custa uma iteração, nunca a execução:
+  `try/catch` por iteração dentro do loop, não no topo.
+- **Onde o retry duplicaria um efeito externo, fixe `attempts: 1` com
+  comentário** dizendo por quê. Retry não é virtude por si; num `request_code`,
+  `charge`, ou `send`, é um bug.
+- Timeout explícito em TODO fetch: o default de 10s do undici é curto para
+  APIs de terceiros em rede ruim. Erro de rede deve nomear a causa
+  (`ENOTFOUND`, `UND_ERR_CONNECT_TIMEOUT`) — leia `err.cause.code` **e**
+  `err.code`; ler só um dos dois transforma o diagnóstico num "Error" inútil
+  (foi o bug que os próprios testes desta correção pegaram).
+- **Teste com a falha injetada, não com o caminho feliz.** Rodar o fluxo bom
+  não passa perto do código de retry: ele só acorda quando a rede quebra. Se o
+  teste não consegue falhar, não prova nada. Um harness com fetch injetado
+  (`fetchImpl`/`sleepImpl`) verifica em milissegundos o que só apareceria numa
+  madrugada com rede ruim.
+- Script operacional que consome recurso externo escasso merece o mesmo rigor
+  de teste que código de produção — o prejuízo de um bug ali é medido em horas
+  de cooldown e tentativas humanas, não em pixels.
+
 ## 2026-07-25 — Fresh queries are not enough: verify WHO the rows belong to before building strategy on them
 
 **Context:** The 25/jul audit + roadmap + traction baseline all treated "5
