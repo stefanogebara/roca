@@ -71,6 +71,39 @@ para testar — cap=0 no mesmo dia).
 **H4 — Template pausado/reprovado. REFUTADA.** Dois templates distintos falharam
 simultaneamente; canário de shape e status dos 4 templates está verde desde então.
 
+## ✅ Número +55 VERIFICADO (26/jul, 02:37 UTC)
+
+O OTP foi capturado e aceito: `+55 11 5028-1932` está com
+**`code_verification_status: VERIFIED`**.
+
+Como foi: `otp-capture.mjs 0` → Meta ligou (`request_code SUCCESS`) → a Twilio
+gravou no `/api/twiml-otp` → transcrição deu o código, confirmado em duas
+gravações independentes → `scripts/otp-verify.mjs` (novo) fez o `verify_code`.
+
+**Pedra no caminho registrada:** o `otp-capture.mjs` morreu no meio
+(`UND_ERR_CONNECT_TIMEOUT` ao falar com a Twilio — rede local, timeout de 10s
+sem retry). A chamada da Meta já tinha acontecido, então a gravação existia e
+o código foi recuperado por fora. **Correção pendente no script:** retry +
+timeout maior nas chamadas à Twilio; hoje uma falha de rede queima o cooldown
+da Meta à toa.
+
+**Falta 1 passo, e ele NÃO passa por aqui:** o `POST /register` (que conecta o
+número à Cloud API) devolveu `(#200) permissão insuficiente` e o número segue
+`status: PENDING` com `platform_type: NOT_APPLICABLE`. O token atual não tem
+escopo para registrar número novo. Caminhos:
+- **Painel (recomendado, poucos cliques):** WhatsApp Manager → Configurações
+  da API → selecionar o +55 → Registrar, usando a PIN de dois fatores.
+- Ou gerar um token de sistema com `whatsapp_business_management` sobre a WABA.
+
+**A PIN de dois fatores foi gerada e salva em `.env` como
+`WHATSAPP_BR_2FA_PIN`** (arquivo gitignored, confirmado). A Meta pede essa PIN
+ao registrar e em re-registros futuros — não a perca.
+
+**Depois de registrado:** apontar `WHATSAPP_CLOUD_PHONE_NUMBER_ID` para
+`1183924088140958` na Vercel e reconfigurar o webhook da Meta para o mesmo
+endpoint. Aí o produto passa a falar por um número brasileiro — o
+pré-requisito comum a H1 e H1b.
+
 ## Evidência nova da Graph API (25/jul, noite) — muda o quadro
 
 Sondei a conta ao vivo (somente leitura). O que apareceu:
