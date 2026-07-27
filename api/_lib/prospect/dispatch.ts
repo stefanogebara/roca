@@ -11,6 +11,7 @@ import {
   clampDailyCap,
   isBusinessHours,
   brtDayStartIso,
+  sendablePhone,
   BATCH_SIZE,
   BATCH_DELAY_MS,
 } from './core';
@@ -267,7 +268,9 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
 
   let breakerError: string | null = null;
   for (const [idx, p] of batch.entries()) {
-    const phone = p.phone as string; // eligibleToSend guarantees non-null
+    // The enriched mobile wins over the sourced landline; eligibleToSend
+    // already guaranteed one of them is messageable.
+    const phone = sendablePhone(p) as string;
     if (dryRun) {
       recipients.push({ id: p.id, name: p.name, phone, result: 'planned' });
       continue;
@@ -436,7 +439,16 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
 
   // Kind gating applies to bumps too — the bump template carries the same
   // lead-gen pitch that's wrong for coops/revendas.
-  const eligible = due.filter((p) => p.phone && !optouts.has(p.phone) && kindAllowed(p.kind));
+  // The bump must land on the SAME number the intro did — sendablePhone, not
+  // the sourced landline. Opt-out is checked on both so a "SAIR" on either
+  // record silences the follow-up.
+  const eligible = due.filter(
+    (p) =>
+      sendablePhone(p) &&
+      !optouts.has(sendablePhone(p) as string) &&
+      !(p.phone && optouts.has(p.phone)) &&
+      kindAllowed(p.kind)
+  );
   const cap = capInfo.cap;
   const batch = planBatch(eligible, { dailyCap: cap, sentToday });
   if (!batch.length) return { skipped: eligible.length ? 'daily_cap_reached' : null, due: eligible.length, sent: 0, failed: 0 };
@@ -465,7 +477,7 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
     const params = buildBumpParams(p);
     let wamid: string;
     try {
-      ({ wamid } = await sendProspectTemplate(p.phone as string, BUMP_TEMPLATE, TEMPLATE_LANG, params));
+      ({ wamid } = await sendProspectTemplate(sendablePhone(p) as string, BUMP_TEMPLATE, TEMPLATE_LANG, params));
     } catch (e) {
       failed++;
       log.error(`bump send failed for ${p.id}:`, (e as Error).message);

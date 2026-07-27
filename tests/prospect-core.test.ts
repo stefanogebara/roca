@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizePhoneBR,
   isMobileBR,
+  sendablePhone,
   eligibleToSend,
   isBusinessHours,
   planBatch,
@@ -147,5 +148,22 @@ describe('eligibleToSend agora exige celular', () => {
   });
   it('celular segue elegível', () => {
     expect(eligibleToSend({ ...(base as object), phone: '+5535999429176' } as never, new Set())).toBe(true);
+  });
+});
+
+describe('sendablePhone — o celular enriquecido é preferido ao fixo do Places', () => {
+  it('usa o mobile_phone quando existe', () => {
+    expect(sendablePhone({ phone: '+553532142166', mobile_phone: '+5535999887766' } as never))
+      .toBe('+5535999887766');
+  });
+  it('sem mobile, usa o phone se for celular', () => {
+    expect(sendablePhone({ phone: '+5535999429176', mobile_phone: null } as never))
+      .toBe('+5535999429176');
+  });
+  it('fixo sem enriquecimento → não há número enviável', () => {
+    expect(sendablePhone({ phone: '+553532142166', mobile_phone: null } as never)).toBeNull();
+  });
+  it('mobile_phone inválido (alguém colou um fixo) NÃO é aceito', () => {
+    expect(sendablePhone({ phone: '+553532142166', mobile_phone: '+553532999999' } as never)).toBeNull();
   });
 });

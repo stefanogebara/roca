@@ -31,6 +31,9 @@ export type ProspectStatus =
 
 export interface ProspectLike {
   phone: string | null;
+  /** Mobile found by enrichment (site/Instagram), when the sourced phone is a
+   * landline. Preferred for sending — see sendablePhone. */
+  mobile_phone?: string | null;
   wa_status: WaStatus;
   status: ProspectStatus;
   send_status: string | null;
@@ -84,6 +87,24 @@ export function isMobileBR(phone: string | null | undefined): boolean {
   return digits[4] === '9'; // 55 + DD(2) + first subscriber digit
 }
 
+/**
+ * The number we can actually message: the enriched mobile when we have one,
+ * else the sourced phone if it happens to be a mobile. Null means "this
+ * prospect is not reachable on WhatsApp yet" — it stays in the base for
+ * enrichment instead of being deleted.
+ *
+ * `mobile_phone` is validated too: a landline pasted into that column by hand
+ * must not resurrect an unreachable prospect.
+ */
+export function sendablePhone(p: {
+  phone?: string | null;
+  mobile_phone?: string | null;
+}): string | null {
+  if (isMobileBR(p.mobile_phone)) return p.mobile_phone as string;
+  if (isMobileBR(p.phone)) return p.phone as string;
+  return null;
+}
+
 /** UTC ISO for the start of the current BRT calendar day (for the daily cap). */
 export function brtDayStartIso(now: Date): string {
   const shifted = new Date(now.getTime() + BRT_OFFSET_MIN * 60_000);
@@ -121,8 +142,11 @@ export function eligibleToSend(p: ProspectLike, optouts: Set<string>): boolean {
   // Landlines can't hold WhatsApp: sending is a guaranteed 131026 that costs
   // reputation and teaches us nothing. They stay in the base for enrichment
   // (site/Instagram usually list a real mobile), just never get dispatched.
-  if (!isMobileBR(p.phone)) return false;
-  if (optouts.has(p.phone)) return false;
+  const reachable = sendablePhone(p);
+  if (!reachable) return false;
+  // Opt-out is checked on BOTH numbers: someone who said SAIR on the landline
+  // record must not be reachable through the enriched mobile.
+  if (optouts.has(reachable) || optouts.has(p.phone)) return false;
   if (p.send_status != null) return false; // already sent/delivered/failed — never re-blast
   return true;
 }
