@@ -308,3 +308,63 @@ that bundled my files with theirs. Nothing was lost — but it was luck-adjacent
 - **Don't fight a concurrent committer.** If commit boundaries scramble (a commit appears
   then vanishes, staged changes get unstaged), stop, snapshot, and surface — don't keep
   issuing git writes into a moving target.
+
+---
+
+## Lição — Não confunda P(A|B) com P(B|A) antes de bloquear metade da base
+**Data:** 27/jul/2026 · **Custo:** um filtro que teria matado 9 das 14 entregas que funcionavam
+
+**O que aconteceu:** Analisando as falhas de disparo, vi que *todo* erro
+`131026 Message undeliverable` tinha vindo de um telefone fixo, e nenhum de
+celular. Concluí "fixo não tem WhatsApp" e implementei um filtro que bloqueava
+toda linha fixa. A base é **71% fixo** — então "quase tudo veio de um fixo" era
+o esperado por acaso, não sinal. Eu tinha medido P(fixo | falhou) e usado como
+se fosse P(falhou | fixo).
+
+Os números que eu não tinha olhado, e que levam 30 segundos:
+- 9 das 14 entregas bem-sucedidas foram para fixos
+- taxa de entrega: fixo 39%, celular 50%
+- as falhas eram dominadas por `131042` (cobrança **nossa**), que atinge os dois
+
+O site de uma das coops publica `wa.me` para o **próprio fixo** — WhatsApp
+Business aceita linha fixa (verificação por chamada de voz).
+
+**Regras:**
+- Antes de bloquear uma classe inteira, meça a taxa **dentro** da classe, não a
+  composição das falhas. Se a classe é maioria da base, ela será maioria de
+  qualquer subconjunto — inclusive dos erros.
+- Sempre pergunte: qual é a taxa de SUCESSO desta classe? Se eu tivesse
+  perguntado isso, o filtro nunca teria sido escrito.
+- Filtro de **evidência** (este número específico voltou 131026) > filtro de
+  **classe** (números deste tipo costumam falhar). O primeiro é verificável e
+  auto-corrige; o segundo é um preconceito codificado.
+- Erro de plataforma que fala de NÓS (cobrança, limite, template) nunca pode
+  condenar o destinatário — senão a base encolhe em silêncio por culpa nossa.
+
+## Lição — Dois agentes de pesquisa discordando é o produto, não o problema
+**Data:** 27/jul/2026
+
+**O que aconteceu:** Três agentes buscaram WhatsApp de cooperativas. Onde as
+buscas se sobrepuseram, o segundo agente derrubou dois achados do primeiro —
+com evidência melhor: baixou a imagem do banner e provou que o "WhatsApp da
+Minasul" era anúncio de trator Mahindra; removeu comentários HTML e provou que
+o celular da Coopama estava **dentro de um comentário** (número morto,
+substituído pelo fixo). Sem a sobreposição, teríamos mandado mensagem para um
+número morto e para uma revenda de tratores.
+
+Todos os três relataram a mesma armadilha independentemente: **resumos de busca
+alucinam** um rótulo de "WhatsApp" em cima de um fixo, e diretórios
+(econodata, listatudo) desenham um botão de WhatsApp sobre o telefone fixo da
+ficha.
+
+**Regras:**
+- Em pesquisa de dados que vira ação (mandar mensagem, ligar, cobrar), planeje
+  **sobreposição** entre agentes. O custo do agente redundante é menor que o de
+  um dado errado que sai como mensagem.
+- Exija do agente: a URL exata + o texto verbatim que ele viu. "Achei o
+  WhatsApp da empresa X" sem citação é palpite.
+- Instrua explicitamente contra as armadilhas conhecidas — inclua no prompt o
+  que agentes anteriores erraram. Os três só escaparam porque o aviso foi passado
+  adiante.
+- Nunca deixe o agente completar dígito faltante (9º dígito, DDD ausente). Todos
+  os três encontraram números truncados e todos os três acertaram em recusar.
