@@ -368,3 +368,29 @@ ficha.
   adiante.
 - Nunca deixe o agente completar dígito faltante (9º dígito, DDD ausente). Todos
   os três encontraram números truncados e todos os três acertaram em recusar.
+
+## Lição — Snippet de busca não tem data; a fonte tem
+**Data:** 27/jul/2026
+
+**O que aconteceu:** Procurando o WhatsApp da Rede do Campo, o Google devolveu
+um resultado com o número bem formatado, o endereço certo e o nome certo.
+Parecia perfeito. Fui à fonte: era legenda de um post de **5 anos atrás**. A bio
+atual daquele perfil só tem fixo. O número vivo estava em **outro** perfil da
+mesma loja — e só apareceu ao expandir a bio (o "... more" do Instagram esconde
+exatamente a linha do telefone).
+
+No mesmo dia, a Agro União mostrou o inverso: o `wa.me` da própria bio deles
+está quebrado (`553588240383`, 12 dígitos, faltando o 9), enquanto o número
+correto está no TEXTO da bio, ao lado. Quem confiasse só no link erraria; quem
+confiasse só no snippet erraria de outro jeito.
+
+**Regras:**
+- Snippet de busca é ponteiro, não evidência. Ele não carrega data e o motor
+  não distingue "bio atual" de "post de 2021". **Sempre abra a fonte.**
+- Em perfil social, **expanda a bio** antes de concluir que não há telefone. O
+  truncamento corta justamente onde o telefone costuma estar.
+- Quando link e texto discordam, prefira o que está **completo e bem formado**,
+  e registre na fonte qual dos dois você usou e por quê. Não complete dígito de
+  nenhum dos lados.
+- Um dado com endereço e nome certos ainda pode estar velho. O que valida é a
+  **fonte atual**, não a plausibilidade.
