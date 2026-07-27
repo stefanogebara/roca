@@ -114,6 +114,36 @@ Os 8 prospects voltam à fila — nada chegou até eles.
    SUCESSO na API, com a negativa vindo por callback segundos depois, ele não
    viu nada. Com o novo, o lote teria parado no 3º.
 
+## ⚠️ A "segunda causa" (fixo não tem WhatsApp) era ERRO DE INFERÊNCIA
+
+Ainda em 27/jul concluí, olhando os `131026`, que **fixo não recebe WhatsApp** —
+todo `131026` tinha vindo de um fixo, nenhum de celular — e implementei um
+filtro que bloqueava toda linha fixa. **Isso estava errado, e o filtro teria
+matado a maior parte do que funcionava.**
+
+O erro: medi P(fixo | falhou) e usei como se fosse P(falhou | fixo). A base é
+**71% fixo**, então quase tudo "vem de um fixo" por acaso.
+
+Os números que fecham a questão:
+
+| | entregues | falhados | taxa de entrega |
+|---|---|---|---|
+| **fixo** | **9** | 14 | 39% |
+| celular | 5 | 5 | 50% |
+
+**9 das nossas 14 entregas bem-sucedidas foram para fixos.** WhatsApp Business
+aceita linha fixa (verificação por chamada de voz) — a coccamig publica
+`wa.me/553532142166` para o próprio fixo, e o envio para ele falhou por
+**131042 (cobrança)**, nunca por inalcançável.
+
+**Correção (commit `f6c00f1`):** o portão passou de CLASSE para EVIDÊNCIA.
+Só `131026` condena um número; `131042`/`131049`/`132000` falam de NÓS e não
+podem condenar o destinatário. `isMobileBR` virou sinal de painel, não portão.
+
+**Efeito na base elegível:** 24 → **81** (nos kinds ativos: 2 → 44). E 17
+prospects marcados `failed` sem nunca terem recebido nada voltaram à fila —
+foram queimados pela nossa cobrança, não pelo número deles.
+
 ## ✅ Número +55 VERIFICADO (26/jul, 02:37 UTC)
 
 O OTP foi capturado e aceito: `+55 11 5028-1932` está com
