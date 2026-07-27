@@ -118,3 +118,28 @@ describe('learning loop', () => {
     expect(playbookBlock([])).toBeNull();
   });
 });
+
+describe('templates v3 / coop_v2 (aprovados 27/jul) — compatibilidade com o registry', () => {
+  it('buildTemplateParams com arity 2 devolve [nome, cidade] — o v3 pede exatamente isso', () => {
+    // Bug pego antes de religar: com paramCount=2 o builder caía no ramo de 1
+    // param e mandava só o nome. A guarda fail-closed abortaria o dispatch
+    // (template_shape_mismatch), do mesmo jeito que no outage #132000.
+    const p = { name: 'Rural Center Ltda', kind: 'revenda', city: 'Machado' };
+    const v3 = buildTemplateParams(p, 2);
+    expect(v3).toHaveLength(2);
+    expect(v3[0]).toBe('Rural Center'); // shortName tira o sufixo societário
+    expect(v3[1]).toBe('Machado');
+  });
+
+  it('cidade ausente cai no default seguro, sem furar a arity', () => {
+    const v3 = buildTemplateParams({ name: 'Agro X', kind: 'consultoria', city: null }, 2);
+    expect(v3).toHaveLength(2);
+    expect(v3[1]).toBe('Sul de Minas');
+  });
+
+  it('o registry conhece os dois novos com 2 params (senão o dispatch aborta)', async () => {
+    const { registryParamCount } = await import('../api/_lib/prospect/template');
+    expect(registryParamCount('stevi_parceria_v3')).toBe(2);
+    expect(registryParamCount('stevi_parceria_coop_v2')).toBe(2);
+  });
+});

@@ -9,7 +9,7 @@
  * faked to a BRT business-hours instant so runBumpDispatch (which has no
  * `force` escape hatch) can run.
  */
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 
 vi.mock('../api/_lib/prospect/db', () => ({
   loadReadyProspects: vi.fn(),
@@ -430,5 +430,46 @@ describe('coop params', () => {
   it('buildCoopParams = [shortName, kindPhrase] — exactly the 2 the template takes', () => {
     expect(buildCoopParams({ name: 'Coopercotton - Cooperativa de MT', kind: 'cooperativa' }))
       .toEqual(['Coopercotton', 'a cooperativa']);
+  });
+});
+
+describe('templates v3/coop_v2: env, params e render (pré-religada, 27/jul)', () => {
+  const prev = { t: process.env.PROSPECT_TEMPLATE_NAME, c: process.env.PROSPECT_COOP_TEMPLATE_NAME };
+  afterEach(() => {
+    process.env.PROSPECT_TEMPLATE_NAME = prev.t ?? '';
+    process.env.PROSPECT_COOP_TEMPLATE_NAME = prev.c ?? '';
+    vi.resetModules();
+  });
+
+  it('templateForKind respeita PROSPECT_COOP_TEMPLATE_NAME — o canário vigiava a env e o envio ignorava', async () => {
+    process.env.PROSPECT_COOP_TEMPLATE_NAME = 'stevi_parceria_coop_v2';
+    process.env.PROSPECT_TEMPLATE_NAME = 'stevi_parceria_v3';
+    vi.resetModules();
+    const { templateForKind } = await import('../api/_lib/prospect/dispatch');
+    expect(templateForKind('cooperativa')).toBe('stevi_parceria_coop_v2');
+    expect(templateForKind('revenda')).toBe('stevi_parceria_coop_v2');
+    expect(templateForKind('agronomo')).toBe('stevi_parceria_v3');
+  });
+
+  it('coop_v2 recebe o NOME no slot 2 (o texto diz "pro time da {{2}}")', async () => {
+    const { buildCoopParams } = await import('../api/_lib/prospect/personalize');
+    const p = { name: 'Coopercafé - Núcleo Machado', kind: 'cooperativa' };
+    // v1: {{2}} é a frase do kind ("a cooperativa"). v2: é o nome da organização
+    // — mandar kindPhrase produziria "pro time da a cooperativa".
+    expect(buildCoopParams(p, 'stevi_parceria_coop_v1')[1]).toBe('a cooperativa');
+    const v2 = buildCoopParams(p, 'stevi_parceria_coop_v2');
+    expect(v2).toHaveLength(2);
+    expect(v2[1]).toBe('Coopercafé');
+    expect(v2[1]).not.toMatch(/^a /);
+  });
+
+  it('o render do painel mostra o texto da versão certa', async () => {
+    const { renderCoopText, renderTemplateText } = await import('../api/_lib/prospect/personalize');
+    expect(renderCoopText(['Coopercafé', 'Coopercafé'], 'stevi_parceria_coop_v2')).toMatch(
+      /assistente digital.*pro time da Coopercafé/s
+    );
+    expect(renderTemplateText(['Rural Center', 'Machado'])).toMatch(
+      /assistente digital.*regi[ãa]o de Machado.*chega at[ée] voc[êe]s como/s
+    );
   });
 });

@@ -70,9 +70,15 @@ const TEMPLATE_NAME = process.env.PROSPECT_TEMPLATE_NAME || V2_NAME;
 const TEMPLATE_LANG = 'pt_BR';
 
 /** Which template a prospect kind receives. Pure; exported for tests. */
+// Distribution template, env-driven like the intro one. It used to be the
+// hardcoded constant while the canary read the env — so the canary could be
+// watching coop_v2's shape while every send still used coop_v1. Same family as
+// the Jul/13 outage: what we monitor must be what we send.
+const COOP_TEMPLATE_NAME = process.env.PROSPECT_COOP_TEMPLATE_NAME || COOP_NAME;
+
 export function templateForKind(kind: string | null): string {
   const k = (kind ?? '').toLowerCase();
-  return k === 'cooperativa' || k === 'coop' || k === 'revenda' ? COOP_NAME : TEMPLATE_NAME;
+  return k === 'cooperativa' || k === 'coop' || k === 'revenda' ? COOP_TEMPLATE_NAME : TEMPLATE_NAME;
 }
 // Gentle spacing between individual sends in a batch (avoids a burst that spikes
 // the block/report rate). Skipped in dryRun.
@@ -128,7 +134,7 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     let error: string | null = null;
     let badTemplate = TEMPLATE_NAME;
     try {
-      for (const name of [TEMPLATE_NAME, COOP_NAME]) {
+      for (const name of [TEMPLATE_NAME, COOP_TEMPLATE_NAME]) {
         const reason = await templateShapeError(name);
         if (reason) {
           badTemplate = name;
@@ -252,10 +258,10 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     // Per-kind routing: coops/revendas get the distribution pitch, everyone
     // else the intro. Param count comes from the registry for THAT template.
     const tpl = templateForKind(p.kind);
-    const params =
-      tpl === COOP_NAME
-        ? buildCoopParams(p)
-        : buildTemplateParams(p, registryParamCount(tpl) ?? 3);
+    const isCoopTpl = tpl === COOP_TEMPLATE_NAME;
+    const params = isCoopTpl
+      ? buildCoopParams(p, tpl)
+      : buildTemplateParams(p, registryParamCount(tpl) ?? 3);
     try {
       ({ wamid } = await sendProspectTemplate(phone, tpl, TEMPLATE_LANG, params));
     } catch (e) {
@@ -277,7 +283,7 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
       sent++;
       // Thread completeness: the painel conversation view starts with the
       // template that actually went out. Best-effort — never fails the batch.
-      const threadText = tpl === COOP_NAME ? renderCoopText(params) : renderTemplateText(params);
+      const threadText = isCoopTpl ? renderCoopText(params, tpl) : renderTemplateText(params);
       await logProspectMessage(p.id, 'out', 'text', threadText).catch(() => {});
     } catch (e) {
       sent++; // it did send — count it, then abort to avoid a duplicate next run

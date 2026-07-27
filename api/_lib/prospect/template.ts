@@ -20,6 +20,10 @@ export const V2_NAME = 'stevi_parceria_v2';
 export const BUMP_NAME = 'stevi_parceria_bump';
 export const LEAD_NAME = 'stevi_lead_v1';
 export const COOP_NAME = 'stevi_parceria_coop_v1';
+/** Reply-first rewrites approved 27/jul: declare the AI in the first touch and
+ * ask ONE question instead of pitching (pitch-first measured <5% reply). */
+export const V3_NAME = 'stevi_parceria_v3';
+export const COOP_V2_NAME = 'stevi_parceria_coop_v2';
 
 const FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
 
@@ -41,6 +45,29 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
       'e quando o produtor precisa de receituário, a gente indica um agrônomo parceiro da região. ' +
       'Faz sentido trocar uma ideia rápida sobre parceria?',
     example: ['Agro Forte', 'atendem produtores no dia a dia', 'Varginha'],
+  },
+  // Intro reply-first (aprovado 27/jul) — {{1}}=name, {{2}}=city. Declares the
+  // AI up front (the gym found the old intro reading as a person) and asks one
+  // question; the answer opens the free 24h window, outside the per-user
+  // marketing cap. Bodies here must match the APPROVED text exactly — the shape
+  // guard compares against what Meta has.
+  [V3_NAME]: {
+    body:
+      'Oi, {{1}}! Sou a Vitória, assistente digital da equipe da Stevi 🌱 Pergunta rápida: quando um ' +
+      'cafeicultor da região de {{2}} precisa de receituário e não tem agrônomo por perto, ele chega até ' +
+      'vocês como? Pergunto porque a gente recebe esses pedidos no WhatsApp e queria saber se faz sentido ' +
+      'indicar vocês.',
+    example: ['Rural Center', 'Machado'],
+  },
+  // Distribution pitch reply-first (aprovado 27/jul) — {{1}}=name, {{2}}=name
+  // again ("pro time da {{2}}"): the slot takes the ORGANIZATION's name, not
+  // kindPhrase — "pro time da a cooperativa" would be broken Portuguese.
+  [COOP_V2_NAME]: {
+    body:
+      'Oi, {{1}}! Sou a Vitória, assistente digital da Stevi 🌱 A gente atende cafeicultores no WhatsApp e ' +
+      'devolve o caso técnico organizado pro time da {{2}} — não substitui ninguém. Posso te mandar um ' +
+      'exemplo real de caso pra você avaliar?',
+    example: ['Coopercafé', 'Coopercafé'],
   },
   // D+3 bump for never-repliers — {{1}}=name, {{2}}=city.
   [BUMP_NAME]: {

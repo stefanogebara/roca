@@ -19,6 +19,11 @@
 
 import type { ProspectRow } from './db';
 
+/** Name of the reply-first distribution template. Kept as a local literal (not
+ * imported from template.ts) so this module stays free of that import cycle;
+ * the registry there is the single source of the BODY text. */
+const COOP_V2 = 'stevi_parceria_coop_v2';
+
 /** Natural short name: strips corporate suffixes and parentheticals. */
 export function shortName(name: string): string {
   return (
@@ -62,7 +67,13 @@ export function buildTemplateParams(
   paramCount: number
 ): string[] {
   const name = shortName(p.name);
-  if (paramCount >= 3) return [name, kindHook(p.kind), (p.city ?? 'Sul de Minas').slice(0, 40)];
+  const city = (p.city ?? 'Sul de Minas').slice(0, 40);
+  // v2 (3): nome + gancho do kind + cidade. v3 (2): nome + cidade — a copy
+  // reply-first cortou o gancho e faz UMA pergunta sobre a região. Sem este
+  // ramo, arity 2 caía no de 1 e o shape guard abortava o dispatch (a proteção
+  // que nasceu do outage #132000 faria seu trabalho, mas nada sairia).
+  if (paramCount >= 3) return [name, kindHook(p.kind), city];
+  if (paramCount === 2) return [name, city];
   return [name.slice(0, 60)];
 }
 
@@ -81,12 +92,26 @@ export function kindPhrase(kind: string | null): string {
 }
 
 /** Params for the distribution template (coops/revendas): {{1}}=name, {{2}}=kind phrase. */
-export function buildCoopParams(p: Pick<ProspectRow, 'name' | 'kind'>): string[] {
-  return [shortName(p.name), kindPhrase(p.kind)];
+export function buildCoopParams(
+  p: Pick<ProspectRow, 'name' | 'kind'>,
+  templateName?: string
+): string[] {
+  const name = shortName(p.name);
+  // coop_v2 ("…pro time da {{2}}") takes the ORGANIZATION's name in slot 2;
+  // sending kindPhrase there would render "pro time da a cooperativa".
+  if (templateName === COOP_V2) return [name, name];
+  return [name, kindPhrase(p.kind)];
 }
 
 /** Painel-thread rendering of the distribution template — sync with template.ts. */
-export function renderCoopText(params: string[]): string {
+export function renderCoopText(params: string[], templateName?: string): string {
+  if (templateName === COOP_V2) {
+    return (
+      `Oi, ${params[0]}! Sou a Vitória, assistente digital da Stevi 🌱 A gente atende cafeicultores no ` +
+      `WhatsApp e devolve o caso técnico organizado pro time da ${params[1]} — não substitui ninguém. ` +
+      `Posso te mandar um exemplo real de caso pra você avaliar?`
+    );
+  }
   return (
     `Oi! Aqui é a Vitória, da Stevi 🌱 Falo com a ${params[0]}? A Stevi é uma assistente gratuita de WhatsApp ` +
     `que faz triagem agronômica pra cafeicultores — foto de praga, janela de pulverização, alerta de geada. ` +
@@ -116,6 +141,15 @@ export function renderBumpText(params: string[]): string {
  * approved template texts — keep in sync when a new template version ships.
  */
 export function renderTemplateText(params: string[]): string {
+  // v3 (2 params): reply-first — declares the AI and asks one question.
+  if (params.length === 2) {
+    return (
+      `Oi, ${params[0]}! Sou a Vitória, assistente digital da equipe da Stevi 🌱 Pergunta rápida: quando um ` +
+      `cafeicultor da região de ${params[1]} precisa de receituário e não tem agrônomo por perto, ele chega ` +
+      `até vocês como? Pergunto porque a gente recebe esses pedidos no WhatsApp e queria saber se faz ` +
+      `sentido indicar vocês.`
+    );
+  }
   if (params.length >= 3) {
     return (
       `Oi! Aqui é a Vitória, da Stevi 🌱 Falo com a ${params[0]}? Vi que vocês ${params[1]} na região de ${params[2]}. ` +
