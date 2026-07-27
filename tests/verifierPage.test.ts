@@ -52,3 +52,26 @@ describe('verifierHtml', () => {
     expect(h).toContain('&lt;script&gt;');
   });
 });
+
+describe('declaração de operadores (LGPD art. 9º/33)', () => {
+  it('nomeia quem mais processa os dados, incluindo a Kapso e a IA no exterior', () => {
+    const h = verifierHtml(base);
+    expect(h).toMatch(/Kapso/); // terceiro que recebe os webhooks da conta WhatsApp
+    expect(h).toMatch(/Meta|WhatsApp/);
+    expect(h).toMatch(/Estados Unidos/i); // transferência internacional declarada
+    expect(h).toMatch(/intelig[êe]ncia artificial/i);
+  });
+
+  it('NÃO afirma consentimento — descreve o que de fato acontece (aviso na 1ª conversa)', () => {
+    const h = verifierHtml(base);
+    // O código só registra a ENTREGA do aviso (db.markConsentNotified); dizer
+    // "com seu consentimento" era uma alegação que o sistema não sustenta.
+    expect(h).not.toMatch(/com seu consentimento/i);
+    expect(h).toMatch(/te aviso|aviso disso|na primeira conversa/i);
+  });
+
+  it('não promete o que não pode provar sobre terceiros (sem alegar contrato/DPA)', () => {
+    const h = verifierHtml(base);
+    expect(h).not.toMatch(/sob contrato|contrato assinado|DPA/i);
+  });
+});

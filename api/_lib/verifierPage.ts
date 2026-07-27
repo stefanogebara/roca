@@ -125,7 +125,8 @@ export function verifierHtml(cfg: VerifierConfig): string {
 
     <section>
       <h2>Seus dados (LGPD)</h2>
-      <p>A Stevi guarda só o necessário pra te ajudar — sua localização e o histórico da conversa — com seu consentimento na primeira mensagem. Você pode pedir <strong>"apaga meus dados"</strong> a qualquer hora, e a gente apaga.${lgpdContact}</p>
+      <p>A Stevi guarda só o necessário pra te ajudar — sua localização e o histórico da conversa — e te aviso disso na primeira conversa. Você pode pedir <strong>"apaga meus dados"</strong> a qualquer hora, e a gente apaga.${lgpdContact}</p>
+      <p><strong>Quem mais participa:</strong> a conversa acontece dentro do WhatsApp (Meta). Pra Stevi funcionar, seus dados passam por provedores de tecnologia: <strong>inteligência artificial hospedada nos Estados Unidos</strong> (é ela que lê sua foto e entende sua pergunta), servidor e banco de dados, e a <strong>Kapso</strong>, plataforma que a gente usa pra gerenciar o WhatsApp — as mensagens da conta passam por ela. Eles tratam seus dados só pra prestar esse serviço.</p>
     </section>
 
     <a class="cta" href="https://wa.me/${digits}?text=${encodeURIComponent('Oi, Stevi! Vi a página de verificação.')}">Falar com a Stevi no WhatsApp</a>
