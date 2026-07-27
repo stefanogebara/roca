@@ -25,7 +25,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
   try {
-    const report = await runDispatch({ dryRun: false });
+    // ?dryRun=1 plans without sending. It did NOT exist on 27/jul: the param
+    // was silently ignored and a "preview" call shipped 8 real templates. A
+    // flag that looks like it works and doesn't is worse than no flag.
+    const dryRun = ['1', 'true', 'yes'].includes(String(req.query?.dryRun ?? '').toLowerCase());
+    const report = await runDispatch({ dryRun });
+    if (dryRun) {
+      // Bumps are skipped entirely in a dry run — nothing should leave.
+      res.status(200).json({ success: true, data: { ...report, bumps: null, note: 'dry run — nada foi enviado' } });
+      return;
+    }
     log.info(
       `dispatch cron: sent=${report.sent} failed=${report.failed} eligible=${report.eligible}` +
         (report.skippedOutsideHours ? ' (outside hours)' : '') +

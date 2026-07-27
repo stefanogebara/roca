@@ -58,6 +58,12 @@ import {
  */
 export const MAX_POST_ACCEPT_FAILURES_PER_DAY = 3;
 
+/** Re-read today's failures every N sends inside a batch. Delivery callbacks
+ * land within seconds, and the batch is paced by jittered delays — so a batch
+ * CAN learn mid-flight that it is burning prospects. 27/jul: 8 sent, 8 denied,
+ * nothing stopped between them. */
+export const BREAKER_RECHECK_EVERY = 2;
+
 /** Whether today's post-accept failures already justify stopping. Pure. */
 export function shouldBreakOnFailures(failuresToday: number): boolean {
   return failuresToday >= MAX_POST_ACCEPT_FAILURES_PER_DAY;
@@ -259,11 +265,27 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   let sent = 0;
   let failed = 0;
 
-  for (const p of batch) {
+  let breakerError: string | null = null;
+  for (const [idx, p] of batch.entries()) {
     const phone = p.phone as string; // eligibleToSend guarantees non-null
     if (dryRun) {
       recipients.push({ id: p.id, name: p.name, phone, result: 'planned' });
       continue;
+    }
+    // Mid-batch breaker. On 27/jul all 8 sends SUCCEEDED at the API (wamid
+    // returned) and Meta denied delivery seconds later by callback
+    // (#131042 billing). A breaker that only counts send errors sees nothing —
+    // so re-read today's failures every few sends and cut the rest of the batch.
+    if (idx > 0 && idx % BREAKER_RECHECK_EVERY === 0) {
+      const failedNow = await countFailedSince(brtDayStartIso(new Date())).catch(() => null);
+      if (failedNow != null && shouldBreakOnFailures(failedNow)) {
+        breakerError = `post_accept_failures_mid_batch (${failedNow} ≥ ${MAX_POST_ACCEPT_FAILURES_PER_DAY})`;
+        log.error('dispatch cut mid-batch:', breakerError);
+        await alertFounders(
+          `⛔ Prospecção CORTADA no meio do lote: ${failedNow} falhas pós-aceite hoje. ${sent} enviado(s) antes do corte. Veja o motivo em prospects.wa_error.`
+        );
+        break;
+      }
     }
     // Concurrent-safe cap recheck: claims stamp sent_at, so a fresh count sees
     // another overlapping run's claims too. Counting BEFORE claiming means a
@@ -337,6 +359,9 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     dryRun,
     skippedOutsideHours: false,
     aborted: false,
+    // A mid-batch cut is not an abort (sends did happen) but the reason must
+    // reach the caller/painel, not just the log.
+    ...(breakerError ? { error: breakerError } : {}),
     eligible: eligible.length,
     planned: batch.length,
     sent,

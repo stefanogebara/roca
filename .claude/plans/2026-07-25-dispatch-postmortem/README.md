@@ -71,6 +71,49 @@ para testar — cap=0 no mesmo dia).
 **H4 — Template pausado/reprovado. REFUTADA.** Dois templates distintos falharam
 simultaneamente; canário de shape e status dos 4 templates está verde desde então.
 
+## 🎯 CAUSA RAIZ ENCONTRADA (27/jul, 14:08 BRT) — era BILLING
+
+Religamos com cap 10 e o primeiro lote real (8 envios, cooperativas/revendas de
+Alfenas e Varginha) falhou 8/8 — **mas desta vez com o motivo gravado**, porque
+`prospects.wa_error` tinha sido implementado uma hora antes:
+
+| Erro | Ocorrências |
+|---|---|
+| **131042 — Business eligibility payment issue** | 3 |
+| **131026 — Message undeliverable** | 5 |
+
+**O #131042 fecha o caso: a conta de negócio não tem forma de pagamento
+válida.** A Meta aceita a mensagem na API (devolve wamid) e nega a entrega no
+faturamento — exatamente a assinatura de 21/jul.
+
+**As duas hipóteses do post-mortem estavam ERRADAS:**
+- ~~H1 (#131049 per-user marketing cap)~~ — nunca apareceu.
+- ~~H1b (#130497 cross-border)~~ — nunca apareceu; e o +55 estava ativo.
+- H2 (tier/limite) — descartada: conta `APPROVED`, negócio `verified`, número
+  GREEN/CONNECTED, `messaging_limit_tier` sem restrição.
+
+Seis dias de especulação foram resolvidos por uma coluna de texto. A lição não
+é sobre WhatsApp: **um erro que você não persiste é um erro que você vai
+diagnosticar por adivinhação.**
+
+**Ação (founder):** business.facebook.com → Configurações do Negócio →
+Faturamento → adicionar cartão válido e associar à WABA `1247524677467078`.
+Enquanto isso não for feito, NENHUM template sai — nem prospecção, nem alerta
+de geada. Conversa iniciada pelo produtor (janela de 24h) segue funcionando,
+porque é gratuita.
+
+**Estado:** `PROSPECT_DAILY_CAP=0` de novo (parada imediata ao ver as falhas).
+Os 8 prospects voltam à fila — nada chegou até eles.
+
+**Duas correções feitas na sequência (27/jul):**
+1. `?dryRun=1` no `/api/cron/dispatch` — o parâmetro era ignorado em silêncio,
+   e uma chamada de "pré-visualização" mandou 8 templates de verdade. Flag que
+   parece funcionar e não funciona é pior que flag nenhuma.
+2. **Breaker no MEIO do lote** (a cada 2 envios, relê as falhas do dia). O
+   breaker anterior só olhava antes do lote — e como os 8 envios tiveram
+   SUCESSO na API, com a negativa vindo por callback segundos depois, ele não
+   viu nada. Com o novo, o lote teria parado no 3º.
+
 ## ✅ Número +55 VERIFICADO (26/jul, 02:37 UTC)
 
 O OTP foi capturado e aceito: `+55 11 5028-1932` está com

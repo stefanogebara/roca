@@ -489,3 +489,38 @@ describe('circuit-breaker intra-dia (falhas pós-aceite)', () => {
     expect(shouldBreakOnFailures(16)).toBe(true);
   });
 });
+
+describe('breaker DURANTE o lote (27/jul: 8 aceitos na API, 8 negados no callback)', () => {
+  it('corta o lote no meio quando os callbacks de falha chegam durante o envio', async () => {
+    // O que aconteceu de verdade: sendProspectTemplate devolveu wamid nas 8
+    // (a Meta aceita), e os callbacks trouxeram 131042/131026 segundos depois.
+    // Um breaker que só conta erro de SEND não vê nada; ele precisa reconsultar
+    // as falhas do dia enquanto o lote roda.
+    const many = Array.from({ length: 5 }, (_, i) =>
+      prospect({ id: `p${i}`, phone: `+55359999900${i}`, kind: 'cooperativa' })
+    );
+    vi.mocked(loadReadyProspects).mockResolvedValue(many);
+    let calls = 0;
+    vi.mocked(countFailedSince).mockImplementation(async () => {
+      // 0 na precondição; a partir da 2ª releitura, os callbacks já falharam.
+      calls += 1;
+      return calls <= 1 ? 0 : 5;
+    });
+
+    const rep = await runDispatch({ force: true, dailyCap: 10 });
+
+    expect(rep.sent).toBeLessThan(5); // não mandou o lote inteiro
+    expect(rep.error).toMatch(/post_accept_failures/);
+    expect(alertFounders).toHaveBeenCalled();
+  }, 60000);
+
+  it('lote saudável não é interrompido', async () => {
+    vi.mocked(loadReadyProspects).mockResolvedValue(
+      Array.from({ length: 4 }, (_, i) => prospect({ id: `q${i}`, phone: `+55359999901${i}` }))
+    );
+    vi.mocked(countFailedSince).mockResolvedValue(0);
+    const rep = await runDispatch({ force: true, dailyCap: 10 });
+    expect(rep.sent).toBe(4);
+    expect(rep.error).toBeUndefined();
+  }, 60000);
+});
