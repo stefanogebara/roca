@@ -81,6 +81,26 @@ export async function countSentSince(sinceIso: string): Promise<number> {
 }
 
 /**
+ * Sends that FAILED post-accept since `sinceIso` (Meta accepted, delivery was
+ * denied). Feeds the intra-day circuit breaker: the health thermometer needs 20
+ * sends in a 7-day window before it grades, which is too slow to stop a day
+ * like 21/jul, when 16 of 16 failed across three cron runs.
+ * Throws — the caller fails closed, like every other safety precondition.
+ */
+export async function countFailedSince(sinceIso: string): Promise<number> {
+  const db = getDb();
+  const { count, error } = await db
+    .from('prospects')
+    .select('id', { count: 'exact', head: true })
+    .eq('send_status', 'failed')
+    .gte('sent_at', sinceIso);
+  if (error || count == null) {
+    throw new Error(`countFailedSince unavailable: ${error?.message ?? 'null count'}`);
+  }
+  return count;
+}
+
+/**
  * Atomically claim a prospect for the intro send (send_status null → 'sending',
  * one SQL statement). Two dispatch runs can overlap — the cron firing while a
  * founder presses "Disparar" in the painel — and both read the same eligible

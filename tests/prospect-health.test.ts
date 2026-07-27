@@ -226,3 +226,45 @@ describe('parseCloudStatuses', () => {
     ).toEqual([]);
   });
 });
+
+describe('forense de falha e circuit-breaker (pré-religada 27/jul)', () => {
+  it('applyProspectStatuses PERSISTE o error code — sem isso o post-mortem vira arqueologia', async () => {
+    const updates: Array<Record<string, unknown>> = [];
+    const db = {
+      from: () => ({
+        update: (patch: Record<string, unknown>) => {
+          updates.push(patch);
+          return {
+            eq: () => ({
+              in: () => ({
+                select: async () => ({ data: [{ id: 'p1', name: 'Coop X', phone: '+5534999887766' }] }),
+              }),
+            }),
+          };
+        },
+      }),
+    };
+    const { applyProspectStatuses } = await import('../api/_lib/prospect/health');
+    await applyProspectStatuses(
+      [{ wamid: 'wamid.A', status: 'failed', errorDetail: '#131049 healthy ecosystem engagement' }],
+      db as never
+    );
+    expect(updates[0].send_status).toBe('failed');
+    expect(String(updates[0].wa_error)).toContain('131049');
+  });
+
+  it('sucesso limpa o erro anterior (não deixa fantasma de falha antiga)', async () => {
+    const updates: Array<Record<string, unknown>> = [];
+    const db = {
+      from: () => ({
+        update: (patch: Record<string, unknown>) => {
+          updates.push(patch);
+          return { eq: () => ({ in: () => ({ select: async () => ({ data: [] }) }) }) };
+        },
+      }),
+    };
+    const { applyProspectStatuses } = await import('../api/_lib/prospect/health');
+    await applyProspectStatuses([{ wamid: 'w', status: 'delivered', errorDetail: null }], db as never);
+    expect(updates[0].wa_error).toBeNull();
+  });
+});

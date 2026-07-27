@@ -170,13 +170,32 @@
   <script>
     const $ = (s, r=document) => r.querySelector(s);
     const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+    // Campos fora de `data` (ex.: prospects → dispatch) ficam aqui para quem
+    // precisar, sem mudar a assinatura de api().
+    let lastMeta = {};
     const api = async (path, opts={}) => {
       const r = await fetch('/api/ops/' + path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...opts });
       if (r.status === 401) { showLogin(); throw new Error('unauthorized'); }
       const j = await r.json();
       if (!j.success) throw new Error(j.error || 'erro');
+      lastMeta = j;
       return j.data;
     };
+
+    /** Frase honesta sobre o estado do disparo — nunca "ativo" quando não está. */
+    function dispatchLine(d) {
+      if (!d || d.error) return '⚠️ Não consegui ler o estado do disparo.';
+      const tpl = d.template ? ` · template ${d.template}` : '';
+      const hoje = d.sentToday != null ? ` · hoje: ${d.sentToday} enviado(s)` : '';
+      const falhas = d.failedToday ? `, ${d.failedToday} falha(s)` : '';
+      if (d.latched) return `⛔ TRAVADO: 2 pausas de saúde em 21 dias. Religar exige limpar dispatch_pauses.${hoje}${falhas}`;
+      if (d.breakerTripped) return `⛔ CORTADO hoje: ${d.failedToday} falhas pós-aceite (corte em ${d.breakerAt}). Veja o motivo em cada prospect.`;
+      if (d.paused) {
+        const por = d.grade === 'manual' ? 'parada manual (PROSPECT_DAILY_CAP=0)' : `saúde do número — ${(d.reasons||[]).join('; ')}`;
+        return `⛔ PARADO: ${por}. Nenhum envio sai.${hoje}${falhas}`;
+      }
+      return `✅ Ativo: até ${d.cap}/dia (${d.grade})${tpl} · seg–sex 10h, 13h e 16h${hoje}${falhas}`;
+    }
     const fmtDate = (s) => { if (!s) return '—'; const d = new Date(s); return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); };
 
     function showLogin() { $('#app').style.display = 'none'; $('#login').style.display = 'grid'; }
@@ -513,7 +532,11 @@
         goBtn.addEventListener('click', () => runDispatch(false));
         act.append(srcBtn, simBtn, goBtn);
         p.append(act);
-        const note = el('div', 'countnote', 'Disparo automático ativo: seg–sex às 10h, 13h e 16h (BRT) · lote de 8 · máx. 20/dia · template aprovado stevi_parceria_v2.');
+        // Estado REAL do motor (vem de /api/ops/prospects → dispatch). O texto
+        // fixo que existia aqui dizia "ativo" mesmo com a parada de emergência
+        // ligada — os founders liam "ativo" enquanto nada saía.
+        const note = el('div', 'countnote', dispatchLine(lastMeta.dispatch));
+        note.id = 'p-dispatch-state';
         p.append(note);
 
         // Manual import, tucked away — sourcing is the primary intake now.
@@ -547,7 +570,12 @@
     }
 
     async function refreshProspects() {
-      try { pCache = await api('prospects'); renderProspects(); } catch {}
+      try {
+        pCache = await api('prospects');
+        const n = document.querySelector('#p-dispatch-state');
+        if (n) n.textContent = dispatchLine(lastMeta.dispatch);
+        renderProspects();
+      } catch {}
     }
 
     function renderFunnel() {
@@ -606,7 +634,15 @@
       [pr.kind, pr.city, pr.uf].filter(Boolean).forEach(v => meta.append(Object.assign(el('span','pill'),{textContent:v})));
       meta.append(document.createTextNode(pr.phone ? pr.phone : '(sem número)'));
       if (pr.wa_status === 'invalid') meta.append(Object.assign(el('span','pill'),{textContent:'nº inválido'}));
-      if (pr.send_status === 'failed') meta.append(Object.assign(el('span','pill'),{textContent:'⚠️ envio falhou'}));
+      if (pr.send_status === 'failed') {
+        // O motivo vem do callback da Meta (prospects.wa_error). Sem ele, o
+        // post-mortem de 21/jul virou arqueologia: 16 falhas e nenhuma causa.
+        const why = pr.wa_error ? String(pr.wa_error).slice(0, 90) : 'motivo não registrado';
+        const pill = Object.assign(el('span','pill'), { textContent: '⚠️ falhou: ' + why });
+        pill.style.background = 'var(--amber)';
+        pill.title = pr.wa_error || '';
+        meta.append(pill);
+      }
       if (pr.send_status === 'sending') meta.append(Object.assign(el('span','pill'),{textContent:'⏳ envio travado'}));
       if (pr.send_status === 'delivered') meta.append(Object.assign(el('span','pill'),{textContent:'📬 entregue'}));
       if (pr.send_status === 'read') meta.append(Object.assign(el('span','pill'),{textContent:'👁 lido'}));

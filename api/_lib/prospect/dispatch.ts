@@ -18,6 +18,7 @@ import {
   loadReadyProspects,
   loadOptouts,
   countSentSince,
+  countFailedSince,
   claimProspectForSend,
   claimProspectForBump,
   recordSend,
@@ -47,6 +48,21 @@ import {
 // the receituário moment — red-team F3). Until the distribution-pitch
 // template is approved, only right-fit kinds receive sends. Widen with
 // PROSPECT_SEND_KINDS (csv of kinds, or 'all').
+/**
+ * Post-accept failures tolerated in one day before the batch is cut.
+ *
+ * On 21/jul, 16 sends failed post-accept in a single day and nothing stopped
+ * between batches: the health thermometer is blind below 20 tracked sends in
+ * its window, and the cron fires 3x/day. This breaker is orthogonal to the
+ * thermometer — it only looks at TODAY, and it cuts fast.
+ */
+export const MAX_POST_ACCEPT_FAILURES_PER_DAY = 3;
+
+/** Whether today's post-accept failures already justify stopping. Pure. */
+export function shouldBreakOnFailures(failuresToday: number): boolean {
+  return failuresToday >= MAX_POST_ACCEPT_FAILURES_PER_DAY;
+}
+
 function kindAllowed(kind: string): boolean {
   // Coops/revendas unlocked 19/jul — their distribution template
   // (stevi_parceria_coop_v1) is APPROVED; they get THAT pitch, never lead-gen.
@@ -158,19 +174,22 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   let optouts: Set<string>;
   let ready: Awaited<ReturnType<typeof loadReadyProspects>>;
   let sentToday: number;
+  let failedToday: number;
   let capInfo: CapGrade;
   try {
     const manual = opts.dailyCap ?? envCapOverride();
-    const [o, r, s, healthRes, latched] = await Promise.all([
+    const [o, r, s, f, healthRes, latched] = await Promise.all([
       loadOptouts(),
       loadReadyProspects(),
       countSentSince(brtDayStartIso(now)),
+      countFailedSince(brtDayStartIso(now)),
       manual == null ? loadSendHealth(now) : Promise.resolve(null),
       isDispatchLatched(now),
     ]);
     optouts = o;
     ready = r;
     sentToday = s;
+    failedToday = f;
     // The LATCH outranks everything, including manual overrides: two health
     // pauses inside 21 days means a human must decide (clear dispatch_pauses)
     // before another send leaves — oscillation is not a retry loop.
@@ -216,6 +235,20 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
       );
     }
     return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [], cap: 0, capGrade: capInfo.grade };
+  }
+
+  // Intra-day breaker: today's post-accept failures alone can stop the run,
+  // before the 7-day thermometer has enough evidence to grade. 21/jul burned 16
+  // prospects across three cron runs with nothing in between.
+  if (shouldBreakOnFailures(failedToday)) {
+    const error = `post_accept_failures_today (${failedToday} ≥ ${MAX_POST_ACCEPT_FAILURES_PER_DAY})`;
+    log.error('dispatch cut by breaker:', error);
+    if (!dryRun) {
+      await alertFounders(
+        `⛔ Prospecção CORTADA hoje: ${failedToday} envios falharam pós-aceite. Veja o motivo em prospects.wa_error antes de religar.`
+      );
+    }
+    return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [], cap: capInfo.cap, capGrade: capInfo.grade };
   }
 
   const eligible = ready.filter((p) => eligibleToSend(p, optouts) && kindAllowed(p.kind));

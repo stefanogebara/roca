@@ -11,16 +11,64 @@ import {
   resetProspectSend,
   reactivateProspect,
 } from '../_lib/prospect/db';
-import { runDispatch } from '../_lib/prospect/dispatch';
+import { countSentSince, countFailedSince } from '../_lib/prospect/db';
+import { runDispatch, MAX_POST_ACCEPT_FAILURES_PER_DAY } from '../_lib/prospect/dispatch';
+import { envCapOverride, gradeCap, loadSendHealth, isDispatchLatched } from '../_lib/prospect/health';
+import { brtDayStartIso } from '../_lib/prospect/core';
 
 const log = createLogger('ops');
+
+/** Live state of the outbound engine, for the painel. Never throws: a partial
+ * read still beats the hardcoded copy it replaces. */
+async function dispatchState(): Promise<Record<string, unknown>> {
+  const now = new Date();
+  try {
+    const manual = envCapOverride();
+    const [sentToday, failedToday, health, latched] = await Promise.all([
+      countSentSince(brtDayStartIso(now)).catch(() => null),
+      countFailedSince(brtDayStartIso(now)).catch(() => null),
+      manual == null ? loadSendHealth(now).catch(() => null) : Promise.resolve(null),
+      isDispatchLatched(now).catch(() => null),
+    ]);
+    const graded =
+      manual != null
+        ? { cap: manual, grade: 'manual' as const, reasons: ['PROSPECT_DAILY_CAP definido'] }
+        : health
+          ? gradeCap(health.health, health.lifetimeSends)
+          : null;
+    return {
+      cap: graded?.cap ?? null,
+      grade: graded?.grade ?? 'desconhecido',
+      reasons: graded?.reasons ?? [],
+      paused: graded?.cap === 0,
+      latched,
+      sentToday,
+      failedToday,
+      breakerAt: MAX_POST_ACCEPT_FAILURES_PER_DAY,
+      breakerTripped: failedToday != null && failedToday >= MAX_POST_ACCEPT_FAILURES_PER_DAY,
+      template: process.env.PROSPECT_TEMPLATE_NAME ?? null,
+      coopTemplate: process.env.PROSPECT_COOP_TEMPLATE_NAME ?? null,
+    };
+  } catch (e) {
+    log.error('dispatchState failed:', (e as Error).message);
+    return { grade: 'desconhecido', error: 'não foi possível ler o estado do disparo' };
+  }
+}
 const STATUSES = new Set(['discovered', 'ready', 'contacted', 'replied', 'discarded']);
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (!requireOps(req, res)) return;
   try {
     if (req.method !== 'POST') {
-      res.status(200).json({ success: true, data: await listProspects() });
+      // `dispatch` carries the REAL state of the outbound engine. The painel
+      // used to print a hardcoded "Disparo automático ativo…", which lied for
+      // the four days the emergency stop was on — the founders read "ativo"
+      // while nothing was being sent.
+      res.status(200).json({
+        success: true,
+        data: await listProspects(),
+        dispatch: await dispatchState(),
+      });
       return;
     }
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body ?? {};

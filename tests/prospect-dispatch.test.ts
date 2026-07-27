@@ -15,6 +15,7 @@ vi.mock('../api/_lib/prospect/db', () => ({
   loadReadyProspects: vi.fn(),
   loadOptouts: vi.fn(),
   countSentSince: vi.fn(),
+  countFailedSince: vi.fn(),
   recordSend: vi.fn(),
   recordSendFailed: vi.fn(),
   logProspectMessage: vi.fn(),
@@ -52,6 +53,7 @@ import {
   loadReadyProspects,
   loadOptouts,
   countSentSince,
+  countFailedSince,
   recordSend,
   recordSendFailed,
   logProspectMessage,
@@ -113,6 +115,7 @@ beforeEach(() => {
   vi.mocked(templateShapeError).mockResolvedValue(null); // approved + shape OK
   vi.mocked(loadOptouts).mockResolvedValue(new Set());
   vi.mocked(countSentSince).mockResolvedValue(0);
+  vi.mocked(countFailedSince).mockResolvedValue(0);
   vi.mocked(loadReadyProspects).mockResolvedValue([]);
   vi.mocked(loadBumpDueProspects).mockResolvedValue([]);
   vi.mocked(claimProspectForSend).mockResolvedValue(true);
@@ -471,5 +474,18 @@ describe('templates v3/coop_v2: env, params e render (pré-religada, 27/jul)', (
     expect(renderTemplateText(['Rural Center', 'Machado'])).toMatch(
       /assistente digital.*regi[ãa]o de Machado.*chega at[ée] voc[êe]s como/s
     );
+  });
+});
+
+describe('circuit-breaker intra-dia (falhas pós-aceite)', () => {
+  it('corta o lote quando N falhas pós-aceite já aconteceram hoje', async () => {
+    const { shouldBreakOnFailures } = await import('../api/_lib/prospect/dispatch');
+    // 21/jul: 16 falhas seguidas em UM dia. O termômetro é cego abaixo de 20
+    // envios na janela e o cron roda 3x/dia — nada cortou entre um lote e o
+    // próximo. Este corte é ortogonal ao termômetro.
+    expect(shouldBreakOnFailures(0)).toBe(false);
+    expect(shouldBreakOnFailures(2)).toBe(false);
+    expect(shouldBreakOnFailures(3)).toBe(true);
+    expect(shouldBreakOnFailures(16)).toBe(true);
   });
 });

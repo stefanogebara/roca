@@ -59,14 +59,22 @@ export interface CloudStatusEvent {
  * (the transition can only happen once).
  */
 export async function applyProspectStatuses(
-  events: CloudStatusEvent[]
+  events: CloudStatusEvent[],
+  dbOverride?: ReturnType<typeof getDb>
 ): Promise<{ applied: number }> {
-  const db = getDb();
+  const db = dbOverride ?? getDb();
   let applied = 0;
   for (const ev of events) {
     const { data, error } = await db
       .from('prospects')
-      .update({ send_status: ev.status, updated_at: new Date().toISOString() })
+      .update({
+        send_status: ev.status,
+        // Persist WHY it failed. The parser always had this; nothing stored it,
+        // so the 21/jul post-mortem could not name the cause six days later.
+        // Cleared on success so an old failure doesn't haunt a healthy row.
+        wa_error: ev.status === 'failed' ? (ev.errorDetail ?? 'sem detalhe no callback') : null,
+        updated_at: new Date().toISOString(),
+      })
       .eq('wamid', ev.wamid)
       .in('send_status', allowedFrom(ev.status))
       .select('id, name, phone');
