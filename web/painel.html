@@ -196,6 +196,8 @@
       }
       return `✅ Ativo: até ${d.cap}/dia (${d.grade})${tpl} · seg–sex 10h, 13h e 16h${hoje}${falhas}`;
     }
+    /** Fixo não tem WhatsApp — mesma regra do core.isMobileBR. */
+    const isMobile = (phone) => { const d = String(phone||'').replace(/[^0-9]/g,''); return d.length === 13 && d.startsWith('55') && d[4] === '9'; };
     const fmtDate = (s) => { if (!s) return '—'; const d = new Date(s); return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); };
 
     function showLogin() { $('#app').style.display = 'none'; $('#login').style.display = 'grid'; }
@@ -634,6 +636,13 @@
       [pr.kind, pr.city, pr.uf].filter(Boolean).forEach(v => meta.append(Object.assign(el('span','pill'),{textContent:v})));
       meta.append(document.createTextNode(pr.phone ? pr.phone : '(sem número)'));
       if (pr.wa_status === 'invalid') meta.append(Object.assign(el('span','pill'),{textContent:'nº inválido'}));
+      // Fixo não tem WhatsApp: fica na base para enriquecimento, nunca é
+      // despachado (aprendido em 27/jul: todo 131026 veio de um fixo).
+      if (pr.phone && !isMobile(pr.phone)) {
+        const pill = Object.assign(el('span','pill'), { textContent: '☎️ fixo — sem WhatsApp' });
+        pill.title = 'Precisa de um celular. Procure no site/Instagram da empresa.';
+        meta.append(pill);
+      }
       if (pr.send_status === 'failed') {
         // O motivo vem do callback da Meta (prospects.wa_error). Sem ele, o
         // post-mortem de 21/jul virou arqueologia: 16 falhas e nenhuma causa.

@@ -65,6 +65,25 @@ export function normalizePhoneBR(raw: string | null | undefined): string | null 
   return `+55${digits}`;
 }
 
+/**
+ * Whether a normalized BR number is a MOBILE line — the only kind that can
+ * hold WhatsApp.
+ *
+ * Learned the expensive way on 27/jul: the Google Places sourcing captures a
+ * company's published phone, which is a landline 71% of the time. Every send to
+ * one came back `131026 Message undeliverable` — burning the number's
+ * reputation on messages that could never arrive. Not one mobile produced that
+ * error.
+ *
+ * Shape: +55 DD 9XXXXXXXX (13 digits total). Landlines have 8 subscriber digits.
+ */
+export function isMobileBR(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length !== 13 || !digits.startsWith('55')) return false;
+  return digits[4] === '9'; // 55 + DD(2) + first subscriber digit
+}
+
 /** UTC ISO for the start of the current BRT calendar day (for the daily cap). */
 export function brtDayStartIso(now: Date): string {
   const shifted = new Date(now.getTime() + BRT_OFFSET_MIN * 60_000);
@@ -99,6 +118,10 @@ export function isBusinessHours(now: Date): boolean {
 export function eligibleToSend(p: ProspectLike, optouts: Set<string>): boolean {
   if (p.status !== 'ready') return false;
   if (p.wa_status !== 'valid' || !p.phone) return false;
+  // Landlines can't hold WhatsApp: sending is a guaranteed 131026 that costs
+  // reputation and teaches us nothing. They stay in the base for enrichment
+  // (site/Instagram usually list a real mobile), just never get dispatched.
+  if (!isMobileBR(p.phone)) return false;
   if (optouts.has(p.phone)) return false;
   if (p.send_status != null) return false; // already sent/delivered/failed — never re-blast
   return true;

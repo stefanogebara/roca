@@ -497,7 +497,7 @@ describe('breaker DURANTE o lote (27/jul: 8 aceitos na API, 8 negados no callbac
     // Um breaker que só conta erro de SEND não vê nada; ele precisa reconsultar
     // as falhas do dia enquanto o lote roda.
     const many = Array.from({ length: 5 }, (_, i) =>
-      prospect({ id: `p${i}`, phone: `+55359999900${i}`, kind: 'cooperativa' })
+      prospect({ id: `p${i}`, phone: `+553599999000${i}`, kind: 'cooperativa' })
     );
     vi.mocked(loadReadyProspects).mockResolvedValue(many);
     let calls = 0;
@@ -516,7 +516,7 @@ describe('breaker DURANTE o lote (27/jul: 8 aceitos na API, 8 negados no callbac
 
   it('lote saudável não é interrompido', async () => {
     vi.mocked(loadReadyProspects).mockResolvedValue(
-      Array.from({ length: 4 }, (_, i) => prospect({ id: `q${i}`, phone: `+55359999901${i}` }))
+      Array.from({ length: 4 }, (_, i) => prospect({ id: `q${i}`, phone: `+553599999100${i}` }))
     );
     vi.mocked(countFailedSince).mockResolvedValue(0);
     const rep = await runDispatch({ force: true, dailyCap: 10 });

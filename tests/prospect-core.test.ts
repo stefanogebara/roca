@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizePhoneBR,
-  isBusinessHours,
+  isMobileBR,
   eligibleToSend,
+  isBusinessHours,
   planBatch,
   clampDailyCap,
   isOptOut,
@@ -114,5 +115,37 @@ describe('isOptOut', () => {
     for (const t of ['quero saber mais', 'como funciona?', 'tenho interesse', null]) {
       expect(isOptOut(t as string), String(t)).toBe(false);
     }
+  });
+});
+
+describe('isMobileBR — WhatsApp só existe em celular (achado de 27/jul)', () => {
+  it('reconhece celular E.164 brasileiro', () => {
+    expect(isMobileBR('+5535999429176')).toBe(true);
+    expect(isMobileBR('+5511987654321')).toBe(true);
+  });
+
+  it('rejeita fixo — 71% da base veio do Google Places com telefone comercial', () => {
+    // Estes são reais: deram 131026 'Message undeliverable' porque fixo não tem
+    // WhatsApp. Enviar para eles gasta reputação do número por nada.
+    expect(isMobileBR('+553532142166')).toBe(false); // coccamig, Varginha
+    expect(isMobileBR('+553534705412')).toBe(false); // Agropecuária JL, Alfenas
+    expect(isMobileBR('+553536981200')).toBe(false);
+  });
+
+  it('rejeita lixo sem explodir', () => {
+    expect(isMobileBR(null)).toBe(false);
+    expect(isMobileBR('')).toBe(false);
+    expect(isMobileBR('1234')).toBe(false);
+    expect(isMobileBR('+1 970 550 9125')).toBe(false); // não é BR
+  });
+});
+
+describe('eligibleToSend agora exige celular', () => {
+  const base = { status: 'ready', wa_status: 'valid', send_status: null } as never;
+  it('um prospect com telefone fixo NÃO é elegível', () => {
+    expect(eligibleToSend({ ...(base as object), phone: '+553532142166' } as never, new Set())).toBe(false);
+  });
+  it('celular segue elegível', () => {
+    expect(eligibleToSend({ ...(base as object), phone: '+5535999429176' } as never, new Set())).toBe(true);
   });
 });
