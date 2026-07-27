@@ -31,9 +31,14 @@ export type ProspectStatus =
 
 export interface ProspectLike {
   phone: string | null;
-  /** Mobile found by enrichment (site/Instagram), when the sourced phone is a
-   * landline. Preferred for sending — see sendablePhone. */
-  mobile_phone?: string | null;
+  /** Number confirmed on WhatsApp by enrichment (site/Instagram/wa.me link).
+   * May be a landline. Preferred for sending — see sendablePhone. */
+  wa_phone?: string | null;
+  /** Where wa_phone was seen. Mandatory for wa_phone to be used. */
+  wa_phone_source?: string | null;
+  /** Last delivery error from Meta's callback. Only 131026 condemns the
+   * number — see numberIsUndeliverable. */
+  wa_error?: string | null;
   wa_status: WaStatus;
   status: ProspectStatus;
   send_status: string | null;
@@ -69,14 +74,16 @@ export function normalizePhoneBR(raw: string | null | undefined): string | null 
 }
 
 /**
- * Whether a normalized BR number is a MOBILE line — the only kind that can
- * hold WhatsApp.
+ * Whether a normalized BR number is a MOBILE line.
  *
- * Learned the expensive way on 27/jul: the Google Places sourcing captures a
- * company's published phone, which is a landline 71% of the time. Every send to
- * one came back `131026 Message undeliverable` — burning the number's
- * reputation on messages that could never arrive. Not one mobile produced that
- * error.
+ * A SIGNAL, never a send gate. On 27/jul this was briefly used to block every
+ * landline, on the inference "every 131026 came from a landline, so landlines
+ * can't hold WhatsApp". That reversed the conditional: the base is 71%
+ * landlines, so almost everything "comes from a landline". Measured delivery
+ * was 39% for landlines vs 50% for mobiles — and 9 of our 14 successful
+ * deliveries went to landlines. WhatsApp Business does accept a fixed line
+ * (voice-call verification); coccamig even publishes wa.me/553532142166 for its
+ * own landline.
  *
  * Shape: +55 DD 9XXXXXXXX (13 digits total). Landlines have 8 subscriber digits.
  */
@@ -88,21 +95,40 @@ export function isMobileBR(phone: string | null | undefined): boolean {
 }
 
 /**
- * The number we can actually message: the enriched mobile when we have one,
- * else the sourced phone if it happens to be a mobile. Null means "this
- * prospect is not reachable on WhatsApp yet" — it stays in the base for
- * enrichment instead of being deleted.
+ * Whether a recorded WhatsApp error condemns the NUMBER (vs. blaming us).
  *
- * `mobile_phone` is validated too: a landline pasted into that column by hand
- * must not resurrect an unreachable prospect.
+ * `131026 Message undeliverable` means Meta could not reach that number — no
+ * WhatsApp account, or it can't receive. Retrying it burns reputation forever.
+ *
+ * Everything else on our failure list is about OUR account, not the recipient:
+ * 131042 (billing — the real cause of the 21/jul outage), 131049 (per-user
+ * marketing limit), 130497, 132000 (template shape). Those numbers deserve
+ * another chance once we fix our side; condemning them would silently shrink
+ * the base for our own mistakes.
+ */
+export function numberIsUndeliverable(waError: string | null | undefined): boolean {
+  return !!waError && /\b131026\b/.test(waError);
+}
+
+/**
+ * The number we can actually message — i.e. the one we have POSITIVE reason to
+ * believe receives WhatsApp. Null means "not reachable yet": the prospect stays
+ * in the base for enrichment instead of being deleted.
+ *
+ * Two sources of belief, in order:
+ *  1. `wa_phone` — a number someone found and CITED (site, Instagram, wa.me
+ *     link). Any valid BR number qualifies, mobile or not. The citation is
+ *     mandatory: an uncited number is someone's guess, and guesses are what
+ *     burn the number's reputation.
+ *  2. `phone` — the Places-sourced number, mobile or landline alike.
  */
 export function sendablePhone(p: {
   phone?: string | null;
-  mobile_phone?: string | null;
+  wa_phone?: string | null;
+  wa_phone_source?: string | null;
 }): string | null {
-  if (isMobileBR(p.mobile_phone)) return p.mobile_phone as string;
-  if (isMobileBR(p.phone)) return p.phone as string;
-  return null;
+  const cited = p.wa_phone_source ? normalizePhoneBR(p.wa_phone) : null;
+  return cited ?? normalizePhoneBR(p.phone);
 }
 
 /** UTC ISO for the start of the current BRT calendar day (for the daily cap). */
@@ -139,11 +165,12 @@ export function isBusinessHours(now: Date): boolean {
 export function eligibleToSend(p: ProspectLike, optouts: Set<string>): boolean {
   if (p.status !== 'ready') return false;
   if (p.wa_status !== 'valid' || !p.phone) return false;
-  // Landlines can't hold WhatsApp: sending is a guaranteed 131026 that costs
-  // reputation and teaches us nothing. They stay in the base for enrichment
-  // (site/Instagram usually list a real mobile), just never get dispatched.
   const reachable = sendablePhone(p);
   if (!reachable) return false;
+  // Meta already told us this exact number can't receive. Retrying it is a
+  // guaranteed 131026 that costs reputation and teaches us nothing — unless
+  // enrichment since found a DIFFERENT number, which is a fresh first contact.
+  if (numberIsUndeliverable(p.wa_error) && reachable === p.phone) return false;
   // Opt-out is checked on BOTH numbers: someone who said SAIR on the landline
   // record must not be reachable through the enriched mobile.
   if (optouts.has(reachable) || optouts.has(p.phone)) return false;

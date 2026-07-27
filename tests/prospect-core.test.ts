@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizePhoneBR,
   isMobileBR,
+  numberIsUndeliverable,
   sendablePhone,
   eligibleToSend,
   isBusinessHours,
@@ -119,15 +120,15 @@ describe('isOptOut', () => {
   });
 });
 
-describe('isMobileBR — WhatsApp só existe em celular (achado de 27/jul)', () => {
+// isMobileBR classifica o número — é um SINAL (útil no painel e na priorização),
+// nunca um portão de envio. Ver o bloco de eligibleToSend abaixo.
+describe('isMobileBR — classifica celular vs fixo', () => {
   it('reconhece celular E.164 brasileiro', () => {
     expect(isMobileBR('+5535999429176')).toBe(true);
     expect(isMobileBR('+5511987654321')).toBe(true);
   });
 
-  it('rejeita fixo — 71% da base veio do Google Places com telefone comercial', () => {
-    // Estes são reais: deram 131026 'Message undeliverable' porque fixo não tem
-    // WhatsApp. Enviar para eles gasta reputação do número por nada.
+  it('reconhece fixo — 71% da base veio do Places com telefone comercial', () => {
     expect(isMobileBR('+553532142166')).toBe(false); // coccamig, Varginha
     expect(isMobileBR('+553534705412')).toBe(false); // Agropecuária JL, Alfenas
     expect(isMobileBR('+553536981200')).toBe(false);
@@ -141,29 +142,92 @@ describe('isMobileBR — WhatsApp só existe em celular (achado de 27/jul)', () 
   });
 });
 
-describe('eligibleToSend agora exige celular', () => {
+// O filtro por CLASSE (bloquear todo fixo), implementado na manhã de 27/jul,
+// estava errado: 9 das nossas 14 entregas bem-sucedidas foram para fixos.
+// A inferência "todo 131026 veio de fixo, logo fixo não recebe" confundiu
+// P(fixo|131026) com P(131026|fixo) — a base é 71% fixo, então quase tudo
+// "vem de fixo". Taxa real de entrega: fixo 39%, celular 50%. O que separa
+// não é a classe, é a EVIDÊNCIA sobre aquele número específico.
+describe('eligibleToSend julga o número, não a classe do número', () => {
   const base = { status: 'ready', wa_status: 'valid', send_status: null } as never;
-  it('um prospect com telefone fixo NÃO é elegível', () => {
-    expect(eligibleToSend({ ...(base as object), phone: '+553532142166' } as never, new Set())).toBe(false);
+  it('fixo é elegível — WhatsApp Business aceita linha fixa', () => {
+    expect(eligibleToSend({ ...(base as object), phone: '+553532142166' } as never, new Set())).toBe(true);
   });
-  it('celular segue elegível', () => {
+  it('celular é elegível', () => {
     expect(eligibleToSend({ ...(base as object), phone: '+5535999429176' } as never, new Set())).toBe(true);
+  });
+  it('número que a Meta já declarou inalcançável NÃO é reenviado', () => {
+    expect(eligibleToSend(
+      { ...(base as object), phone: '+553532924233', wa_error: '131026 Message undeliverable' } as never,
+      new Set()
+    )).toBe(false);
+  });
+  it('inalcançável, mas achamos OUTRO número → volta a ser elegível', () => {
+    expect(eligibleToSend({
+      ...(base as object),
+      phone: '+553532924233',
+      wa_error: '131026 Message undeliverable',
+      wa_phone: '+5535999887766',
+      wa_phone_source: 'https://exemplo.com.br/contato',
+    } as never, new Set())).toBe(true);
+  });
+  it('falha de COBRANÇA não condena o número — foi problema nosso', () => {
+    expect(eligibleToSend(
+      { ...(base as object), phone: '+553532142166', wa_error: '131042 Business eligibility payment issue' } as never,
+      new Set()
+    )).toBe(true);
   });
 });
 
-describe('sendablePhone — o celular enriquecido é preferido ao fixo do Places', () => {
-  it('usa o mobile_phone quando existe', () => {
-    expect(sendablePhone({ phone: '+553532142166', mobile_phone: '+5535999887766' } as never))
+describe('numberIsUndeliverable — só o erro que fala do NÚMERO conta', () => {
+  it('131026 condena o número', () => {
+    expect(numberIsUndeliverable('131026 Message undeliverable')).toBe(true);
+  });
+  it('131042 (cobrança) e 131049 (limite) são nossos, não do número', () => {
+    expect(numberIsUndeliverable('131042 Business eligibility payment issue')).toBe(false);
+    expect(numberIsUndeliverable('131049 healthy ecosystem limit')).toBe(false);
+  });
+  it('sem erro registrado, nada é condenado', () => {
+    expect(numberIsUndeliverable(null)).toBe(false);
+  });
+});
+
+describe('sendablePhone — o número confirmado vence o telefone do Places', () => {
+  const fonte = 'https://exemplo.coop.br/contato';
+  it('usa o wa_phone quando existe', () => {
+    expect(sendablePhone({ phone: '+553532142166', wa_phone: '+5535999887766', wa_phone_source: fonte } as never))
       .toBe('+5535999887766');
   });
-  it('sem mobile, usa o phone se for celular', () => {
-    expect(sendablePhone({ phone: '+5535999429176', mobile_phone: null } as never))
+  it('sem wa_phone, usa o phone da fonte', () => {
+    expect(sendablePhone({ phone: '+5535999429176', wa_phone: null } as never))
+      .toBe('+5535999429176');
+    expect(sendablePhone({ phone: '+553532142166', wa_phone: null } as never))
+      .toBe('+553532142166'); // fixo também — a classe não decide
+  });
+  it('sem número nenhum → nada a enviar', () => {
+    expect(sendablePhone({ phone: null, wa_phone: null } as never)).toBeNull();
+    expect(sendablePhone({ phone: 'lixo', wa_phone: null } as never)).toBeNull();
+  });
+  // Fixo COM wa.me publicado é enviável — WhatsApp Business aceita linha fixa.
+  // A coccamig provou: wa.me/553532142166 no site dela, e o envio para esse
+  // número voltou 131042 (cobrança), nunca 131026 (inalcançável).
+  it('fixo com wa.me comprovado É enviável', () => {
+    expect(sendablePhone({
+      phone: '+553532142166',
+      wa_phone: '+553532142166',
+      wa_phone_source: 'https://coccamig.com.br — botão wa.me/553532142166',
+    } as never)).toBe('+553532142166');
+  });
+  it('wa_phone sem fonte citada é ignorado — cai no phone da fonte', () => {
+    expect(sendablePhone({ phone: '+553532142166', wa_phone: '+5535999887766', wa_phone_source: null } as never))
+      .toBe('+553532142166');
+  });
+  it('wa_phone que nem é número BR válido NÃO é aceito', () => {
+    expect(sendablePhone({ phone: '+5535999429176', wa_phone: '+55351234', wa_phone_source: fonte } as never))
       .toBe('+5535999429176');
   });
-  it('fixo sem enriquecimento → não há número enviável', () => {
-    expect(sendablePhone({ phone: '+553532142166', mobile_phone: null } as never)).toBeNull();
-  });
-  it('mobile_phone inválido (alguém colou um fixo) NÃO é aceito', () => {
-    expect(sendablePhone({ phone: '+553532142166', mobile_phone: '+553532999999' } as never)).toBeNull();
+  it('fixo com wa.me é o MESMO número — o disparo não muda de destino', () => {
+    const p = { phone: '+553532668200', wa_phone: '+553532668200', wa_phone_source: fonte } as never;
+    expect(sendablePhone(p)).toBe('+553532668200');
   });
 });

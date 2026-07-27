@@ -634,22 +634,31 @@
       left.append(who);
       const meta = el('div', 'meta');
       [pr.kind, pr.city, pr.uf].filter(Boolean).forEach(v => meta.append(Object.assign(el('span','pill'),{textContent:v})));
-      // Mostra o número para o qual REALMENTE mandaríamos (o celular
-      // enriquecido ganha do fixo do Places) — igual ao core.sendablePhone.
-      const enviavel = isMobile(pr.mobile_phone) ? pr.mobile_phone : (isMobile(pr.phone) ? pr.phone : null);
-      meta.append(document.createTextNode(enviavel || pr.phone || '(sem número)'));
+      // Mostra o número para o qual REALMENTE mandaríamos — igual ao
+      // core.sendablePhone: o confirmado com fonte ganha do telefone do Places.
+      const enviavel = (pr.wa_phone_source && pr.wa_phone) ? pr.wa_phone : pr.phone;
+      meta.append(document.createTextNode(enviavel || '(sem número)'));
       if (pr.wa_status === 'invalid') meta.append(Object.assign(el('span','pill'),{textContent:'nº inválido'}));
-      if (enviavel && enviavel === pr.mobile_phone) {
-        const pill = Object.assign(el('span','pill'), { textContent: '📱 celular achado' });
+      if (pr.wa_phone_source && pr.wa_phone) {
+        const achouOutro = pr.wa_phone !== pr.phone;
+        const pill = Object.assign(el('span','pill'), {
+          textContent: achouOutro ? '📱 número achado' : '✅ zap confirmado',
+        });
         pill.style.background = 'var(--green)';
-        pill.title = 'Fixo do Places: ' + (pr.phone || '—') + (pr.mobile_source ? ' · fonte: ' + pr.mobile_source : '');
+        pill.title = (achouOutro ? 'Places: ' + (pr.phone || '—') + ' · ' : '') + 'fonte: ' + pr.wa_phone_source;
+        meta.append(pill);
+      } else if (!isMobile(pr.phone)) {
+        // Fixo sem confirmação ainda entrega (9 das nossas 14 entregas foram
+        // pra fixo), mas é onde vale procurar um número melhor.
+        const pill = Object.assign(el('span','pill'), { textContent: '☎️ fixo — vale enriquecer' });
+        pill.title = 'Fixo entrega, mas menos. Procure no site/Instagram um celular ou um link wa.me.';
         meta.append(pill);
       }
-      // Fixo não tem WhatsApp: fica na base para enriquecimento, nunca é
-      // despachado (aprendido em 27/jul: todo 131026 veio de um fixo).
-      if (pr.phone && !enviavel) {
-        const pill = Object.assign(el('span','pill'), { textContent: '☎️ fixo — sem WhatsApp' });
-        pill.title = 'Precisa de um celular. Procure no site/Instagram da empresa.';
+      // 131026 é o único erro que condena o número: a Meta disse que não
+      // alcança. Sem outro número, ele não volta pra fila.
+      if (/\b131026\b/.test(String(pr.wa_error || ''))) {
+        const pill = Object.assign(el('span','pill'), { textContent: '🚫 número não alcançável' });
+        pill.title = 'Meta retornou 131026. Só volta à fila se acharmos outro número.';
         meta.append(pill);
       }
       if (pr.send_status === 'failed') {
