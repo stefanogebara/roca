@@ -117,10 +117,19 @@ documento inteiro.
 | Roadmap | Sobem: caderno por talhão (exigência de certificação/crédito) e o par observação→desfecho. Descem: features de produtor avulso. |
 | Preço | Sai da mesa a assinatura B2C. Entra: piloto gratuito por safra → contrato por associado/técnico. |
 
-## 7. Decisão
+## 7. Decisão — ✅ TOMADA em 27/jul/2026
 
-- [ ] Tese primária: **B2B2C institucional** · [ ] Lead-gen · [ ] Outra: ______
-- [ ] Beachhead: **café** · [ ] Hortifruti · [ ] Outro: ______
-- [ ] Manter o teste dos R$50 com o Michel como instrumento de medida: sim/não
+- [x] Tese primária: **B2B2C institucional**
+- [x] Beachhead: **café**
+- [x] Teste dos R$50 com o Michel mantido como instrumento de medida
 
-Assinado por: ______________ (Stefano) · ______________ (Vitoria) · Data: ___/___
+**Decidido por:** Stefano, 27/jul/2026 (registrado por Claude a pedido dele).
+
+### O que mudou na prática no mesmo dia
+- `PROSPECT_SEND_KINDS=cooperativa,revenda` — a prospecção passa a falar com
+  quem a tese diz que paga. Consultoria/agrônomo (37 prospects prontos) saem da
+  fila ativa; voltam se o teste do Michel provar valor no lead-gen.
+- Template principal do primeiro toque: `stevi_parceria_coop_v2` (pitch de
+  distribuição: "devolve o caso técnico organizado pro time da {{2}}"),
+  não o de lead-gen.
+- Primeiro lote real disparado em 27/jul à tarde, cap 10.
