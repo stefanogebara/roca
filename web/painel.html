@@ -655,8 +655,9 @@
         meta.append(pill);
       }
       // 131026 é o único erro que condena o número: a Meta disse que não
-      // alcança. Sem outro número, ele não volta pra fila.
-      if (/\b131026\b/.test(String(pr.wa_error || ''))) {
+      // alcança. Mas condena AQUELE número — se o enriquecimento achou outro,
+      // o prospect voltou à fila e dizer "não alcançável" seria mentira.
+      if (/\b131026\b/.test(String(pr.wa_error || '')) && enviavel === pr.phone) {
         const pill = Object.assign(el('span','pill'), { textContent: '🚫 número não alcançável' });
         pill.title = 'Meta retornou 131026. Só volta à fila se acharmos outro número.';
         meta.append(pill);
