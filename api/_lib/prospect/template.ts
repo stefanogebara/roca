@@ -24,6 +24,11 @@ export const COOP_NAME = 'stevi_parceria_coop_v1';
  * ask ONE question instead of pitching (pitch-first measured <5% reply). */
 export const V3_NAME = 'stevi_parceria_v3';
 export const COOP_V2_NAME = 'stevi_parceria_coop_v2';
+/** Proactive farmer alerts (geada/fogo/vazio) outside Meta's 24h window. Lives
+ * in this registry — even though alerts.ts sends it, not the dispatcher — so the
+ * canary's shape check covers it. Without that, a paused alert template would
+ * only surface on the next frost, when the alert silently fails to go out. */
+export const ALERT_NAME = 'stevi_alerta_v1';
 
 const FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
 
@@ -68,6 +73,14 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
       'devolve o caso técnico organizado pro time da {{2}} — não substitui ninguém. Posso te mandar um ' +
       'exemplo real de caso pra você avaliar?',
     example: ['Coopercafé', 'Coopercafé'],
+  },
+  // Proactive alert to a farmer outside the 24h window — {{1}}=alert text
+  // (flattened by cloud.sendTemplate; Meta rejects newlines in params). UTILITY:
+  // ~9x cheaper than marketing and immune to the per-user marketing cap.
+  [ALERT_NAME]: {
+    category: 'UTILITY',
+    body: 'Stevi 🌱 aviso da sua lavoura: {{1}}. Me chama aqui se quiser entender o que dá pra fazer.',
+    example: ['Alerta de geada: mínima de -1°C prevista pro dia 26/07 na sua região'],
   },
   // D+3 bump for never-repliers — {{1}}=name, {{2}}=city.
   [BUMP_NAME]: {

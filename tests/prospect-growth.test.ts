@@ -143,3 +143,13 @@ describe('templates v3 / coop_v2 (aprovados 27/jul) — compatibilidade com o re
     expect(registryParamCount('stevi_parceria_coop_v2')).toBe(2);
   });
 });
+
+describe('template de alerta no registry (cobertura de canário do loop de retenção)', () => {
+  it('stevi_alerta_v1 está no registry com 1 param — senão o canário não o vigia', async () => {
+    const { registryParamCount } = await import('../api/_lib/prospect/template');
+    // Sem isto, templateShapeError devolve 'template desconhecido no registry' e
+    // o único template do loop de retenção fica sem monitoramento: uma pausa da
+    // Meta só apareceria na próxima geada, quando o alerta não sair.
+    expect(registryParamCount('stevi_alerta_v1')).toBe(1);
+  });
+});

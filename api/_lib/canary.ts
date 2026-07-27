@@ -188,6 +188,10 @@ async function templateChecks(): Promise<CanaryCheck[]> {
     process.env.PROSPECT_TEMPLATE_NAME || V2_NAME,
     process.env.PROSPECT_BUMP_TEMPLATE_NAME || 'stevi_parceria_bump',
     process.env.PROSPECT_COOP_TEMPLATE_NAME || COOP_NAME,
+    // The farmer-alert template (geada/fogo/vazio outside the 24h window). It
+    // ships from alerts.ts, not the dispatcher — and was therefore invisible
+    // here: a pause would only surface on the next frost, as a missing alert.
+    ...(process.env.WHATSAPP_TEMPLATE_ALERT ? [process.env.WHATSAPP_TEMPLATE_ALERT] : []),
   ];
   const statusOnly = ['stevi_lead_v1']; // lead params vary per lead; status suffices
   return Promise.all([
