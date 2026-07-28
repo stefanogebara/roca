@@ -228,10 +228,15 @@ export async function simulateProspect(persona: ProspectPersona): Promise<GymTur
   try {
     for (let i = 0; i < MAX_TURNS; i++) {
       const inbound = turns[turns.length - 1];
-      const reply = await withRetry('vitoria-reply', () =>
+      const action = await withRetry('vitoria-reply', () =>
         buildAgentReply(persona.intro[0], toThread(turns.slice(0, -1)), inbound.text)
       );
+      // Silence is a legitimate turn now (auto-menu, empty completion). The gym
+      // must SEE it as silence, not as an empty message — a run where Vitória
+      // rightly shut up should read as such in the transcript.
+      const reply = action.tipo === 'responder' ? action.texto : `[silêncio: ${action.motivo}]`;
       turns.push({ role: 'vitoria', text: reply, escalated: needsEscalation(inbound.text) || undefined });
+      if (action.tipo === 'silencio') break;
 
       const raw = await withRetry('persona-turn', () =>
         chat({

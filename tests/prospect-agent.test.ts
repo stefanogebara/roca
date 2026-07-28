@@ -6,6 +6,7 @@ import {
   formatThreadBlock,
   isNonReply,
   repeatedInbound,
+  interpretAgentOutput,
 } from '../api/_lib/prospect/agent';
 import { parseVcards } from '../api/_lib/transport/vcard';
 
@@ -157,5 +158,44 @@ describe('repeatedInbound — contraparte automática repetindo o mesmo texto', 
       { direction: 'out', text: 'Oi!' },
     ];
     expect(repeatedInbound(thread as never, 'Oi!')).toBe(false);
+  });
+});
+
+// #1 do relatório da Olímpia: enquanto buildAgentReply devolver `string`, o
+// silêncio é inexprimível — e o modelo, mandado "parar", escreve a palavra
+// "silêncio" e nós enviamos. A correção é de TIPO, não de prompt: o retorno
+// vira uma união onde não-responder é um caso legítimo.
+describe('interpretAgentOutput — silêncio é um resultado, não um texto', () => {
+  it('texto normal vira resposta', () => {
+    const a = interpretAgentOutput('Claro! Te mando o exemplo hoje.', 'stop');
+    expect(a).toEqual({ tipo: 'responder', texto: 'Claro! Te mando o exemplo hoje.' });
+  });
+
+  it('o sentinela SILENCIO vira silêncio, não mensagem', () => {
+    for (const raw of ['SILENCIO', 'silencio', '  SILÊNCIO  ', 'SILENCIO.']) {
+      expect(interpretAgentOutput(raw, 'stop').tipo, raw).toBe('silencio');
+    }
+  });
+
+  it('resposta vazia vira silêncio em vez de mensagem em branco', () => {
+    expect(interpretAgentOutput('', 'stop').tipo).toBe('silencio');
+    expect(interpretAgentOutput('   ', 'stop').tipo).toBe('silencio');
+  });
+
+  it('placeholder do modelo vira silêncio — o bug de 28/jul', () => {
+    const a = interpretAgentOutput('(sem resposta)', 'stop');
+    expect(a.tipo).toBe('silencio');
+    if (a.tipo === 'silencio') expect(a.motivo).toMatch(/placeholder/i);
+  });
+
+  it('resposta truncada NUNCA sai pela metade', () => {
+    const a = interpretAgentOutput('Olha, o que a gente faz é receber a foto e', 'length');
+    expect(a.tipo).toBe('silencio');
+    if (a.tipo === 'silencio') expect(a.motivo).toMatch(/truncad/i);
+  });
+
+  it('texto que só CONTÉM a palavra silêncio segue sendo mensagem', () => {
+    const a = interpretAgentOutput('Prefiro o silêncio a insistir — fico à disposição!', 'stop');
+    expect(a.tipo).toBe('responder');
   });
 });

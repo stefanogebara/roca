@@ -162,12 +162,31 @@ async function chatOnce(opts: ChatOptions): Promise<string> {
   }
 
   const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     error?: { message?: string };
   };
   if (data.error) throw new Error(`OpenRouter error: ${data.error.message}`);
 
   const text = data.choices?.[0]?.message?.content?.trim();
   if (!text) throw new Error('OpenRouter returned empty completion');
+  // Stashed for chatDetailed; callers of chat() keep the plain-string contract.
+  lastFinishReason = data.choices?.[0]?.finish_reason ?? null;
   return text;
+}
+
+// Why a module-level stash instead of a wider return type: `chat()` is called
+// from a dozen places that want a string, and threading an object through all
+// of them to serve one caller would be churn for churn's sake. chatDetailed()
+// reads it immediately after its own awaited call, so there is no interleaving
+// window — each serverless invocation handles one message at a time.
+let lastFinishReason: string | null = null;
+
+/**
+ * Like chat(), plus the provider's finish_reason. 'length' means the completion
+ * was cut off — the caller must decide whether half a message is worth sending.
+ * (For the prospect agent it never is: see interpretAgentOutput.)
+ */
+export async function chatDetailed(opts: ChatOptions): Promise<{ text: string; finishReason: string | null }> {
+  const text = await chat(opts);
+  return { text, finishReason: lastFinishReason };
 }

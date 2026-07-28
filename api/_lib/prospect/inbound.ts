@@ -137,21 +137,29 @@ export async function respondAsProspectAgent(
     return null;
   }
 
-  const reply = await buildAgentReply(prospect.name, thread, inboundText);
+  const action = await buildAgentReply(prospect.name, thread, inboundText);
 
-  // The model sometimes narrates silence instead of being silent. Never ship
-  // stage direction to a real business.
-  if (isNonReply(reply)) {
-    log.error(`agent produced a non-reply for ${prospect.id} (${JSON.stringify(reply).slice(0, 60)}) — nada enviado`);
+  if (action.tipo === 'silencio') {
+    log.info(`agent stayed quiet on ${prospect.id}: ${action.motivo}`);
     return null;
   }
-
-  await logProspectMessage(prospect.id, 'out', 'text', reply);
 
   // Extracted from the whole thread; a failure only costs freshness.
   const q = await extractQualification([...thread, { direction: 'in', text: inboundText }]);
   if (q) await mergeProspectQualification(prospect.id, q as Record<string, unknown>);
 
   log.info(`agent (${AGENT_NAME}) replied to prospect ${prospect.id}`);
-  return reply;
+  // NOT logged here: the thread must record what the prospect RECEIVED. The
+  // caller writes it after a confirmed send (recordProspectOutbound) — a ghost
+  // turn poisons the next prompt (the model believes it already said this) and
+  // trips the loop guard forever.
+  return action.texto;
+}
+
+/**
+ * Append an outbound turn to a prospect thread. Call ONLY after the send came
+ * back successful.
+ */
+export async function recordProspectOutbound(prospectId: string, text: string): Promise<void> {
+  await logProspectMessage(prospectId, 'out', 'text', text);
 }

@@ -10,7 +10,7 @@ import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
 import { buildFarmCard, isFarmConfirmYes } from './farmcard';
 import { buildAgronomoBrief } from './brief';
-import { handleProspectInbound, respondAsProspectAgent } from './prospect/inbound';
+import { handleProspectInbound, respondAsProspectAgent, recordProspectOutbound } from './prospect/inbound';
 import { normalizePhoneBR } from './prospect/core';
 import {
   findPartnerByPhone,
@@ -1136,7 +1136,11 @@ async function respondAsProspectIfApplicable(
 
   const agentReply = await respondAsProspectAgent(prospect, inboundText, inboundKind);
   if (agentReply) {
-    await sendOrRecord(adapter, msg.from, { text: agentReply }, userId, 'prospect_agent');
+    // Record the outbound turn ONLY once it actually left. A message logged but
+    // never delivered makes the model think it already spoke.
+    const delivered = await sendOrRecord(adapter, msg.from, { text: agentReply }, userId, 'prospect_agent');
+    if (delivered) await recordProspectOutbound(prospect.id, agentReply);
+    else log.error(`prospect agent reply NOT delivered to ${prospect.id} — thread left untouched`);
   }
   return true; // prospects never fall through to the farmer pipeline
 }

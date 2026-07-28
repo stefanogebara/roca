@@ -13,7 +13,7 @@
  *   blocked reply degrades to an honest handoff line, never silence.
  */
 
-import { chat } from '../llm';
+import { chat, chatDetailed } from '../llm';
 import { MODELS } from '../env';
 import { withRetry } from '../retry';
 import { loadPlaybook, playbookBlock } from './learn';
@@ -74,6 +74,45 @@ export function isNonReply(reply: string | null | undefined): boolean {
   return !/[\p{L}\p{N}]/u.test(t);
 }
 
+/**
+ * What the agent decided to do this turn. Staying quiet is a first-class
+ * outcome — the whole point of the union.
+ *
+ * Before this existed, `buildAgentReply` returned `string`, so a model told to
+ * "stop and not talk to a robot" had no way to comply: on 28/jul it wrote the
+ * words "(sem resposta)" nine times and the pipeline shipped every one. A rule
+ * in the prompt is not an execution mechanism; a type is.
+ */
+export type AgentAction =
+  | { tipo: 'responder'; texto: string }
+  | { tipo: 'silencio'; motivo: string };
+
+/** The word the agent is told to emit when the right move is to say nothing. */
+export const SILENCE_SENTINEL = 'SILENCIO';
+
+const isSentinel = (t: string): boolean =>
+  t
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[.!]+$/, '')
+    .trim()
+    .toUpperCase() === SILENCE_SENTINEL;
+
+/**
+ * Turn a raw model completion into an action. Pure.
+ *
+ * `finishReason` comes from the provider: 'length' means the model was cut off
+ * mid-sentence, and half a message is worse than none.
+ */
+export function interpretAgentOutput(raw: string | null | undefined, finishReason?: string): AgentAction {
+  const texto = (raw ?? '').trim();
+  if (finishReason === 'length') return { tipo: 'silencio', motivo: 'resposta truncada (max_tokens)' };
+  if (!texto) return { tipo: 'silencio', motivo: 'resposta vazia do modelo' };
+  if (isSentinel(texto)) return { tipo: 'silencio', motivo: 'o agente escolheu não responder' };
+  if (isNonReply(texto)) return { tipo: 'silencio', motivo: `placeholder do modelo: ${texto.slice(0, 40)}` };
+  return { tipo: 'responder', texto };
+}
+
 const norm = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, ' ');
 
 /**
@@ -132,8 +171,12 @@ export function agentSystemPrompt(name: string): string {
     `responde direto, hoje ainda.\n` +
     `- Se o prospect pedir pra falar direto com o Stefano (ou disser que só trata detalhes com ele), PARE de ` +
     `qualificar: confirme que o Stefano chama hoje ainda e encerre cordialmente. Não faça mais perguntas.\n` +
+    `- COMO FICAR EM SILÊNCIO: quando o certo for não responder, escreva só a palavra ${SILENCE_SENTINEL} ` +
+    `e nada mais. Nunca escreva "(sem resposta)", "[silêncio]" ou qualquer descrição de que você não vai ` +
+    `responder — isso É uma mensagem e chega no WhatsApp da pessoa.\n` +
     `- Se a resposta parecer atendimento automático (menu numerado, protocolo, "digite 1"), responda UMA única ` +
-    `vez pedindo pra chegar ao responsável técnico/agronômico e pare — não converse com robô.\n` +
+    `vez pedindo pra chegar ao responsável técnico/agronômico. Se vier outra mensagem automática depois ` +
+    `dessa, responda ${SILENCE_SENTINEL} — não converse com robô.\n` +
     `- Se não souber, diga que confirma com os fundadores. Nunca invente.\n` +
     `- Se ele indicar outra pessoa (contato compartilhado), agradeça e confirme que os fundadores vão falar com ela.\n` +
     `- Se perguntarem se você é robô/IA depois de você já ter se apresentado (regra zero): confirme sem ` +
@@ -181,31 +224,44 @@ export async function buildAgentReply(
   prospectName: string,
   thread: ThreadTurn[],
   inboundText: string
-): Promise<string> {
+): Promise<AgentAction> {
   const history = formatThreadBlock(thread, AGENT_NAME);
   const user =
     (history ? history + '\n\n' : '') +
     `[Prospect: ${prospectName}]\n` +
     `Nova mensagem do prospect: ${inboundText}\n\n` +
-    `Responda como ${AGENT_NAME} (só o texto da mensagem, tamanho WhatsApp).`;
+    `Responda como ${AGENT_NAME} (só o texto da mensagem, tamanho WhatsApp). ` +
+    `Se o certo for não responder, escreva só ${SILENCE_SENTINEL}.`;
 
   // Market learnings (weekly-mined) are appended as an informational block;
   // a load failure only costs the learnings, never the reply.
   const learned = playbookBlock(await loadPlaybook().catch(() => []));
 
-  const raw = await withRetry(
-    () =>
-      chat({
-        model: MODELS.reasoning(),
-        system: agentSystemPrompt(AGENT_NAME) + (learned ? `\n\n${learned}` : ''),
-        maxTokens: 400,
-        user,
-      }),
-    { attempts: 2 }
-  );
-  const gated = gateAgentReply(raw.trim());
-  if (!gated.safe) log.error('agent reply gated (price/terms):', raw.slice(0, 120));
-  return gated.text;
+  let raw: string;
+  let finishReason: string | null;
+  try {
+    ({ text: raw, finishReason } = await withRetry(
+      () =>
+        chatDetailed({
+          model: MODELS.reasoning(),
+          system: agentSystemPrompt(AGENT_NAME) + (learned ? `\n\n${learned}` : ''),
+          maxTokens: 400,
+          user,
+        }),
+      { attempts: 2 }
+    ));
+  } catch (e) {
+    // A dead model is not a decision to stay quiet, but sending nothing is the
+    // safe failure direction — the founder is paged by the caller.
+    return { tipo: 'silencio', motivo: `erro no modelo: ${(e as Error).message.slice(0, 80)}` };
+  }
+
+  const action = interpretAgentOutput(raw, finishReason ?? undefined);
+  if (action.tipo === 'silencio') return action;
+
+  const gated = gateAgentReply(action.texto);
+  if (!gated.safe) log.error('agent reply gated (price/terms):', action.texto.slice(0, 120));
+  return { tipo: 'responder', texto: gated.text };
 }
 
 // ── Qualification extraction ─────────────────────────────────────────────────
