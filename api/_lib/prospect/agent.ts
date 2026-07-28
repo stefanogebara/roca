@@ -56,6 +56,42 @@ export function gateAgentReply(reply: string): GateResult {
   return { safe: true, text: reply };
 }
 
+// A model with nothing to say sometimes narrates that fact instead of staying
+// quiet — "(sem resposta)", "[silêncio]", "…". On 28/jul we shipped nine of
+// those verbatim to a real business. Anything wrapped in brackets/parens, or
+// pure punctuation, is stage direction, not a message.
+const PLACEHOLDER_RE = /^[([{]?\s*(sem\s+(resposta|retorno|coment[áa]rio)|nenhuma\s+resposta|sil[êe]ncio|n\/?a|null|none|vazio)\s*[)\]}]?[.!]?$/i;
+
+/**
+ * Whether an agent reply must NOT be sent. Silence is a valid turn; a
+ * placeholder describing silence is not.
+ */
+export function isNonReply(reply: string | null | undefined): boolean {
+  const t = (reply ?? '').trim();
+  if (!t) return true;
+  if (PLACEHOLDER_RE.test(t)) return true;
+  // Pure punctuation/ellipsis/dashes carry no message.
+  return !/[\p{L}\p{N}]/u.test(t);
+}
+
+const norm = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
+/**
+ * Whether the other side just repeated something it already sent — the
+ * signature of an automated menu that our reply can't navigate. Only INBOUND
+ * messages count: our own repetition is our bug, not their loop.
+ *
+ * One repeat is enough. The 28/jul loop ran 2 minutes because nothing counted.
+ */
+export function repeatedInbound(
+  thread: Array<{ direction: string; text: string | null }>,
+  inboundText: string
+): boolean {
+  const target = norm(inboundText);
+  if (!target) return false;
+  return thread.some((m) => m.direction === 'in' && norm(m.text ?? '') === target);
+}
+
 // ── Persona ──────────────────────────────────────────────────────────────────
 
 export function agentSystemPrompt(name: string): string {

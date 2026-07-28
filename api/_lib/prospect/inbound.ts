@@ -14,9 +14,10 @@ import {
   logProspectMessage,
   getProspectThread,
   mergeProspectQualification,
+  setProspectAgentEnabled,
   type ProspectRow,
 } from './db';
-import { AGENT_NAME, needsEscalation, buildAgentReply, extractQualification } from './agent';
+import { AGENT_NAME, needsEscalation, buildAgentReply, extractQualification, isNonReply, repeatedInbound } from './agent';
 import { alertFounders } from '../alert';
 import { sendProspectReplyNotification } from '../notify';
 import { createLogger } from '../logger';
@@ -121,7 +122,30 @@ export async function respondAsProspectAgent(
   }
 
   const thread = await getProspectThread(prospect.id);
+
+  // Automated counterpart: the other side re-sent something it already sent, so
+  // our reply isn't landing on a human. Answering again just ping-pongs — on
+  // 28/jul that ran 2 minutes and 12 outbound messages against one shop's menu
+  // bot. Hand to a founder and go quiet for good on this thread.
+  if (repeatedInbound(thread, inboundText)) {
+    await setProspectAgentEnabled(prospect.id, false).catch(() => {});
+    await alertFounders(
+      `🤖 ${prospect.name} respondeu com atendimento automático (mesma mensagem repetida). ` +
+        `Desliguei a Vitória nesse contato pra não entrar em loop — assuma no painel se quiser seguir.`
+    );
+    log.info(`agent silenced on ${prospect.id} — repeated inbound (auto-menu)`);
+    return null;
+  }
+
   const reply = await buildAgentReply(prospect.name, thread, inboundText);
+
+  // The model sometimes narrates silence instead of being silent. Never ship
+  // stage direction to a real business.
+  if (isNonReply(reply)) {
+    log.error(`agent produced a non-reply for ${prospect.id} (${JSON.stringify(reply).slice(0, 60)}) — nada enviado`);
+    return null;
+  }
+
   await logProspectMessage(prospect.id, 'out', 'text', reply);
 
   // Extracted from the whole thread; a failure only costs freshness.

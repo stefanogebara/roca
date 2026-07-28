@@ -81,6 +81,22 @@ export function previewCapOverride(dryRun: boolean, raw: unknown): number | unde
   return Math.floor(n);
 }
 
+/**
+ * Prospects with a CITED number first, everything else in its original order.
+ * Stable, non-mutating.
+ *
+ * The queue used to be pure `created_at asc`, so the 23 numbers found by
+ * enrichment on 28/jul sat from position 15 down — the next morning's batch
+ * would have re-run the same raw-landline population that had just tripped the
+ * breaker (4 failures out of 4 landlines). Reach beats seniority.
+ */
+export function prioritizeQueue<T extends { wa_phone?: string | null; wa_phone_source?: string | null }>(
+  rows: readonly T[]
+): T[] {
+  const confirmed = (p: T) => !!p.wa_phone && !!p.wa_phone_source;
+  return [...rows.filter(confirmed), ...rows.filter((p) => !confirmed(p))];
+}
+
 /** Whether today's post-accept failures already justify stopping. Pure. */
 export function shouldBreakOnFailures(failuresToday: number): boolean {
   return failuresToday >= MAX_POST_ACCEPT_FAILURES_PER_DAY;
@@ -274,7 +290,7 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     return { dryRun, skippedOutsideHours: false, aborted: true, error, eligible: 0, planned: 0, sent: 0, failed: 0, recipients: [], cap: capInfo.cap, capGrade: capInfo.grade };
   }
 
-  const eligible = ready.filter((p) => eligibleToSend(p, optouts) && kindAllowed(p.kind));
+  const eligible = prioritizeQueue(ready.filter((p) => eligibleToSend(p, optouts) && kindAllowed(p.kind)));
   const cap = capInfo.cap;
   const batch = planBatch(eligible, { dailyCap: cap, sentToday });
 

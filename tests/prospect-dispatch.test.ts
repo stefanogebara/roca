@@ -74,6 +74,9 @@ const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => ({
   city: 'Varginha',
   uf: 'MG',
   phone: '+5535999990000',
+  wa_phone: null,
+  wa_phone_source: null,
+  wa_error: null,
   wa_status: 'valid',
   source: 'manual',
   status: 'ready',
@@ -394,6 +397,7 @@ describe('runBumpDispatch — atomic claim', () => {
 
 // ── Pure shape/routing helpers (the by-construction fix for the Jul/13 outage) ──
 import { templateForKind } from '../api/_lib/prospect/dispatch';
+import { prioritizeQueue } from '../api/_lib/prospect/dispatch';
 import { previewCapOverride } from '../api/_lib/prospect/dispatch';
 import { registryParamCount, countBodyParams } from '../api/_lib/prospect/template';
 import { kindPhrase, buildCoopParams } from '../api/_lib/prospect/personalize';
@@ -545,5 +549,41 @@ describe('previewCapOverride — cap manual só vale em dry-run', () => {
     expect(previewCapOverride(true, null)).toBeUndefined();
     expect(previewCapOverride(true, 'abc')).toBeUndefined();
     expect(previewCapOverride(true, -5)).toBeUndefined();
+  });
+});
+
+// A fila era ordenada só por data de cadastro, então o enriquecimento de 28/jul
+// (23 números confirmados) caía a partir da posição 15 — o primeiro lote do dia
+// seguinte repetiria a mesma população de fixos crus que acabara de acionar o
+// breaker (4 falhas em 4 fixos). Quem tem número com fonte citada vai primeiro.
+describe('prioritizeQueue — número confirmado antes de telefone do Places', () => {
+  const row = (name: string, wa_phone: string | null, wa_phone_source: string | null) =>
+    ({ name, phone: '+553533333333', wa_phone, wa_phone_source });
+
+  it('confirmados sobem, o resto mantém a ordem de cadastro', () => {
+    const q = [
+      row('A', null, null),
+      row('B', '+5535999887766', 'site.com.br'),
+      row('C', null, null),
+      row('D', '+5535988776655', 'instagram.com/x'),
+    ];
+    expect(prioritizeQueue(q).map((p) => p.name)).toEqual(['B', 'D', 'A', 'C']);
+  });
+
+  it('wa_phone SEM fonte não conta como confirmado', () => {
+    const q = [row('A', null, null), row('B', '+5535999887766', null)];
+    expect(prioritizeQueue(q).map((p) => p.name)).toEqual(['A', 'B']);
+  });
+
+  it('é estável: entre iguais, a ordem de entrada é preservada', () => {
+    const q = [row('A', null, null), row('B', null, null), row('C', null, null)];
+    expect(prioritizeQueue(q).map((p) => p.name)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('não muta a lista recebida', () => {
+    const q = [row('A', null, null), row('B', '+5535999887766', 'site.com.br')];
+    const antes = q.map((p) => p.name);
+    prioritizeQueue(q);
+    expect(q.map((p) => p.name)).toEqual(antes);
   });
 });

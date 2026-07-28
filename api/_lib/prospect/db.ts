@@ -16,6 +16,13 @@ export interface ProspectRow {
   city: string | null;
   uf: string | null;
   phone: string | null;
+  /** Number confirmed on WhatsApp by enrichment; may be a landline. Preferred
+   * over `phone` for sending — see core.sendablePhone. */
+  wa_phone: string | null;
+  /** Where wa_phone was seen. Mandatory for wa_phone to be used. */
+  wa_phone_source: string | null;
+  /** Last delivery error from Meta's callback (only 131026 condemns a number). */
+  wa_error: string | null;
   wa_status: WaStatus;
   source: string;
   status: ProspectStatus;
