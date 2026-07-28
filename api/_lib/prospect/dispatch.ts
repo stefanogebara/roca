@@ -65,6 +65,22 @@ export const MAX_POST_ACCEPT_FAILURES_PER_DAY = 3;
  * nothing stopped between them. */
 export const BREAKER_RECHECK_EVERY = 2;
 
+/**
+ * Cap override for a PREVIEW only. Returns undefined for a real send, so the
+ * emergency stop (PROSPECT_DAILY_CAP=0) can never be lifted by an API call —
+ * only by a human changing the env.
+ *
+ * Exists because on 27/jul the founders had no way to see WHO the next batch
+ * would contact while the stop was on: the dry run returned "paused" and told
+ * them nothing. Previewing a batch must be free; sending one must not be.
+ */
+export function previewCapOverride(dryRun: boolean, raw: unknown): number | undefined {
+  if (!dryRun) return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.floor(n);
+}
+
 /** Whether today's post-accept failures already justify stopping. Pure. */
 export function shouldBreakOnFailures(failuresToday: number): boolean {
   return failuresToday >= MAX_POST_ACCEPT_FAILURES_PER_DAY;

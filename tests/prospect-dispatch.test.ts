@@ -394,6 +394,7 @@ describe('runBumpDispatch — atomic claim', () => {
 
 // ── Pure shape/routing helpers (the by-construction fix for the Jul/13 outage) ──
 import { templateForKind } from '../api/_lib/prospect/dispatch';
+import { previewCapOverride } from '../api/_lib/prospect/dispatch';
 import { registryParamCount, countBodyParams } from '../api/_lib/prospect/template';
 import { kindPhrase, buildCoopParams } from '../api/_lib/prospect/personalize';
 
@@ -523,4 +524,26 @@ describe('breaker DURANTE o lote (27/jul: 8 aceitos na API, 8 negados no callbac
     expect(rep.sent).toBe(4);
     expect(rep.error).toBeUndefined();
   }, 60000);
+});
+
+// A parada de emergência (PROSPECT_DAILY_CAP=0) só pode ser desfeita mudando a
+// env — é o freio que o fundador puxa. Mas prever QUEM seria contatado antes de
+// religar é justamente o que faltava em 27/jul, quando um "preview" mandou 8
+// templates de verdade. O override de cap existe só para o dry-run: enxerga o
+// lote sem que nada saia.
+describe('previewCapOverride — cap manual só vale em dry-run', () => {
+  it('no dry-run, aceita o cap pedido', () => {
+    expect(previewCapOverride(true, 10)).toBe(10);
+    expect(previewCapOverride(true, '8')).toBe(8);
+  });
+  it('em envio REAL, ignora — a env manda', () => {
+    expect(previewCapOverride(false, 10)).toBeUndefined();
+    expect(previewCapOverride(false, 999)).toBeUndefined();
+  });
+  it('sem pedido, não inventa cap', () => {
+    expect(previewCapOverride(true, undefined)).toBeUndefined();
+    expect(previewCapOverride(true, null)).toBeUndefined();
+    expect(previewCapOverride(true, 'abc')).toBeUndefined();
+    expect(previewCapOverride(true, -5)).toBeUndefined();
+  });
 });

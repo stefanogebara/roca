@@ -12,7 +12,7 @@ import {
   reactivateProspect,
 } from '../_lib/prospect/db';
 import { countSentSince, countFailedSince } from '../_lib/prospect/db';
-import { runDispatch, MAX_POST_ACCEPT_FAILURES_PER_DAY } from '../_lib/prospect/dispatch';
+import { runDispatch, previewCapOverride, MAX_POST_ACCEPT_FAILURES_PER_DAY } from '../_lib/prospect/dispatch';
 import { envCapOverride, gradeCap, loadSendHealth, isDispatchLatched } from '../_lib/prospect/health';
 import { brtDayStartIso } from '../_lib/prospect/core';
 
@@ -184,7 +184,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     if (action === 'dispatch') {
       const dryRun = (body as { dryRun?: unknown }).dryRun !== false; // default to a safe dry-run
-      const report = await runDispatch({ dryRun });
+      // `dailyCap` previews a batch while the emergency stop is on. Ignored on
+      // a real send — see previewCapOverride.
+      const dailyCap = previewCapOverride(dryRun, (body as { dailyCap?: unknown }).dailyCap);
+      const report = await runDispatch({ dryRun, dailyCap });
       res.status(200).json({ success: true, data: report });
       return;
     }
