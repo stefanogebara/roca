@@ -5,8 +5,12 @@ import {
   agentSystemPrompt,
   formatThreadBlock,
   isNonReply,
-  repeatedInbound,
   interpretAgentOutput,
+  pareceAutoAtendimento,
+  ecoDeMaquina,
+  porteiroEsgotado,
+  podeFalarDeNovo,
+  PORTEIRO_MAX,
 } from '../api/_lib/prospect/agent';
 import { parseVcards } from '../api/_lib/transport/vcard';
 
@@ -129,37 +133,6 @@ describe('isNonReply — placeholder do modelo nunca vira mensagem', () => {
   });
 });
 
-describe('repeatedInbound — contraparte automática repetindo o mesmo texto', () => {
-  const menu = 'Bem-vindo(a) à Agro.com!\n\nDigite a opção:\n[ 1 ] - Vendas\n[ 2 ] - Financeiro';
-  it('segunda repetição do mesmo menu = conversa travada', () => {
-    const thread = [
-      { direction: 'in', text: menu },
-      { direction: 'out', text: 'Poderia me passar o responsável técnico?' },
-    ];
-    expect(repeatedInbound(thread as never, menu)).toBe(true);
-  });
-  it('primeira vez não é loop — a Vitória tem direito a uma tentativa', () => {
-    expect(repeatedInbound([] as never, menu)).toBe(false);
-  });
-  it('ignora diferença de espaço/caixa (o bot re-renderiza)', () => {
-    const thread = [{ direction: 'in', text: menu.toUpperCase() + '   ' }];
-    expect(repeatedInbound(thread as never, menu)).toBe(true);
-  });
-  it('mensagens humanas diferentes NÃO são loop', () => {
-    const thread = [
-      { direction: 'in', text: 'Oi, tudo bem?' },
-      { direction: 'in', text: 'Pode me explicar melhor?' },
-    ];
-    expect(repeatedInbound(thread as never, 'Quanto custa?')).toBe(false);
-  });
-  it('não confunde nossa própria mensagem repetida com loop do outro lado', () => {
-    const thread = [
-      { direction: 'out', text: 'Oi!' },
-      { direction: 'out', text: 'Oi!' },
-    ];
-    expect(repeatedInbound(thread as never, 'Oi!')).toBe(false);
-  });
-});
 
 // #1 do relatório da Olímpia: enquanto buildAgentReply devolver `string`, o
 // silêncio é inexprimível — e o modelo, mandado "parar", escreve a palavra
@@ -197,5 +170,88 @@ describe('interpretAgentOutput — silêncio é um resultado, não um texto', ()
   it('texto que só CONTÉM a palavra silêncio segue sendo mensagem', () => {
     const a = interpretAgentOutput('Prefiro o silêncio a insistir — fico à disposição!', 'stop');
     expect(a.tipo).toBe('responder');
+  });
+});
+
+// #2 do relatório da Olímpia — porteiro determinístico, em duas camadas.
+describe('pareceAutoAtendimento — assinatura de atendedor automático', () => {
+  it('pega o menu que nos travou hoje', () => {
+    expect(pareceAutoAtendimento('Bem-vindo(a) à Agro.com!\n\nDigite a opção desejada:\n[ 1 ] - Vendas')).toBe(true);
+  });
+  it('pega as fórmulas institucionais mais comuns', () => {
+    for (const t of [
+      'Agradecemos o seu contato! Em breve retornaremos.',
+      'Horários: seg a sex das 8h às 18h',
+      'Estamos fechados no momento',
+      'Digite 2 para falar com um atendente',
+      'Sua solicitação foi registrada sob o protocolo 88213',
+      'Aguarde, em alguns instantes você será atendido',
+    ]) {
+      expect(pareceAutoAtendimento(t), t).toBe(true);
+    }
+  });
+  it('NÃO acusa gente falando normal', () => {
+    for (const t of [
+      'boa tarde, tudo certo?',
+      'opa, me manda esse exemplo aí',
+      'to em reunião agora, me chama mais tarde',
+      'quem fala é o Felipe, sou o gerente da loja',
+      'nosso horário de pulverização é de manhã',
+    ]) {
+      expect(pareceAutoAtendimento(t), t).toBe(false);
+    }
+  });
+});
+
+describe('ecoDeMaquina — repetição literal, com piso anti-falso-positivo', () => {
+  const menu = 'Bem-vindo(a) à Agro.com! Por favor, digite a opção desejada para continuar: 1 Vendas 2 Financeiro';
+  it('mesmo texto longo repetido = máquina', () => {
+    expect(ecoDeMaquina([{ direction: 'in', text: menu }] as never, menu)).toBe(true);
+  });
+  it('"ok" repetido é HUMANO, não eco — gente repete monossílabo o dia todo', () => {
+    const thread = [{ direction: 'in', text: 'ok' }, { direction: 'in', text: 'ok' }];
+    expect(ecoDeMaquina(thread as never, 'ok')).toBe(false);
+    expect(ecoDeMaquina(thread as never, 'blz')).toBe(false);
+  });
+  it('primeira ocorrência não é eco', () => {
+    expect(ecoDeMaquina([] as never, menu)).toBe(false);
+  });
+  it('só olha o que ELES mandaram', () => {
+    expect(ecoDeMaquina([{ direction: 'out', text: menu }] as never, menu)).toBe(false);
+  });
+});
+
+// A lição de hoje: o "1" que o fundador mandou no menu FUNCIONOU — trouxe o
+// Felipe Augusto, o primeiro humano da campanha. Desligar na primeira mensagem
+// automática teria matado esse lead. Uma tentativa educada vale a pena; a
+// terceira é teimosia.
+describe('porteiroEsgotado — uma tentativa vale, duas já é insistência', () => {
+  it('deixa tentar até o limite', () => {
+    expect(porteiroEsgotado(0)).toBe(false);
+    expect(porteiroEsgotado(1)).toBe(false);
+  });
+  it('para no limite', () => {
+    expect(porteiroEsgotado(PORTEIRO_MAX)).toBe(true);
+    expect(porteiroEsgotado(PORTEIRO_MAX + 5)).toBe(true);
+  });
+  it('o limite é 2 — a decisão está no código, não num número mágico', () => {
+    expect(PORTEIRO_MAX).toBe(2);
+  });
+});
+
+// #3 — teto de cadência nas NOSSAS mensagens. Hoje saíram 12 em 2 minutos.
+describe('podeFalarDeNovo — cadência mínima entre falas nossas', () => {
+  const t0 = new Date('2026-07-28T16:00:00Z');
+  it('primeira fala sempre pode', () => {
+    expect(podeFalarDeNovo(null, t0)).toBe(true);
+  });
+  it('bloqueia resposta em rajada', () => {
+    expect(podeFalarDeNovo(new Date('2026-07-28T15:59:55Z'), t0)).toBe(false);
+  });
+  it('libera depois do intervalo', () => {
+    expect(podeFalarDeNovo(new Date('2026-07-28T15:59:00Z'), t0)).toBe(true);
+  });
+  it('data inválida não trava a conversa (falha aberta)', () => {
+    expect(podeFalarDeNovo(new Date('lixo'), t0)).toBe(true);
   });
 });

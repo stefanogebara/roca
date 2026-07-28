@@ -32,6 +32,8 @@ export interface ProspectRow {
   wamid: string | null;
   template_used: string | null;
   touches: number;
+  /** Tentativas de furar atendimento automático — ver agent.PORTEIRO_MAX. */
+  porteiro_tentativas: number;
   created_at: string;
   updated_at: string;
 }
@@ -512,4 +514,17 @@ export async function mergeProspectQualification(
     .update({ qualification: merged, updated_at: new Date().toISOString() })
     .eq('id', prospectId);
   if (error) log.error('mergeProspectQualification failed:', error.message);
+}
+
+/** Count one more attempt at getting past an automated attendant. */
+export async function bumpPorteiroTentativas(id: string): Promise<void> {
+  const db = getDb();
+  const { data, error } = await db.from('prospects').select('porteiro_tentativas').eq('id', id).maybeSingle();
+  if (error) throw new Error(`bumpPorteiroTentativas read failed: ${error.message}`);
+  const atual = (data as { porteiro_tentativas?: number } | null)?.porteiro_tentativas ?? 0;
+  const { error: upErr } = await db
+    .from('prospects')
+    .update({ porteiro_tentativas: atual + 1, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (upErr) throw new Error(`bumpPorteiroTentativas write failed: ${upErr.message}`);
 }

@@ -15,9 +15,21 @@ import {
   getProspectThread,
   mergeProspectQualification,
   setProspectAgentEnabled,
+  bumpPorteiroTentativas,
   type ProspectRow,
 } from './db';
-import { AGENT_NAME, needsEscalation, buildAgentReply, extractQualification, isNonReply, repeatedInbound } from './agent';
+import {
+  AGENT_NAME,
+  needsEscalation,
+  buildAgentReply,
+  extractQualification,
+  pareceAutoAtendimento,
+  ecoDeMaquina,
+  porteiroEsgotado,
+  podeFalarDeNovo,
+  PORTEIRO_MAX,
+  MIN_GAP_MS,
+} from './agent';
 import { alertFounders } from '../alert';
 import { sendProspectReplyNotification } from '../notify';
 import { createLogger } from '../logger';
@@ -123,18 +135,33 @@ export async function respondAsProspectAgent(
 
   const thread = await getProspectThread(prospect.id);
 
-  // Automated counterpart: the other side re-sent something it already sent, so
-  // our reply isn't landing on a human. Answering again just ping-pongs — on
-  // 28/jul that ran 2 minutes and 12 outbound messages against one shop's menu
-  // bot. Hand to a founder and go quiet for good on this thread.
-  if (repeatedInbound(thread, inboundText)) {
-    await setProspectAgentEnabled(prospect.id, false).catch(() => {});
-    await alertFounders(
-      `🤖 ${prospect.name} respondeu com atendimento automático (mesma mensagem repetida). ` +
-        `Desliguei a Vitória nesse contato pra não entrar em loop — assuma no painel se quiser seguir.`
-    );
-    log.info(`agent silenced on ${prospect.id} — repeated inbound (auto-menu)`);
+  // Cadence ceiling on OUR OWN messages. Per-message dedup (claimInbound) can't
+  // see a burst: each inbound is a different message, so each concurrent
+  // invocation legitimately claims its own and replies. 28/jul: 12 outbound in
+  // 2 minutes to one shop.
+  const lastOut = [...thread].reverse().find((m) => m.direction === 'out');
+  if (lastOut?.created_at && !podeFalarDeNovo(new Date(lastOut.created_at), new Date())) {
+    log.info(`agent held back on ${prospect.id} — falou há menos de ${MIN_GAP_MS / 1000}s`);
     return null;
+  }
+
+  // PORTEIRO — two layers, both deterministic, both BEFORE the LLM. A rule in
+  // the prompt is not an execution mechanism: on 28/jul the "don't talk to a
+  // robot" rule existed and the ping-pong ran anyway.
+  const robo = pareceAutoAtendimento(inboundText) || ecoDeMaquina(thread, inboundText);
+  if (robo) {
+    const tentativas = prospect.porteiro_tentativas ?? 0;
+    if (porteiroEsgotado(tentativas)) {
+      await setProspectAgentEnabled(prospect.id, false).catch(() => {});
+      await alertFounders(
+        `🚪 ${prospect.name}: ${PORTEIRO_MAX} tentativas de furar o atendimento automático e só veio robô. ` +
+          `Desliguei a Vitória e parquei o lead — assuma no painel se quiser insistir.`
+      );
+      log.info(`agent parked on ${prospect.id} — porteiro esgotado (${tentativas})`);
+      return null;
+    }
+    await bumpPorteiroTentativas(prospect.id).catch(() => {});
+    log.info(`porteiro attempt ${tentativas + 1}/${PORTEIRO_MAX} on ${prospect.id}`);
   }
 
   const action = await buildAgentReply(prospect.name, thread, inboundText);

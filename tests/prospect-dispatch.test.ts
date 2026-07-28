@@ -77,6 +77,7 @@ const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => ({
   wa_phone: null,
   wa_phone_source: null,
   wa_error: null,
+  porteiro_tentativas: 0,
   wa_status: 'valid',
   source: 'manual',
   status: 'ready',

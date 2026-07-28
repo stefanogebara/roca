@@ -115,21 +115,95 @@ export function interpretAgentOutput(raw: string | null | undefined, finishReaso
 
 const norm = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, ' ');
 
+// ── Porteiro: reconhecer atendimento automático ──────────────────────────────
+
 /**
- * Whether the other side just repeated something it already sent — the
- * signature of an automated menu that our reply can't navigate. Only INBOUND
- * messages count: our own repetition is our bug, not their loop.
+ * Institutional-autoresponder signatures. Deliberately generic (no vertical
+ * jargon): what marks a bot is the FORM — a numbered menu, a protocol number,
+ * an opening-hours notice — not the industry.
  *
- * One repeat is enough. The 28/jul loop ran 2 minutes because nothing counted.
+ * Layer 1 of the porteiro. Layer 2 (ecoDeMaquina) catches the ones no regex
+ * anticipates, because a bot repeats itself verbatim and a person doesn't.
  */
-export function repeatedInbound(
+const AUTO_ATENDIMENTO_PATTERNS: RegExp[] = [
+  /\bdigite\s+\d/i,
+  /\b(?:tecle|pressione)\s+\d/i,
+  /\[\s*\d\s*\]/, // "[ 1 ] - Vendas"
+  /\bop[çc][ãa]o\s+desejada\b/i,
+  /\bagradec\w+\s+(?:o\s+)?(?:seu|sua)\s+(?:contato|mensagem|prefer[êe]ncia|solicita[çc][ãa]o)/i,
+  /\bhor[áa]rios?\s+de\s+(?:atendimento|funcionamento)\b/i,
+  /\bhor[áa]rios?\s*:/i,
+  /\best(?:amos|[áa])\s+fechad[oa]s?\b/i,
+  /\bfalar\s+com\s+(?:um\s+|o\s+|a\s+)?atendente\b/i,
+  /\bprotocolo\s*(?:n[ºo°]?\s*)?\d/i,
+  /\bem\s+(?:alguns\s+)?instantes\b/i,
+  /\b(?:em\s+breve\s+)?retornaremos\b/i,
+  /\bmensagem\s+autom[áa]tica\b/i,
+  /\bn[ãa]o\s+responda\s+(?:a\s+)?esta\s+mensagem\b/i,
+];
+
+/** Whether an inbound looks like an automated attendant rather than a person. */
+export function pareceAutoAtendimento(text: string | null | undefined): boolean {
+  const t = (text ?? '').trim();
+  if (!t) return false;
+  return AUTO_ATENDIMENTO_PATTERNS.some((re) => re.test(t));
+}
+
+// A person repeats "ok", "sim", "blz" all day; a bot repeats a paragraph. Below
+// these floors, identical text is human, not machine.
+const ECO_MIN_CHARS = 40;
+const ECO_MIN_PALAVRAS = 5;
+
+/**
+ * Whether the counterpart just re-sent something it already sent — the tell of
+ * an autoresponder no pattern list anticipated. Only INBOUND turns count: our
+ * own repetition is our bug, not their loop.
+ */
+export function ecoDeMaquina(
   thread: Array<{ direction: string; text: string | null }>,
   inboundText: string
 ): boolean {
-  const target = norm(inboundText);
-  if (!target) return false;
-  return thread.some((m) => m.direction === 'in' && norm(m.text ?? '') === target);
+  const alvo = norm(inboundText);
+  if (!alvo) return false;
+  if (alvo.length < ECO_MIN_CHARS && alvo.split(' ').length < ECO_MIN_PALAVRAS) return false;
+  return thread.some((m) => m.direction === 'in' && norm(m.text ?? '') === alvo);
 }
+
+/**
+ * Polite attempts to reach a human past a bot before parking the lead.
+ *
+ * Two, not one. On 28/jul the founder answered the Agro.com menu with "1" and
+ * it WORKED — a human (Felipe Augusto) picked up, the first of the whole
+ * campaign. Giving up on the first automated reply would have killed that lead;
+ * a third attempt is just stubbornness.
+ */
+export const PORTEIRO_MAX = 2;
+
+/** Whether we've already spent our attempts at getting past the bot. */
+export function porteiroEsgotado(tentativas: number): boolean {
+  return (tentativas ?? 0) >= PORTEIRO_MAX;
+}
+
+// ── Cadência: teto nas nossas próprias falas ─────────────────────────────────
+
+/**
+ * Minimum gap between two messages OF OURS to the same prospect. Meta's quality
+ * systems read rapid-fire as spraying, and so does a human watching a phone.
+ *
+ * 28/jul: 12 outbound messages in 2 minutes to one shop. Per-message dedup
+ * (claimInbound) can't see this — each inbound was a DIFFERENT message, so each
+ * concurrent invocation legitimately claimed its own and replied.
+ */
+export const MIN_GAP_MS = 20_000;
+
+/** Whether enough time passed since our last message to speak again. */
+export function podeFalarDeNovo(lastOutAt: Date | null | undefined, now: Date): boolean {
+  if (!lastOutAt) return true;
+  const t = lastOutAt.getTime();
+  if (!Number.isFinite(t)) return true; // unreadable timestamp must not mute us
+  return now.getTime() - t >= MIN_GAP_MS;
+}
+
 
 // ── Persona ──────────────────────────────────────────────────────────────────
 
