@@ -200,7 +200,9 @@ const PERSONA_RULES =
   'Responda SEMPRE como o personagem, no estilo dele, curto. NÃO seja a Vitória. ' +
   'Se o personagem encerraria a conversa, responda apenas o token [FIM]. Uma mensagem só.';
 
-async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+/** Retry para chamadas do gym. Exportado para o juiz pareado usar a MESMA
+ * política — duas implementações divergiriam sem ninguém notar. */
+export async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= 2; attempt++) {
     try {
