@@ -255,3 +255,23 @@ describe('podeFalarDeNovo — cadência mínima entre falas nossas', () => {
     expect(podeFalarDeNovo(new Date('lixo'), t0)).toBe(true);
   });
 });
+
+// O gym de 28/jul encerrava a conversa em QUALQUER silêncio. Só que silêncio
+// por decisão ("é um robô, vou parar") e silêncio por falha ("o modelo
+// truncou") são coisas opostas: um é acerto, o outro é defeito de
+// infraestrutura. Contar os dois igual fez a Vitória parecer pior do que é.
+describe('silêncio deliberado vs silêncio por falha', () => {
+  it('sentinela é decisão dela', () => {
+    const a = interpretAgentOutput('SILENCIO', 'stop');
+    expect(a).toMatchObject({ tipo: 'silencio', deliberado: true });
+  });
+  it('placeholder também é decisão — ela quis calar, só errou a forma', () => {
+    expect(interpretAgentOutput('(sem resposta)', 'stop')).toMatchObject({ deliberado: true });
+  });
+  it('truncamento é FALHA, não decisão', () => {
+    expect(interpretAgentOutput('metade de uma frase que', 'length')).toMatchObject({ deliberado: false });
+  });
+  it('resposta vazia é FALHA', () => {
+    expect(interpretAgentOutput('', 'stop')).toMatchObject({ deliberado: false });
+  });
+});

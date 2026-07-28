@@ -238,7 +238,11 @@ export async function simulateProspect(persona: ProspectPersona): Promise<GymTur
       // rightly shut up should read as such in the transcript.
       const reply = action.tipo === 'responder' ? action.texto : `[silêncio: ${action.motivo}]`;
       turns.push({ role: 'vitoria', text: reply, escalated: needsEscalation(inbound.text) || undefined });
-      if (action.tipo === 'silencio') break;
+      // Encerrar só quando ela DECIDIU calar (robô do outro lado, nada a
+      // dizer) — aí o diálogo acabou mesmo. Silêncio por truncamento ou erro
+      // do modelo é defeito nosso: cortar a conversa ali faz o gym medir a
+      // nossa infraestrutura e chamar isso de desempenho dela.
+      if (action.tipo === 'silencio' && action.deliberado) break;
 
       const raw = await withRetry('persona-turn', () =>
         chat({

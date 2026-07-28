@@ -85,7 +85,11 @@ export function isNonReply(reply: string | null | undefined): boolean {
  */
 export type AgentAction =
   | { tipo: 'responder'; texto: string }
-  | { tipo: 'silencio'; motivo: string };
+  /** `deliberado`: ela ESCOLHEU calar (robô do outro lado, nada a dizer) — um
+   * acerto. Falso quando o silêncio veio de defeito nosso (truncou, veio
+   * vazio, modelo caiu). Contar os dois como a mesma coisa faz o gym punir a
+   * Vitória por falha de infraestrutura. */
+  | { tipo: 'silencio'; motivo: string; deliberado: boolean };
 
 /** The word the agent is told to emit when the right move is to say nothing. */
 export const SILENCE_SENTINEL = 'SILENCIO';
@@ -106,10 +110,16 @@ const isSentinel = (t: string): boolean =>
  */
 export function interpretAgentOutput(raw: string | null | undefined, finishReason?: string): AgentAction {
   const texto = (raw ?? '').trim();
-  if (finishReason === 'length') return { tipo: 'silencio', motivo: 'resposta truncada (max_tokens)' };
-  if (!texto) return { tipo: 'silencio', motivo: 'resposta vazia do modelo' };
-  if (isSentinel(texto)) return { tipo: 'silencio', motivo: 'o agente escolheu não responder' };
-  if (isNonReply(texto)) return { tipo: 'silencio', motivo: `placeholder do modelo: ${texto.slice(0, 40)}` };
+  // Falhas primeiro: meia mensagem é pior que nenhuma, e nada disso é escolha dela.
+  if (finishReason === 'length')
+    return { tipo: 'silencio', motivo: 'resposta truncada (max_tokens)', deliberado: false };
+  if (!texto) return { tipo: 'silencio', motivo: 'resposta vazia do modelo', deliberado: false };
+  // Decisões: o sentinela é a forma certa; o placeholder é a mesma intenção
+  // expressa errado (ela quis calar e escreveu que ia calar).
+  if (isSentinel(texto))
+    return { tipo: 'silencio', motivo: 'o agente escolheu não responder', deliberado: true };
+  if (isNonReply(texto))
+    return { tipo: 'silencio', motivo: `placeholder do modelo: ${texto.slice(0, 40)}`, deliberado: true };
   return { tipo: 'responder', texto };
 }
 
@@ -319,7 +329,10 @@ export async function buildAgentReply(
         chatDetailed({
           model: MODELS.reasoning(),
           system: agentSystemPrompt(AGENT_NAME) + (learned ? `\n\n${learned}` : ''),
-          maxTokens: 400,
+          // 400 cabia o texto (respostas de 150-200 chars) mas não o raciocínio
+          // do Sonnet-5 quando ele pensa mais — e aí o turno virava silêncio por
+          // truncamento. Cap não é cobrança: só se paga o que for gerado.
+          maxTokens: 1200,
           user,
         }),
       { attempts: 2 }
@@ -327,7 +340,7 @@ export async function buildAgentReply(
   } catch (e) {
     // A dead model is not a decision to stay quiet, but sending nothing is the
     // safe failure direction — the founder is paged by the caller.
-    return { tipo: 'silencio', motivo: `erro no modelo: ${(e as Error).message.slice(0, 80)}` };
+    return { tipo: 'silencio', motivo: `erro no modelo: ${(e as Error).message.slice(0, 80)}`, deliberado: false };
   }
 
   const action = interpretAgentOutput(raw, finishReason ?? undefined);
