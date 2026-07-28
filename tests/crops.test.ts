@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseCrops, joinCrops, isCropsOnlyMessage } from '../api/_lib/tools/crops';
+import { parseCrops, joinCrops, isCropsOnlyMessage, cropLabel } from '../api/_lib/tools/crops';
 
 describe('parseCrops', () => {
   it('parses a single crop', () => {
@@ -71,5 +71,26 @@ describe('joinCrops', () => {
   });
   it('handles empty', () => {
     expect(joinCrops([])).toBe('');
+  });
+});
+
+// O brief pro agrônomo imprimia "Cultura/local: cafe · MG" — o slug interno
+// vazando pro produtor (e, pior, pro parceiro que recebe o encaminhamento).
+describe('cropLabel — o que sai na tela é português, não slug', () => {
+  it('devolve o rótulo acentuado a partir do slug interno', () => {
+    expect(cropLabel('cafe')).toBe('café');
+    expect(cropLabel('feijao')).toBe('feijão');
+    expect(cropLabel('algodao')).toBe('algodão');
+  });
+  it('já acentuado continua igual', () => {
+    expect(cropLabel('café')).toBe('café');
+    expect(cropLabel('soja')).toBe('soja');
+  });
+  it('cultura desconhecida passa reto, sem inventar', () => {
+    expect(cropLabel('sorgo')).toBe('sorgo');
+    expect(cropLabel('')).toBe('');
+  });
+  it('ignora caixa e espaço', () => {
+    expect(cropLabel(' CAFE ')).toBe('café');
   });
 });

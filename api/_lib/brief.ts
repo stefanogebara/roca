@@ -15,6 +15,7 @@
 import { chat } from './llm';
 import { MODELS } from './env';
 import { groundedHit, chemicalGroups } from './tools/agrofit';
+import { cropLabel } from './tools/crops';
 import { getFarmProfile, getRecentInboundText, type FarmProfile } from './db';
 import { createLogger } from './logger';
 
@@ -83,10 +84,12 @@ async function extractBriefFields(convo: string): Promise<BriefFields> {
 export function composeBrief(profile: FarmProfile, f: BriefFields): string {
   // Crops can arrive pipe/comma-joined ("soja|milho") from either the profile or
   // the extractor — normalise to a clean "soja e milho".
+  // cropLabel: the DB stores unaccented slugs; the farmer (and the partner who
+  // receives the forwarded case) must read "café", not "cafe".
   const clean = (s: string): string =>
-    s.split(/[|,/]/).map((x) => x.trim()).filter(Boolean).join(' e ');
+    s.split(/[|,/]/).map((x) => cropLabel(x.trim())).filter(Boolean).join(' e ');
   const rawCrop = f.crop ?? (profile.crop && profile.crop.length ? profile.crop.join(' e ') : null);
-  const cropLabel = rawCrop ? clean(rawCrop) : null;
+  const cultura = rawCrop ? clean(rawCrop) : null;
   const local = profile.uf ?? null;
 
   const hit = f.pest ? groundedHit(f.crop, f.pest, profile.crop) : null;
@@ -94,7 +97,7 @@ export function composeBrief(profile: FarmProfile, f: BriefFields): string {
 
   const lines: string[] = ['📋 *Resumo pra levar ao agrônomo*', ''];
 
-  lines.push(`• *Cultura/local:* ${[cropLabel, local].filter(Boolean).join(' · ') || 'a confirmar'}`);
+  lines.push(`• *Cultura/local:* ${[cultura, local].filter(Boolean).join(' · ') || 'a confirmar'}`);
   lines.push(`• *O que observei:* ${f.symptom ?? f.pest ?? 'a confirmar (mando foto)'}`);
   if (f.pest) lines.push(`• *Suspeita:* ${f.pest}`);
   if (f.stage) lines.push(`• *Estágio da lavoura:* ${f.stage}`);
@@ -107,7 +110,7 @@ export function composeBrief(profile: FarmProfile, f: BriefFields): string {
     const grp = groups.length ? ` (grupos: ${groups.join(', ')})` : '';
     lines.push(
       '',
-      `_Referência Agrofit/MAPA: ${hit.entry.products} produtos registrados pra ${f.pest} em ${hit.crop}${grp}. A escolha do produto e da dose é do agrônomo, no receituário._`
+      `_Referência Agrofit/MAPA: ${hit.entry.products} produtos registrados pra ${f.pest} em ${cropLabel(hit.crop)}${grp}. A escolha do produto e da dose é do agrônomo, no receituário._`
     );
   }
 

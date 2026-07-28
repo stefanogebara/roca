@@ -9,6 +9,14 @@ import {
   renderTemplateText,
 } from '../api/_lib/prospect/personalize';
 import { computeFunnelStats, playbookBlock } from '../api/_lib/prospect/learn';
+import {
+  registryParamCount,
+  templateBody,
+  templateCategory,
+  RETOMADA_NAME,
+  ENTREGA_NAME,
+  DESPEDIDA_NAME,
+} from '../api/_lib/prospect/template';
 
 describe('sourcing query grid', () => {
   it('bounds the run (maxCities × queries)', () => {
@@ -151,5 +159,39 @@ describe('template de alerta no registry (cobertura de canário do loop de reten
     // o único template do loop de retenção fica sem monitoramento: uma pausa da
     // Meta só apareceria na próxima geada, quando o alerta não sair.
     expect(registryParamCount('stevi_alerta_v1')).toBe(1);
+  });
+});
+
+// 28/jul: todo template aprovado era de ABERTURA. Quando a conversa com o
+// Felipe (Agro.com) esfriar e a janela de 24h fechar, mandar de novo um
+// template de primeiro contato lê como robô que esqueceu a conversa.
+describe('templates de continuação (retomada / entrega / despedida)', () => {
+  it('cada um declara os params que a shape guard vai cobrar', () => {
+    expect(registryParamCount(RETOMADA_NAME)).toBe(2);
+    expect(registryParamCount(ENTREGA_NAME)).toBe(2);
+    expect(registryParamCount(DESPEDIDA_NAME)).toBe(1);
+  });
+
+  it('retomada e entrega são UTILITY — cumprem combinado, não ofertam', () => {
+    // UTILITY: ~9x mais barato e imune ao teto de marketing por usuário (131049).
+    expect(templateCategory(RETOMADA_NAME)).toBe('UTILITY');
+    expect(templateCategory(ENTREGA_NAME)).toBe('UTILITY');
+  });
+
+  it('despedida é MARKETING e por isso LEVA o rodapé de opt-out', () => {
+    expect(templateCategory(DESPEDIDA_NAME)).not.toBe('UTILITY');
+    expect(templateBody(DESPEDIDA_NAME)).toMatch(/responda SAIR/);
+  });
+
+  it('utility NÃO leva rodapé de opt-out — não é cold outreach', () => {
+    expect(templateBody(RETOMADA_NAME)).not.toMatch(/responda SAIR/i);
+    expect(templateBody(ENTREGA_NAME)).not.toMatch(/responda SAIR/i);
+  });
+
+  it('nenhum se reapresenta como primeiro contato', () => {
+    // "Falo com a X?" é abertura; num follow-up soa como amnésia.
+    for (const n of [RETOMADA_NAME, ENTREGA_NAME, DESPEDIDA_NAME]) {
+      expect(templateBody(n), n).not.toMatch(/falo com a/i);
+    }
   });
 });

@@ -29,7 +29,10 @@ describe('composeBrief', () => {
 
   it('scopes grounding to the farmer\'s crop (café, not soja)', () => {
     const text = composeBrief({ uf: 'MG', crop: ['cafe'] }, { ...blank(), pest: 'ferrugem' });
-    expect(text).toMatch(/em cafe/);
+    // Acentuado de propósito: o slug interno é 'cafe', mas o que sai pro
+    // produtor (e pro parceiro que recebe o encaminhamento) é português.
+    expect(text).toMatch(/em café/);
+    expect(text).not.toMatch(/\bcafe\b/);
     expect(text).not.toMatch(/em soja/);
   });
 

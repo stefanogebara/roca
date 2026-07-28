@@ -30,6 +30,24 @@ export const COOP_V2_NAME = 'stevi_parceria_coop_v2';
  * only surface on the next frost, when the alert silently fails to go out. */
 export const ALERT_NAME = 'stevi_alerta_v1';
 
+/**
+ * CONTINUAÇÃO — a lacuna que 28/jul expôs. Todo template aprovado era de
+ * ABERTURA: quando a conversa com o Felipe (Agro.com) esfriar e a janela de 24h
+ * fechar, não existe nada para retomar de onde parou. Mandar um template de
+ * primeiro contato para quem já conversa com a gente lê como robô que esqueceu
+ * a conversa — e é o tipo de coisa que faz o interlocutor bloquear.
+ *
+ * Categoria UTILITY nos dois primeiros por serem cumprimento de algo combinado
+ * na própria conversa, não oferta nova: ~9x mais barato e imune ao teto de
+ * marketing por usuário (#131049). Sem rodapé SAIR — utility não é cold.
+ */
+/** Retoma uma conversa esfriada, citando o que ficou pendente. */
+export const RETOMADA_NAME = 'stevi_retomada_v1';
+/** Entrega o material que a gente ficou de mandar. */
+export const ENTREGA_NAME = 'stevi_entrega_v1';
+/** Última tentativa antes de parquear o lead — porta aberta, sem insistência. */
+export const DESPEDIDA_NAME = 'stevi_despedida_v1';
+
 const FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
 
 interface TemplateDef {
@@ -73,6 +91,34 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
       'devolve o caso técnico organizado pro time da {{2}} — não substitui ninguém. Posso te mandar um ' +
       'exemplo real de caso pra você avaliar?',
     example: ['Coopercafé', 'Coopercafé'],
+  },
+  // Retomada — {{1}}=nome de quem fala, {{2}}=o que ficou pendente. Cita a
+  // conversa anterior para não soar como primeiro contato repetido.
+  [RETOMADA_NAME]: {
+    category: 'UTILITY',
+    body:
+      'Oi, {{1}}! Aqui é a Vitória, da Stevi 🌱 A gente conversou por aqui e ficou de {{2}}. ' +
+      'Posso seguir de onde a gente parou?',
+    example: ['Felipe', 'eu te mandar um exemplo de caso'],
+  },
+  // Entrega — {{1}}=nome, {{2}}=o que está sendo entregue. O turno que cumpre
+  // a promessa; sem pitch, porque o pitch já foi feito na conversa.
+  [ENTREGA_NAME]: {
+    category: 'UTILITY',
+    body:
+      'Oi, {{1}}! Como combinado, te trago {{2}}. ' +
+      'Se fizer sentido pra loja, me diz que a gente segue daqui.',
+    example: ['Felipe', 'o exemplo de caso de um cafeicultor da região'],
+  },
+  // Despedida — {{1}}=nome. Encerra sem cobrar resposta. MARKETING (é
+  // reengajamento, não cumprimento de combinado) e por isso leva o rodapé.
+  [DESPEDIDA_NAME]: {
+    body:
+      'Oi, {{1}}! Não quero tomar seu tempo — vou parar por aqui. ' +
+      'Se um dia fizer sentido receber produtores da região com o caso técnico já organizado, ' +
+      'é só me chamar nesse mesmo número. Bom trabalho! 🌱\n\n' +
+      FOOTER,
+    example: ['Felipe'],
   },
   // Proactive alert to a farmer outside the 24h window — {{1}}=alert text
   // (flattened by cloud.sendTemplate; Meta rejects newlines in params). UTILITY:
@@ -256,4 +302,20 @@ export async function submitTemplate(
 /** Back-compat wrapper for the ops action. */
 export async function submitV2Template(): Promise<{ submitted: boolean; status: TemplateStatus }> {
   return submitTemplate(V2_NAME);
+}
+
+/** The registry body for a template, or null when unknown. */
+export function templateBody(name: string): string | null {
+  return TEMPLATE_DEFS[name]?.body ?? null;
+}
+
+/**
+ * The Meta category we submit under. Defaults to MARKETING: assuming UTILITY
+ * for an unmarked template would understate cost AND dodge the per-user
+ * marketing cap by accident — the conservative default is the expensive one.
+ */
+export function templateCategory(name: string): 'MARKETING' | 'UTILITY' | null {
+  const def = TEMPLATE_DEFS[name];
+  if (!def) return null;
+  return def.category ?? 'MARKETING';
 }

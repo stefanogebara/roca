@@ -76,3 +76,18 @@ export function isCropsOnlyMessage(text: string): boolean {
     .trim();
   return rest.length <= 2;
 }
+
+/**
+ * Display label for a stored crop slug. The DB keeps unaccented slugs ('cafe',
+ * 'feijao'); people read accented Portuguese.
+ *
+ * Without this, the agrônomo briefing printed "Cultura/local: cafe · MG" — an
+ * internal slug leaking to the farmer AND to the partner who receives the
+ * forwarded case. Unknown crops pass through untouched: never invent a label.
+ */
+export function cropLabel(slug: string): string {
+  const s = strip(slug);
+  if (!s) return slug.trim();
+  const hit = CROP_PATTERNS.find((c) => strip(c.label) === s);
+  return hit ? hit.label : slug.trim();
+}
