@@ -178,9 +178,11 @@ describe('templates de continuação (retomada / entrega / despedida)', () => {
     expect(templateCategory(ENTREGA_NAME)).toBe('UTILITY');
   });
 
-  it('despedida é MARKETING e por isso LEVA o rodapé de opt-out', () => {
+  it('despedida é MARKETING — o rodapé vem do componente FOOTER, não do corpo', () => {
     expect(templateCategory(DESPEDIDA_NAME)).not.toBe('UTILITY');
-    expect(templateBody(DESPEDIDA_NAME)).toMatch(/responda SAIR/);
+    // submitTemplate anexa o FOOTER a todo MARKETING; repetir no corpo
+    // mandaria "responda SAIR" duas vezes na mesma mensagem.
+    expect(templateBody(DESPEDIDA_NAME)).not.toMatch(/responda SAIR/i);
   });
 
   it('utility NÃO leva rodapé de opt-out — não é cold outreach', () => {

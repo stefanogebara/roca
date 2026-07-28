@@ -116,8 +116,10 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
     body:
       'Oi, {{1}}! Não quero tomar seu tempo — vou parar por aqui. ' +
       'Se um dia fizer sentido receber produtores da região com o caso técnico já organizado, ' +
-      'é só me chamar nesse mesmo número. Bom trabalho! 🌱\n\n' +
-      FOOTER,
+      'é só me chamar nesse mesmo número. Bom trabalho! 🌱',
+    // Sem FOOTER no corpo: submitTemplate anexa o rodapé como componente FOOTER
+    // em todo MARKETING. Escrever aqui também mandaria "responda SAIR" duas
+    // vezes na mesma mensagem.
     example: ['Felipe'],
   },
   // Proactive alert to a farmer outside the 24h window — {{1}}=alert text
