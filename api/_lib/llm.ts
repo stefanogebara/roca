@@ -6,8 +6,10 @@
 
 import { requireEnv, MODELS } from './env';
 import { withRetry, isTransient } from './retry';
+import { createLogger } from './logger';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const log = createLogger('llm');
 
 export interface ChatImage {
   base64: string;
@@ -75,13 +77,22 @@ export async function describeImage(image: ChatImage): Promise<string> {
  * maxDuration budget.
  */
 export async function chat(opts: ChatOptions): Promise<string> {
-  return withRetry(() => chatOnce(opts), {
-    attempts: 2,
-    shouldRetry: (e) =>
-      isTransient(e) ||
-      (e instanceof Error &&
-        (e.message.includes('empty completion') || e.message.includes('timeout after'))),
-  });
+  try {
+    return await withRetry(() => chatOnce(opts), {
+      attempts: 2,
+      shouldRetry: (e) =>
+        isTransient(e) ||
+        (e instanceof Error &&
+          (e.message.includes('empty completion') || e.message.includes('timeout after'))),
+    });
+  } catch (e) {
+    // Saldo zero é incidente de negócio, não erro técnico: sem alerta a Vitória
+    // fica muda e ninguém sabe. O alerta NUNCA altera o resultado da chamada —
+    // o erro segue subindo para quem chamou decidir.
+    const msg = (e as Error).message ?? '';
+    if (isCreditError(msg)) void alertarCredito(msg);
+    throw e;
+  }
 }
 
 /**
@@ -189,4 +200,64 @@ let lastFinishReason: string | null = null;
 export async function chatDetailed(opts: ChatOptions): Promise<{ text: string; finishReason: string | null }> {
   const text = await chat(opts);
   return { text, finishReason: lastFinishReason };
+}
+
+// ── Falha por crédito ≠ falha transitória ───────────────────────────────────
+
+/**
+ * Se o erro é "sem saldo" e não "deu ruim". 29/jul: o OpenRouter devolveu 402
+ * "Insufficient credits", e a Vitória — que degrada para silêncio quando o
+ * modelo falha — ficaria muda num dia de disparo sem ninguém saber.
+ *
+ * Timeout e 429 o retry resolve. Saldo zero não: alguém tem que pagar. São
+ * classes diferentes e merecem tratamento diferente.
+ */
+export function isCreditError(msg: string | null | undefined): boolean {
+  const m = (msg ?? '').toLowerCase();
+  if (!m) return false;
+  return (
+    m.includes('402') ||
+    m.includes('insufficient credit') ||
+    m.includes('quota exceeded') ||
+    m.includes('payment required') ||
+    m.includes('credit balance')
+  );
+}
+
+/** Intervalo mínimo entre dois alertas de crédito. */
+export const CREDIT_ALERT_COOLDOWN_MS = 10 * 60_000;
+
+/**
+ * Se vale alertar agora. Uma rajada de falhas é UM problema, não vinte — mas
+ * passado o cooldown alerta de novo, porque saldo zero não se resolve sozinho e
+ * cada minuto parado custa lead.
+ */
+export function deveAlertarCredito(ultimoAlertaMs: number | null, agoraMs: number): boolean {
+  if (ultimoAlertaMs == null) return true;
+  return agoraMs - ultimoAlertaMs >= CREDIT_ALERT_COOLDOWN_MS;
+}
+
+// Por instância de função (serverless). Instância nova pode alertar de novo, e
+// isso é aceitável: saldo zero É incidente, repetir é melhor que engolir.
+let ultimoAlertaCredito: number | null = null;
+
+/**
+ * Avisa os fundadores que o modelo está sem saldo. Fail-soft e com import
+ * dinâmico: um alerta que derruba a chamada de LLM seria pior que o problema
+ * que ele reporta.
+ */
+async function alertarCredito(msg: string): Promise<void> {
+  const agora = Date.now();
+  if (!deveAlertarCredito(ultimoAlertaCredito, agora)) return;
+  ultimoAlertaCredito = agora;
+  try {
+    const { alertFounders } = await import('./alert');
+    await alertFounders(
+      `💳 MODELO SEM SALDO no OpenRouter. A Stevi e a Vitória ficam MUDAS enquanto isso — ` +
+        `prospect que responder não recebe nada, e produtor também não. ` +
+        `Adicione crédito em openrouter.ai/settings/credits. (${msg.slice(0, 90)})`
+    );
+  } catch (e) {
+    log.error('alerta de crédito falhou:', (e as Error).message);
+  }
 }
