@@ -274,6 +274,9 @@ export function agentSystemPrompt(name: string): string {
     `descreve o PRODUTO, não você. Dizer "sou assistente gratuita no WhatsApp" NÃO cumpre a regra zero; ` +
     `o interlocutor precisa entender que quem digita é automatizado. Use "assistente digital" ou "IA" ` +
     `explicitamente, sobre VOCÊ.**\n` +
+    `- NUNCA repita pergunta que você já fez nesta conversa, nem reformulada. Antes de perguntar, releia o ` +
+    `histórico: se ele já respondeu, avance pro próximo assunto ou proponha o próximo passo.
+` +
     `- Faça no máximo UMA pergunta por mensagem. Curto, tom profissional-caloroso, pt-BR.\n` +
     `- NUNCA cite preço ou valor (nem exemplos). Perguntas de preço/contrato/ligação: diga que o Stefano ` +
     `responde direto por aqui. NUNCA prometa prazo ("hoje ainda", "amanhã"): a agenda dele não é sua.\n` +
@@ -375,11 +378,50 @@ export async function buildAgentReply(
 
   // Silêncio diante de gente vira encerramento; diante de robô, continua
   // silêncio. Ver resolverSilencio.
-  const action = resolverSilencio(
+  let action = resolverSilencio(
     interpretAgentOutput(raw, finishReason ?? undefined),
     turno,
     prospectName
   );
+
+  // Gate de repetição: o juiz pareado pegou "repetiu a mesma pergunta após uma
+  // resposta clara" no cenário da coop. Regra no prompt não basta (quinta vez
+  // que isso se confirma em 29/jul), então há UMA retentativa avisando o modelo
+  // do que ele acabou de repetir. Se repetir de novo, é sinal de que não há
+  // assunto novo: vira silêncio deliberado, que diante de gente resolverSilencio
+  // converte em encerramento.
+  if (action.tipo === 'responder' && repeticaoNossa(thread, action.texto)) {
+    log.error(`agent repetiu pergunta já feita — 1 retentativa: "${action.texto.slice(0, 70)}"`);
+    try {
+      const r2 = await chatDetailed({
+        model: MODELS.reasoning(),
+        system: agentSystemPrompt(AGENT_NAME) + (learned ? `
+
+${learned}` : ''),
+        maxTokens: 1200,
+        user:
+          user +
+          `
+
+[CORREÇÃO] Você acabou de escrever isto, que REPETE algo que já disse nesta conversa: ` +
+          `"${action.texto.slice(0, 200)}". Ele já respondeu. Avance pro próximo assunto ou proponha o ` +
+          `próximo passo. Se não houver assunto novo, responda só ${SILENCE_SENTINEL}.`,
+      });
+      const a2 = resolverSilencio(
+        interpretAgentOutput(r2.text, r2.finishReason ?? undefined),
+        turno,
+        prospectName
+      );
+      action =
+        a2.tipo === 'responder' && repeticaoNossa(thread, a2.texto)
+          ? { tipo: 'silencio', motivo: 'repetiu a pergunta duas vezes — sem assunto novo', deliberado: true }
+          : a2;
+      if (action.tipo === 'silencio') action = resolverSilencio(action, turno, prospectName);
+    } catch (e) {
+      log.error('retentativa anti-repetição falhou:', (e as Error).message);
+    }
+  }
+
   if (action.tipo === 'silencio') return action;
 
   const gated = gateAgentReply(action.texto);
@@ -541,4 +583,52 @@ export function decidirTurno(e: EstadoDoTurno): DecisaoTurno {
   }
 
   return { acao: 'responder', turno: { robo, tentativa: e.tentativas } };
+}
+
+// ── Não repetir o que já perguntamos ────────────────────────────────────────
+
+/** Abaixo disso, repetir é humano: "Perfeito!", "Combinado", "Obrigada". */
+const REPETICAO_MIN_PALAVRAS = 6;
+/** Sobreposição de palavras a partir da qual duas mensagens dizem o mesmo. */
+const REPETICAO_LIMIAR = 0.7;
+
+const palavras = (s: string): Set<string> =>
+  new Set(
+    norm(s)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .split(/\s+/)
+      .filter((w) => w.length > 2) // artigos e preposições não distinguem nada
+  );
+
+/** Jaccard entre os conjuntos de palavras. */
+function sobreposicao(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const w of a) if (b.has(w)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+
+/**
+ * Se a resposta candidata repete algo que NÓS já mandamos nesta conversa.
+ *
+ * O juiz pareado pegou isso no cenário da coop: "a segunda repetiu a mesma
+ * pergunta após uma resposta clara". O prompt não tinha nenhuma regra de
+ * não-repetir — e, pela quinta vez em 29/jul, regra no prompt não é mecanismo.
+ *
+ * Compara por sobreposição de palavras, não por igualdade: o modelo reformula
+ * ("precisam de receituário" → "precisam de um receituário") e a igualdade
+ * exata deixaria passar. Só olha as NOSSAS mensagens — o prospect repetir é
+ * assunto do porteiro, não deste gate.
+ */
+export function repeticaoNossa(
+  thread: Array<{ direction: string; text: string | null }>,
+  candidato: string
+): boolean {
+  const novo = palavras(candidato);
+  if (novo.size < REPETICAO_MIN_PALAVRAS) return false;
+  return thread.some(
+    (m) => m.direction === 'out' && sobreposicao(novo, palavras(m.text ?? '')) >= REPETICAO_LIMIAR
+  );
 }

@@ -13,6 +13,7 @@ import {
   PORTEIRO_MAX,
   dicaDeTurno,
   resolverSilencio,
+  repeticaoNossa,
 } from '../api/_lib/prospect/agent';
 import { parseVcards } from '../api/_lib/transport/vcard';
 
@@ -400,5 +401,40 @@ describe('nunca prometer prazo de terceiro', () => {
     const t = gateAgentReply('cobramos R$ 50 por lead').text;
     expect(t).toMatch(/stefano/i);
     expect(t).not.toMatch(/R\$/);
+  });
+})
+
+// O juiz pareado, no cenário da coop: "a segunda repetiu a mesma pergunta após
+// uma resposta clara". O prompt não tinha NENHUMA regra de não-repetir — e,
+// pela quinta vez hoje, regra no prompt não é mecanismo. Daí o gate.
+describe('repeticaoNossa — não perguntar de novo o que já perguntamos', () => {
+  const nossa = (text: string) => ({ direction: 'out', text });
+  const dele = (text: string) => ({ direction: 'in', text });
+  const P = 'Como os produtores da região chegam até vocês quando precisam de receituário?';
+
+  it('pega repetição literal do que JÁ dissemos', () => {
+    expect(repeticaoNossa([nossa(P)] as never, P)).toBe(true);
+  });
+
+  it('pega reformulação próxima, não só cópia exata', () => {
+    expect(repeticaoNossa([nossa(P)] as never,
+      'Como os produtores da região chegam até vocês quando precisam de um receituário?')).toBe(true);
+  });
+
+  it('NÃO acusa pergunta diferente sobre o mesmo tema', () => {
+    expect(repeticaoNossa([nossa(P)] as never,
+      'E vocês atendem quais municípios hoje?')).toBe(false);
+  });
+
+  it('mensagem curta pode repetir — "Perfeito!" duas vezes é humano', () => {
+    expect(repeticaoNossa([nossa('Perfeito, obrigada!')] as never, 'Perfeito, obrigada!')).toBe(false);
+  });
+
+  it('só olha o que NÓS mandamos — o prospect repetir não é nosso problema', () => {
+    expect(repeticaoNossa([dele(P)] as never, P)).toBe(false);
+  });
+
+  it('thread vazia nunca é repetição', () => {
+    expect(repeticaoNossa([] as never, P)).toBe(false);
   });
 })
