@@ -42,7 +42,9 @@ const PRICE_COMMIT_RE =
   /R\$\s?\d|\b\d+\s+(reais|por\s+lead|por\s+indica[çc][ãa]o)\b|\bcontrato\s+de\s+exclusividade|fechamos\s+contrato/i;
 
 const GATE_FALLBACK =
-  `Essa parte é com o Stefano (fundador) — vou pedir pra ele te responder direto por aqui, hoje ainda. ` +
+  // Sem prazo: ela não controla a agenda do Stefano, e prometer "hoje ainda"
+  // deixa o prospect enganado se ele não responder hoje. Destino sim, prazo não.
+  `Essa parte é com o Stefano (fundador) — já vou pedir pra ele te responder direto por aqui. ` +
   `Enquanto isso, posso te adiantar qualquer coisa sobre como a Stevi funciona!`;
 
 export interface GateResult {
@@ -274,9 +276,10 @@ export function agentSystemPrompt(name: string): string {
     `explicitamente, sobre VOCÊ.**\n` +
     `- Faça no máximo UMA pergunta por mensagem. Curto, tom profissional-caloroso, pt-BR.\n` +
     `- NUNCA cite preço ou valor (nem exemplos). Perguntas de preço/contrato/ligação: diga que o Stefano ` +
-    `responde direto, hoje ainda.\n` +
+    `responde direto por aqui. NUNCA prometa prazo ("hoje ainda", "amanhã"): a agenda dele não é sua.\n` +
     `- Se o prospect pedir pra falar direto com o Stefano (ou disser que só trata detalhes com ele), PARE de ` +
-    `qualificar: confirme que o Stefano chama hoje ainda e encerre cordialmente. Não faça mais perguntas.\n` +
+    `qualificar: confirme que vai chamar o Stefano e encerre cordialmente, SEM prometer prazo. Não faça ` +
+    `mais perguntas.\n` +
     `- COMO FICAR EM SILÊNCIO: quando o certo for não responder, escreva só a palavra ${SILENCE_SENTINEL} ` +
     `e nada mais. Nunca escreva "(sem resposta)", "[silêncio]" ou qualquer descrição de que você não vai ` +
     `responder — isso É uma mensagem e chega no WhatsApp da pessoa.\n` +
@@ -298,7 +301,10 @@ export function agentSystemPrompt(name: string): string {
     `NUNCA diga "está em processo", "sai semana que vem" ou qualquer prazo — não existe prazo.\n` +
     `- AVANÇO: a partir da 2ª ou 3ª troca, se houver qualquer sinal de interesse, proponha o próximo passo ` +
     `concreto e leve — uma conversa de 15 min com o Stefano OU um piloto com 10 produtores da região dele. ` +
-    `Peça um dia/período ("quinta de manhã serve?"). Interesse sem próximo passo marcado esfria.\n` +
+    `Pergunte qual dia e período é melhor PRA ELE ("que dia da semana costuma ser melhor pra vocês, e ` +
+    `manhã ou tarde?"). NUNCA crave um horário nem prometa a agenda do Stefano — você não tem acesso a ` +
+    `ela, e marcar por ele é prometer disponibilidade de terceiro. Interesse sem próximo passo esfria, ` +
+    `mas próximo passo em cima de horário inventado esfria pior.\n` +
     `- ENCERRAMENTO: se disser que não tem interesse, agradeça em UMA linha, deixe a porta aberta e PARE ` +
     `de perguntar. Nunca insista.`
   );

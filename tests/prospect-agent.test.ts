@@ -345,3 +345,60 @@ describe('silêncio com HUMANO do outro lado vira encerramento', () => {
     expect(a).toEqual({ tipo: 'responder', texto: 'oi' });
   });
 })
+
+// gap:proposta_de_horario_flexivel — apontado pelo juiz na rodada 32c510f3.
+// A raiz era o próprio prompt: ele MANDAVA propor um dia fixo, com o exemplo
+// literal "quinta de manhã serve?". O modelo obedecia, e o juiz reclamava em
+// dois lugares diferentes:
+//   "marcar a reunião sem confirmar a agenda do prospect de forma mais flexível"
+//   "se prende a datas fixas sem contextualizar"
+// Ela também não tem acesso à agenda do Stefano — cravar horário é prometer
+// disponibilidade de terceiro, o mesmo defeito do "ele te chama ainda hoje".
+describe('prompt de AVANÇO — pergunta a preferência, não crava horário', () => {
+  const p = agentSystemPrompt('Vitória');
+
+  it('não instrui a cravar um dia específico', () => {
+    expect(p).not.toMatch(/quinta de manh[ãa]/i);
+  });
+
+  it('manda perguntar quando é melhor PRA ELE', () => {
+    expect(p).toMatch(/melhor\s+(pra|para)\s+(voc[êe]|vocês)|qual.*melhor.*hor[áa]rio|que\s+dia.*melhor/i);
+  });
+
+  it('proíbe prometer a agenda do Stefano — ela não a conhece', () => {
+    expect(p).toMatch(/n[ãa]o.*(crav|prometa|marque).*hor[áa]rio|agenda do stefano/i);
+  });
+
+  it('mantém a regra de que interesse sem próximo passo esfria', () => {
+    expect(p).toMatch(/esfria/i);
+  });
+})
+
+// Irmão do mesmo defeito, achado ao consertar o horário: três lugares
+// prometiam que o Stefano responde "hoje ainda". É disponibilidade de TERCEIRO
+// que ela não controla — se ele não responder hoje, o prospect foi enganado. O
+// juiz já havia marcado: "promete que o Stefano chamará 'ainda hoje'... uma
+// promessa que não pode ser feita por uma assistente virtual".
+describe('nunca prometer prazo de terceiro', () => {
+  // Cuidado que este teste já me pegou: proibir a SUBSTRING é ingênuo, porque o
+  // prompt cita "hoje ainda" justamente para PROIBIR. O que não pode existir é
+  // a construção afirmativa — "responde hoje ainda", "chama hoje ainda".
+  it('o prompt não promete resposta do Stefano no mesmo dia', () => {
+    const p = agentSystemPrompt('Vitória');
+    expect(p).not.toMatch(/(responde|chama|retorna|liga)\w*[^.\n]{0,40}(hoje ainda|ainda hoje)/i);
+  });
+
+  it('e proíbe prazo explicitamente', () => {
+    expect(agentSystemPrompt('Vitória')).toMatch(/nunca\s+prometa\s+prazo/i);
+  });
+
+  it('o fallback do gate de preço também não', () => {
+    expect(gateAgentReply('cobramos R$ 50 por lead').text).not.toMatch(/hoje ainda|ainda hoje/i);
+  });
+
+  it('o fallback continua encaminhando pro Stefano — sem prazo, mas com destino', () => {
+    const t = gateAgentReply('cobramos R$ 50 por lead').text;
+    expect(t).toMatch(/stefano/i);
+    expect(t).not.toMatch(/R\$/);
+  });
+})
