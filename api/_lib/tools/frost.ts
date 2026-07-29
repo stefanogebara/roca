@@ -7,6 +7,7 @@
  */
 
 import type { Coordinates } from './weather';
+import { openMeteoRequestUrl } from './openMeteo';
 
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
 
@@ -55,7 +56,7 @@ export async function fetchDailyMinTemps(coords: Coordinates, days = 3): Promise
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(`${OPEN_METEO}?${params.toString()}`, { signal: ctrl.signal });
+    const res = await fetch(openMeteoRequestUrl('api', '/v1/forecast', params), { signal: ctrl.signal });
     if (!res.ok) throw new Error(`Open-Meteo returned ${res.status}`);
     const data = (await res.json()) as {
       daily?: { time: string[]; temperature_2m_min: number[] };

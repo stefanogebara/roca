@@ -5,6 +5,7 @@
  */
 
 import type { HourWeather } from './deltaT';
+import { openMeteoRequestUrl } from './openMeteo';
 
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
 // Hard deadline — this is the hottest external call in the pipeline (spray
@@ -48,7 +49,7 @@ export async function fetchHourlyWeather(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(`${OPEN_METEO}?${params.toString()}`, { signal: controller.signal });
+    res = await fetch(openMeteoRequestUrl('api', '/v1/forecast', params), { signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }

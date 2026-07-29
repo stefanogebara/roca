@@ -9,6 +9,7 @@
  */
 
 import { createLogger } from '../logger';
+import { openMeteoRequestUrl } from './openMeteo';
 
 const log = createLogger('geo');
 
@@ -110,7 +111,7 @@ export async function geocodeCityBR(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const params = new URLSearchParams({ name: city, count: '10', language: 'pt', format: 'json' });
-    const res = await fetch(`${GEOCODE_URL}?${params.toString()}`, { signal: controller.signal });
+    const res = await fetch(openMeteoRequestUrl('geocoding-api', '/v1/search', params), { signal: controller.signal });
     if (!res.ok) {
       log.error(`geocode returned ${res.status}`);
       return null;
