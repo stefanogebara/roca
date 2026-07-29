@@ -249,8 +249,13 @@ describe('porteiroEsgotado — UMA tentativa, e encerra', () => {
     expect(porteiroEsgotado(PORTEIRO_MAX)).toBe(true);
     expect(porteiroEsgotado(PORTEIRO_MAX + 5)).toBe(true);
   });
-  it('o limite é 1 — decisão medida, não número mágico', () => {
+  it('o default é 1 — decisão medida, não número mágico', () => {
     expect(PORTEIRO_MAX).toBe(1);
+  });
+  it('nunca é 0 nem absurdo, mesmo com env malformada', () => {
+    // 0 = nunca tenta furar o menu; 99 = insiste com robô a tarde inteira.
+    expect(PORTEIRO_MAX).toBeGreaterThanOrEqual(1);
+    expect(PORTEIRO_MAX).toBeLessThanOrEqual(3);
   });
 });
 

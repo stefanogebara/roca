@@ -48,7 +48,17 @@ async function carregar(ids: string[]): Promise<StoredRun[]> {
 }
 
 async function main(): Promise<void> {
-  const ids = process.argv.slice(2).flatMap((a) => a.split(',')).map((s) => s.trim()).filter(Boolean);
+  const argv = process.argv.slice(2);
+  // --personas=a,b recorta a comparação. Existe porque 13 cenários inertes
+  // diluem uma mudança dirigida em ruído: em 29/jul o placar 5×9 "reverta a
+  // mudança" saiu de um par de rodadas comportamentalmente idênticas, com o
+  // veredito inteiro apoiado em cenários que a mudança nem tocava.
+  const escopo = argv
+    .filter((a) => a.startsWith('--personas='))
+    .flatMap((a) => a.slice('--personas='.length).split(','))
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const ids = argv.filter((a) => !a.startsWith('--')).flatMap((a) => a.split(',')).map((s) => s.trim()).filter(Boolean);
   const [runA, runB] = await carregar(ids);
   const { runPairedGym } = await import('../api/_lib/prospect/gymPaired');
   const { PROSPECT_PERSONAS } = await import('../api/_lib/prospect/gym');
@@ -58,9 +68,12 @@ async function main(): Promise<void> {
   console.log(`   B (depois): ${runB.id}  ${runB.ran_at}\n`);
 
   const t0 = Date.now();
+  const noEscopo = (p: string) => escopo.length === 0 || escopo.includes(p);
+  if (escopo.length) console.log(`   recorte: ${escopo.join(', ')}
+`);
   const r = await runPairedGym(
-    runA.verdicts.map((v) => ({ persona: v.persona, transcript: v.transcript as never })),
-    runB.verdicts.map((v) => ({ persona: v.persona, transcript: v.transcript as never })),
+    runA.verdicts.filter((v) => noEscopo(v.persona)).map((v) => ({ persona: v.persona, transcript: v.transcript as never })),
+    runB.verdicts.filter((v) => noEscopo(v.persona)).map((v) => ({ persona: v.persona, transcript: v.transcript as never })),
     PROSPECT_PERSONAS
   );
   const secs = Math.round((Date.now() - t0) / 1000);

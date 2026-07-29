@@ -204,7 +204,12 @@ export function ecoDeMaquina(
  * O caminho do Felipe segue aberto: o fundador manda o "1" pelo painel quando
  * quiser furar um menu. Isso é decisão humana, não da agente.
  */
-export const PORTEIRO_MAX = 1;
+const PORTEIRO_MAX_RAW = Number(process.env.PROSPECT_PORTEIRO_MAX ?? '1');
+/** Ajustável por env só para o experimento pareado poder comparar 1 vs 2 sem
+ * editar código no meio da medição. Clamp em [1, 3]: env malformada não pode
+ * virar 0 (nunca tenta) nem 99 (insiste com robô a tarde inteira). */
+export const PORTEIRO_MAX =
+  Number.isFinite(PORTEIRO_MAX_RAW) ? Math.min(3, Math.max(1, Math.floor(PORTEIRO_MAX_RAW))) : 1;
 
 /** Whether we've already spent our attempts at getting past the bot. */
 export function porteiroEsgotado(tentativas: number): boolean {
