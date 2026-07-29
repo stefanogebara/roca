@@ -307,7 +307,8 @@ export function formatThreadBlock(turns: ThreadTurn[], name: string): string {
 export async function buildAgentReply(
   prospectName: string,
   thread: ThreadTurn[],
-  inboundText: string
+  inboundText: string,
+  turno: TurnoContexto = { robo: false, tentativa: 0 }
 ): Promise<AgentAction> {
   const history = formatThreadBlock(thread, AGENT_NAME);
   const user =
@@ -315,7 +316,8 @@ export async function buildAgentReply(
     `[Prospect: ${prospectName}]\n` +
     `Nova mensagem do prospect: ${inboundText}\n\n` +
     `Responda como ${AGENT_NAME} (só o texto da mensagem, tamanho WhatsApp). ` +
-    `Se o certo for não responder, escreva só ${SILENCE_SENTINEL}.`;
+    `Se o certo for não responder, escreva só ${SILENCE_SENTINEL}.` +
+    dicaDeTurno(turno);
 
   // Market learnings (weekly-mined) are appended as an informational block;
   // a load failure only costs the learnings, never the reply.
@@ -343,7 +345,13 @@ export async function buildAgentReply(
     return { tipo: 'silencio', motivo: `erro no modelo: ${(e as Error).message.slice(0, 80)}`, deliberado: false };
   }
 
-  const action = interpretAgentOutput(raw, finishReason ?? undefined);
+  // Silêncio diante de gente vira encerramento; diante de robô, continua
+  // silêncio. Ver resolverSilencio.
+  const action = resolverSilencio(
+    interpretAgentOutput(raw, finishReason ?? undefined),
+    turno,
+    prospectName
+  );
   if (action.tipo === 'silencio') return action;
 
   const gated = gateAgentReply(action.texto);
@@ -387,4 +395,69 @@ export async function extractQualification(thread: ThreadTurn[]): Promise<Qualif
     log.error('qualification extraction failed:', (e as Error).message);
     return null;
   }
+}
+
+// ── Dica de turno: contar pro modelo o que o porteiro descobriu ──────────────
+
+export interface TurnoContexto {
+  /** O porteiro identificou atendimento automático nesta mensagem. */
+  robo: boolean;
+  /** Quantas tentativas de furar o robô já gastamos (0 = esta é a primeira). */
+  tentativa: number;
+}
+
+/**
+ * Instrução extra pro modelo, derivada do que o porteiro DETERMINISTICAMENTE já
+ * descobriu.
+ *
+ * Existe porque o pareado de 28/jul perdeu dois cenários pela mesma raiz: o
+ * porteiro detectava o robô e não contava pro modelo. Ele caía no
+ * buildAgentReply sem saber com quem falava, e o juiz viu — "a segunda ignorou
+ * a dica do bot e ficou em um impasse".
+ *
+ * É a terceira vez hoje que o mesmo defeito aparece (regra no prompt sem
+ * gate; números enriquecidos sem ordenação; indicação sem chegar na resposta).
+ * A forma é sempre: o dado existia e não estava ligado na decisão.
+ *
+ * Vazio quando é gente do outro lado — não poluir o prompt do caso normal.
+ */
+export function dicaDeTurno(ctx: TurnoContexto): string {
+  if (!ctx.robo) return '';
+  if (ctx.tentativa >= PORTEIRO_MAX) {
+    return (
+      `\n\n[TURNO] A última mensagem é de atendimento AUTOMÁTICO, e já tentamos ${PORTEIRO_MAX}x chegar ` +
+      `numa pessoa. Encerre em UMA linha, agradecendo e deixando a porta aberta. Não pergunte nada, ` +
+      `não repita o pedido, não faça pitch.`
+    );
+  }
+  return (
+    `\n\n[TURNO] A última mensagem é de atendimento AUTOMÁTICO (menu, protocolo, horário). Não converse ` +
+    `com o robô nem tente navegar o menu. Em UMA linha, peça pra ser encaminhada ao responsável técnico ` +
+    `ou agronômico da empresa. Sem pitch, sem outra pergunta.`
+  );
+}
+
+/**
+ * Silêncio deliberado é a coisa certa diante de uma MÁQUINA. Diante de gente,
+ * some da conversa sem fechar a porta — e o juiz do pareado classificou isso
+ * como erro grave em `manda-material`: "comete erro grave ao ficar em silêncio,
+ * equiparado a mensagem vazia ou inútil".
+ *
+ * Então: robô → silêncio; humano → uma linha de encerramento. Silêncio por
+ * FALHA (truncou, veio vazio) nunca vira mensagem: não foi decisão dela, e
+ * inventar despedida em cima de um bug esconderia o bug.
+ */
+export function resolverSilencio(
+  acao: AgentAction,
+  ctx: { robo: boolean },
+  prospectName: string
+): AgentAction {
+  if (acao.tipo !== 'silencio' || !acao.deliberado || ctx.robo) return acao;
+  const nome = (prospectName ?? '').trim();
+  return {
+    tipo: 'responder',
+    texto:
+      `Tudo bem, ${nome ? nome + ', ' : ''}não vou insistir. 🌱 Fico à disposição por aqui se um dia ` +
+      `fizer sentido receber produtores da região com o caso técnico já organizado. Bom trabalho!`,
+  };
 }

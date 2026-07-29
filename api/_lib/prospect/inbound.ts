@@ -149,8 +149,8 @@ export async function respondAsProspectAgent(
   // the prompt is not an execution mechanism: on 28/jul the "don't talk to a
   // robot" rule existed and the ping-pong ran anyway.
   const robo = pareceAutoAtendimento(inboundText) || ecoDeMaquina(thread, inboundText);
+  const tentativas = prospect.porteiro_tentativas ?? 0;
   if (robo) {
-    const tentativas = prospect.porteiro_tentativas ?? 0;
     if (porteiroEsgotado(tentativas)) {
       await setProspectAgentEnabled(prospect.id, false).catch(() => {});
       await alertFounders(
@@ -164,7 +164,9 @@ export async function respondAsProspectAgent(
     log.info(`porteiro attempt ${tentativas + 1}/${PORTEIRO_MAX} on ${prospect.id}`);
   }
 
-  const action = await buildAgentReply(prospect.name, thread, inboundText);
+  // O que o porteiro descobriu VAI pro modelo — detectar sem contar foi o que
+  // custou os dois cenários no pareado de 28/jul.
+  const action = await buildAgentReply(prospect.name, thread, inboundText, { robo, tentativa: tentativas });
 
   if (action.tipo === 'silencio') {
     log.info(`agent stayed quiet on ${prospect.id}: ${action.motivo}`);

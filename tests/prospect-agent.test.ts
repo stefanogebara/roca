@@ -11,6 +11,8 @@ import {
   porteiroEsgotado,
   podeFalarDeNovo,
   PORTEIRO_MAX,
+  dicaDeTurno,
+  resolverSilencio,
 } from '../api/_lib/prospect/agent';
 import { parseVcards } from '../api/_lib/transport/vcard';
 
@@ -275,3 +277,53 @@ describe('silêncio deliberado vs silêncio por falha', () => {
     expect(interpretAgentOutput('', 'stop')).toMatchObject({ deliberado: false });
   });
 });
+
+// O pareado de 28/jul perdeu dois cenários, e os dois pela mesma raiz: o
+// porteiro DETECTAVA o robô e não contava pro modelo. Ele caía no
+// buildAgentReply sem saber com quem falava.
+//   auto-atendimento: "a segunda ignorou a dica do bot e ficou em um impasse"
+//   manda-material:   "comete erro grave ao ficar em silêncio, equiparado a
+//                      mensagem inútil"
+describe('dicaDeTurno — o que o modelo precisa saber ANTES de responder', () => {
+  it('robô detectado: instrui a pedir o responsável técnico em UMA linha', () => {
+    const d = dicaDeTurno({ robo: true, tentativa: 1 });
+    expect(d).toMatch(/autom[áa]tic/i);
+    expect(d).toMatch(/respons[áa]vel|t[ée]cnic/i);
+    expect(d).toMatch(/uma linha|1 linha/i);
+  });
+
+  it('robô na ÚLTIMA tentativa: instrui a encerrar, não a insistir', () => {
+    const d = dicaDeTurno({ robo: true, tentativa: PORTEIRO_MAX });
+    expect(d).toMatch(/encerr|despedi|parar/i);
+  });
+
+  it('humano: nenhuma dica — não poluir o prompt do caso normal', () => {
+    expect(dicaDeTurno({ robo: false, tentativa: 0 })).toBe('');
+  });
+});
+
+describe('silêncio com HUMANO do outro lado vira encerramento', () => {
+  it('robô: silêncio deliberado continua silêncio', () => {
+    const a = resolverSilencio({ tipo: 'silencio', motivo: 'x', deliberado: true }, { robo: true }, 'Coop');
+    expect(a.tipo).toBe('silencio');
+  });
+
+  it('humano: silêncio deliberado vira UMA linha de encerramento', () => {
+    const a = resolverSilencio({ tipo: 'silencio', motivo: 'x', deliberado: true }, { robo: false }, 'Coop');
+    expect(a.tipo).toBe('responder');
+    if (a.tipo === 'responder') {
+      expect((a.texto.match(/\?/g) ?? []).length).toBe(0); // encerra, não pergunta
+      expect(a.texto.length).toBeLessThan(220);
+    }
+  });
+
+  it('silêncio por FALHA nunca vira mensagem — não é decisão dela', () => {
+    const a = resolverSilencio({ tipo: 'silencio', motivo: 'truncou', deliberado: false }, { robo: false }, 'Coop');
+    expect(a.tipo).toBe('silencio');
+  });
+
+  it('resposta normal passa intacta', () => {
+    const a = resolverSilencio({ tipo: 'responder', texto: 'oi' }, { robo: false }, 'Coop');
+    expect(a).toEqual({ tipo: 'responder', texto: 'oi' });
+  });
+})
