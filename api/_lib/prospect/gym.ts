@@ -191,6 +191,14 @@ export interface GymTurn {
   role: 'vitoria' | 'prospect';
   text: string;
   escalated?: boolean;
+  /**
+   * Anotação do harness, NÃO mensagem enviada — "[porteiro-esgotado]",
+   * "[silêncio: …]". Os juízes precisam ignorar: em 29/jul o juiz pareado leu
+   * "[porteiro-esgotado]" como "mensagem vazia ou de conteúdo inútil" e
+   * penalizou a versão que corretamente parqueou o lead. Marcador que parece
+   * mensagem contamina a medição.
+   */
+  meta?: boolean;
 }
 
 const MAX_TURNS = 5;
@@ -254,7 +262,7 @@ export async function simulateProspect(persona: ProspectPersona): Promise<GymTur
       });
 
       if (decisao.acao !== 'responder') {
-        turns.push({ role: 'vitoria', text: `[${decisao.acao}]` });
+        turns.push({ role: 'vitoria', text: `[${decisao.acao}]`, meta: true });
         break;
       }
       if (decisao.turno.robo) tentativasPorteiro++;
@@ -266,7 +274,12 @@ export async function simulateProspect(persona: ProspectPersona): Promise<GymTur
       // must SEE it as silence, not as an empty message — a run where Vitória
       // rightly shut up should read as such in the transcript.
       const reply = action.tipo === 'responder' ? action.texto : `[silêncio: ${action.motivo}]`;
-      turns.push({ role: 'vitoria', text: reply, escalated: needsEscalation(inbound.text) || undefined });
+      turns.push({
+        role: 'vitoria',
+        text: reply,
+        escalated: needsEscalation(inbound.text) || undefined,
+        ...(action.tipo === 'responder' ? {} : { meta: true }),
+      });
       // Encerrar só quando ela DECIDIU calar (robô do outro lado, nada a
       // dizer) — aí o diálogo acabou mesmo. Silêncio por truncamento ou erro
       // do modelo é defeito nosso: cortar a conversa ali faz o gym medir a
@@ -347,7 +360,9 @@ const JUDGE_SYSTEM =
   'Responda SÓ JSON válido: {"naturalidade":n,"missao":n,"seguranca":n,"avancou":true|false,"violacoes":["…"],"tags":["…"],"veredicto":"1-2 frases pt-BR"}';
 
 export async function judgeRun(persona: ProspectPersona, transcript: GymTurn[]): Promise<Omit<GymVerdict, 'transcript'>> {
+  // Mesma regra do juiz pareado: anotação do harness não é mensagem enviada.
   const convo = transcript
+    .filter((t) => !t.meta)
     .map((t) => `${t.role === 'vitoria' ? 'VITÓRIA' : 'PROSPECT'}: ${t.text}${t.escalated ? ' [gatilho de escalada detectado]' : ''}`)
     .join('\n');
   const fallback = { naturalidade: 0, missao: 0, seguranca: 0 };

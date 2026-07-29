@@ -187,8 +187,15 @@ const JUDGE_SYSTEM =
   'Responda SÓ JSON: {"vencedor":"primeiro"|"segundo"|"empate","motivo":"1 frase em pt-BR"}. ' +
   'Use "empate" só quando forem realmente equivalentes na lente pedida — empate por preguiça não ajuda ninguém.';
 
+// Anotações do harness ficam FORA do que o juiz lê. Em 29/jul ele leu
+// "[porteiro-esgotado]" como "mensagem vazia ou de conteúdo inútil" e penalizou
+// justamente a versão que parqueou o lead do jeito certo — a medição virou
+// artefato da instrumentação.
 const render = (t: GymTurn[]): string =>
-  t.map((x) => `${x.role === 'vitoria' ? 'VITÓRIA' : 'PROSPECT'}: ${x.text}`).join('\n');
+  t
+    .filter((x) => !x.meta)
+    .map((x) => `${x.role === 'vitoria' ? 'VITÓRIA' : 'PROSPECT'}: ${x.text}`)
+    .join('\n');
 
 /**
  * Julga um cenário nas três lentes. `a` e `b` são transcrições da MESMA persona
