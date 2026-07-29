@@ -23,12 +23,8 @@ import {
   needsEscalation,
   buildAgentReply,
   extractQualification,
-  pareceAutoAtendimento,
-  ecoDeMaquina,
-  porteiroEsgotado,
-  podeFalarDeNovo,
+  decidirTurno,
   PORTEIRO_MAX,
-  MIN_GAP_MS,
 } from './agent';
 import { alertFounders } from '../alert';
 import { sendProspectReplyNotification } from '../notify';
@@ -119,14 +115,6 @@ export async function respondAsProspectAgent(
 ): Promise<string | null> {
   await logProspectMessage(prospect.id, 'in', inboundKind, inboundText);
 
-  if ((prospect as ProspectRow & { agent_enabled?: boolean }).agent_enabled === false) {
-    // Human takeover: record, ping the founder, stay silent.
-    await alertFounders(
-      `💬 Prospect ${prospect.name} respondeu (agente desligado — responda você): "${inboundText.slice(0, 150)}"`
-    );
-    return null;
-  }
-
   if (needsEscalation(inboundText)) {
     await alertFounders(
       `📞 Prospect ${prospect.name} pediu preço/contrato/humano — assuma a conversa: "${inboundText.slice(0, 150)}"`
@@ -135,38 +123,46 @@ export async function respondAsProspectAgent(
 
   const thread = await getProspectThread(prospect.id);
 
-  // Cadence ceiling on OUR OWN messages. Per-message dedup (claimInbound) can't
-  // see a burst: each inbound is a different message, so each concurrent
-  // invocation legitimately claims its own and replies. 28/jul: 12 outbound in
-  // 2 minutes to one shop.
-  const lastOut = [...thread].reverse().find((m) => m.direction === 'out');
-  if (lastOut?.created_at && !podeFalarDeNovo(new Date(lastOut.created_at), new Date())) {
-    log.info(`agent held back on ${prospect.id} — falou há menos de ${MIN_GAP_MS / 1000}s`);
+  // A decisão é pura e vive em agent.decidirTurno — o gym usa a MESMA, sem os
+  // efeitos abaixo. Antes ela estava embutida aqui, e por isso o gym (que chama
+  // buildAgentReply direto) não passava por nenhum freio.
+  const decisao = decidirTurno({
+    thread,
+    inboundText,
+    tentativas: prospect.porteiro_tentativas ?? 0,
+    agenteLigado:
+      (prospect as ProspectRow & { agent_enabled?: boolean }).agent_enabled !== false,
+    agora: new Date(),
+  });
+
+  if (decisao.acao === 'humano-assumiu') {
+    await alertFounders(
+      `💬 Prospect ${prospect.name} respondeu (agente desligado — responda você): "${inboundText.slice(0, 150)}"`
+    );
     return null;
   }
 
-  // PORTEIRO — two layers, both deterministic, both BEFORE the LLM. A rule in
-  // the prompt is not an execution mechanism: on 28/jul the "don't talk to a
-  // robot" rule existed and the ping-pong ran anyway.
-  const robo = pareceAutoAtendimento(inboundText) || ecoDeMaquina(thread, inboundText);
-  const tentativas = prospect.porteiro_tentativas ?? 0;
-  if (robo) {
-    if (porteiroEsgotado(tentativas)) {
-      await setProspectAgentEnabled(prospect.id, false).catch(() => {});
-      await alertFounders(
-        `🚪 ${prospect.name}: ${PORTEIRO_MAX} tentativas de furar o atendimento automático e só veio robô. ` +
-          `Desliguei a Vitória e parquei o lead — assuma no painel se quiser insistir.`
-      );
-      log.info(`agent parked on ${prospect.id} — porteiro esgotado (${tentativas})`);
-      return null;
-    }
-    await bumpPorteiroTentativas(prospect.id).catch(() => {});
-    log.info(`porteiro attempt ${tentativas + 1}/${PORTEIRO_MAX} on ${prospect.id}`);
+  if (decisao.acao === 'porteiro-esgotado') {
+    await setProspectAgentEnabled(prospect.id, false).catch(() => {});
+    await alertFounders(
+      `🚪 ${prospect.name}: ${PORTEIRO_MAX} tentativa(s) de furar o atendimento automático e só veio robô. ` +
+        `Desliguei a Vitória e parquei o lead — assuma no painel se quiser insistir.`
+    );
+    log.info(`agent parked on ${prospect.id} — porteiro esgotado`);
+    return null;
   }
 
-  // O que o porteiro descobriu VAI pro modelo — detectar sem contar foi o que
-  // custou os dois cenários no pareado de 28/jul.
-  const action = await buildAgentReply(prospect.name, thread, inboundText, { robo, tentativa: tentativas });
+  if (decisao.acao === 'segurar-cadencia') {
+    log.info(`agent held back on ${prospect.id} — falou há ${Math.round(decisao.desdeMs / 1000)}s`);
+    return null;
+  }
+
+  if (decisao.turno.robo) {
+    await bumpPorteiroTentativas(prospect.id).catch(() => {});
+    log.info(`porteiro attempt ${decisao.turno.tentativa + 1}/${PORTEIRO_MAX} on ${prospect.id}`);
+  }
+
+  const action = await buildAgentReply(prospect.name, thread, inboundText, decisao.turno);
 
   if (action.tipo === 'silencio') {
     log.info(`agent stayed quiet on ${prospect.id}: ${action.motivo}`);

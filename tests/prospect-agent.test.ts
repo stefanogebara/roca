@@ -180,6 +180,16 @@ describe('pareceAutoAtendimento — assinatura de atendedor automático', () => 
   it('pega o menu que nos travou hoje', () => {
     expect(pareceAutoAtendimento('Bem-vindo(a) à Agro.com!\n\nDigite a opção desejada:\n[ 1 ] - Vendas')).toBe(true);
   });
+  // Achado pelo gym em 29/jul, depois de ligá-lo no caminho real: o bot da
+  // Coopagro escreveu "digite **2**" e o padrão /digite\s+\d/ não pegou —
+  // o asterisco de markdown fica entre o verbo e o dígito. A Vitória deu
+  // despedida de humano para um robô.
+  it('pega o dígito mesmo com markdown/pontuação no meio', () => {
+    for (const t of ['digite **2** para técnico', 'Digite: 1', 'digite "3"', 'tecle *0*', 'digite  ➡ 2']) {
+      expect(pareceAutoAtendimento(t), t).toBe(true);
+    }
+  });
+
   it('pega as fórmulas institucionais mais comuns', () => {
     for (const t of [
       'Agradecemos o seu contato! Em breve retornaremos.',

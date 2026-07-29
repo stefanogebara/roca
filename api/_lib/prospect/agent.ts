@@ -136,8 +136,12 @@ const norm = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, ' ');
  * anticipates, because a bot repeats itself verbatim and a person doesn't.
  */
 const AUTO_ATENDIMENTO_PATTERNS: RegExp[] = [
-  /\bdigite\s+\d/i,
-  /\b(?:tecle|pressione)\s+\d/i,
+  // A folga [^\p{L}\p{N}]{0,4} entre o verbo e o dígito existe porque bots
+  // escrevem "digite **2**", "Digite: 1", 'digite "3"'. Achado pelo gym em
+  // 29/jul, depois de ligá-lo no caminho real: sem ela o padrão não pegou o
+  // "digite **2**" da Coopagro e a Vitória deu despedida de humano a um robô.
+  /\bdigite[^\p{L}\p{N}]{0,4}\d/iu,
+  /\b(?:tecle|pressione)[^\p{L}\p{N}]{0,4}\d/iu,
   /\[\s*\d\s*\]/, // "[ 1 ] - Vendas"
   /\bop[çc][ãa]o\s+desejada\b/i,
   /\bagradec\w+\s+(?:o\s+)?(?:seu|sua)\s+(?:contato|mensagem|prefer[êe]ncia|solicita[çc][ãa]o)/i,
@@ -473,4 +477,57 @@ export function resolverSilencio(
       `Tudo bem, ${nome ? nome + ', ' : ''}não vou insistir. 🌱 Fico à disposição por aqui se um dia ` +
       `fizer sentido receber produtores da região com o caso técnico já organizado. Bom trabalho!`,
   };
+}
+
+// ── A decisão de turno, separada dos efeitos ─────────────────────────────────
+
+export interface EstadoDoTurno {
+  /** Thread já gravada, mais antiga primeiro. */
+  thread: Array<{ direction: string; text: string | null; created_at?: string }>;
+  inboundText: string;
+  /** Tentativas de furar robô já gastas neste prospect. */
+  tentativas: number;
+  /** false = fundador assumiu a conversa no painel. */
+  agenteLigado: boolean;
+  agora: Date;
+}
+
+export type DecisaoTurno =
+  | { acao: 'humano-assumiu' }
+  | { acao: 'porteiro-esgotado' }
+  | { acao: 'segurar-cadencia'; desdeMs: number }
+  | { acao: 'responder'; turno: TurnoContexto };
+
+/**
+ * O que fazer neste turno, ANTES de chamar o LLM. Pura de propósito.
+ *
+ * Existia embutida no respondAsProspectAgent, junto dos efeitos (gravar,
+ * alertar, contar tentativa) — e por isso o gym não passava por ela: ele chama
+ * buildAgentReply direto, e um harness que não passa pelos freios testa o
+ * cérebro sem os freios.
+ *
+ * O custo disso foi concreto: rodei o juiz pareado duas vezes sobre mudanças no
+ * porteiro que o gym não exercitava, e ele devolveu "reverta a mudança" com
+ * confiança, comparando duas rodadas comportamentalmente idênticas.
+ *
+ * Precedência, explícita porque a ordem é a decisão:
+ *   takeover humano > porteiro > cadência > responder
+ * Parquear vence esperar: se o outro lado é robô e as tentativas acabaram, não
+ * há motivo para segurar a vez — a conversa terminou.
+ */
+export function decidirTurno(e: EstadoDoTurno): DecisaoTurno {
+  if (!e.agenteLigado) return { acao: 'humano-assumiu' };
+
+  const robo = pareceAutoAtendimento(e.inboundText) || ecoDeMaquina(e.thread, e.inboundText);
+  if (robo && porteiroEsgotado(e.tentativas)) return { acao: 'porteiro-esgotado' };
+
+  const ultimaNossa = [...e.thread].reverse().find((m) => m.direction === 'out');
+  if (ultimaNossa?.created_at) {
+    const quando = new Date(ultimaNossa.created_at);
+    if (!podeFalarDeNovo(quando, e.agora)) {
+      return { acao: 'segurar-cadencia', desdeMs: e.agora.getTime() - quando.getTime() };
+    }
+  }
+
+  return { acao: 'responder', turno: { robo, tentativa: e.tentativas } };
 }

@@ -19,7 +19,7 @@
 import { chat } from '../llm';
 import { MODELS } from '../env';
 import { getDb } from '../db';
-import { buildAgentReply, needsEscalation, type ThreadTurn } from './agent';
+import { buildAgentReply, needsEscalation, decidirTurno, MIN_GAP_MS, type ThreadTurn } from './agent';
 import { renderTemplateText } from './personalize';
 import { createLogger } from '../logger';
 
@@ -227,11 +227,40 @@ export async function simulateProspect(persona: ProspectPersona): Promise<GymTur
     { role: 'vitoria', text: renderTemplateText([...persona.intro]) },
     { role: 'prospect', text: persona.opener },
   ];
+  // Contador do porteiro simulado: em produção mora em prospects, aqui vive na
+  // rodada. Sem ele o gym não exercitava PORTEIRO_MAX e eu comparei duas
+  // rodadas idênticas achando que media uma mudança.
+  let tentativasPorteiro = 0;
   try {
     for (let i = 0; i < MAX_TURNS; i++) {
       const inbound = turns[turns.length - 1];
+
+      // MESMA decisão da produção (agent.decidirTurno), sem os efeitos. Antes
+      // o gym chamava buildAgentReply direto e passava ao largo do porteiro, do
+      // teto de cadência e do gate de takeover — testava o cérebro sem freios.
+      const historico = toThread(turns.slice(0, -1)).map((t, idx) => ({
+        direction: t.direction,
+        text: t.text,
+        // Cadência não é o que este harness mede; espaçar os turnos além do
+        // MIN_GAP_MS evita que ele engula a conversa por motivo errado.
+        created_at: new Date(Date.now() - (turns.length - idx) * (MIN_GAP_MS + 1000)).toISOString(),
+      }));
+      const decisao = decidirTurno({
+        thread: historico,
+        inboundText: inbound.text,
+        tentativas: tentativasPorteiro,
+        agenteLigado: true,
+        agora: new Date(),
+      });
+
+      if (decisao.acao !== 'responder') {
+        turns.push({ role: 'vitoria', text: `[${decisao.acao}]` });
+        break;
+      }
+      if (decisao.turno.robo) tentativasPorteiro++;
+
       const action = await withRetry('vitoria-reply', () =>
-        buildAgentReply(persona.intro[0], toThread(turns.slice(0, -1)), inbound.text)
+        buildAgentReply(persona.intro[0], toThread(turns.slice(0, -1)), inbound.text, decisao.turno)
       );
       // Silence is a legitimate turn now (auto-menu, empty completion). The gym
       // must SEE it as silence, not as an empty message — a run where Vitória
