@@ -124,3 +124,55 @@ function withDeadline<T>(p: Promise<T>, ms: number): Promise<T> {
     new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`timeout ${ms}ms`)), ms)),
   ]);
 }
+
+/**
+ * Lê uma janela RGB de um COG de 3 bandas (o asset TCI do Sentinel-2, que já
+ * vem 8-bit) e devolve os bytes entrelaçados (r,g,b,r,g,b,…) prontos pro
+ * encoder PNG.
+ *
+ * `halfSpanM` é o meio-lado do recorte em METROS — o chamador pensa em terreno,
+ * não em pixel, e a conversão usa a resolução real da cena em vez de assumir
+ * 10 m (o TCI vem em 10 m, mas assumir seria uma pegadinha esperando acontecer).
+ */
+export async function readRgbWindow(
+  cogUrl: string,
+  lat: number,
+  lon: number,
+  halfSpanM: number
+): Promise<{ rgb: Uint8Array; width: number; height: number } | null> {
+  try {
+    const tiff = await withDeadline(fromUrl(cogUrl), TIMEOUT_MS);
+    const img = await withDeadline(tiff.getImage(), TIMEOUT_MS);
+    const px = pixelFor(img, lat, lon);
+    if (!px) return null;
+
+    const [rx] = img.getResolution();
+    const raio = Math.max(1, Math.round(halfSpanM / Math.abs(rx)));
+    const x0 = Math.max(0, px.x - raio);
+    const y0 = Math.max(0, px.y - raio);
+    const x1 = Math.min(img.getWidth(), px.x + raio + 1);
+    const y1 = Math.min(img.getHeight(), px.y + raio + 1);
+    if (x1 <= x0 || y1 <= y0) return null;
+
+    const rasters = (await withDeadline(
+      img.readRasters({ window: [x0, y0, x1, y1] }),
+      TIMEOUT_MS
+    )) as unknown as ArrayLike<number>[];
+    if (rasters.length < 3) return null; // não é RGB — não inventar cor
+
+    const w = x1 - x0;
+    const h = y1 - y0;
+    const rgb = new Uint8Array(w * h * 3);
+    for (let i = 0; i < w * h; i++) {
+      rgb[i * 3] = clamp8(rasters[0][i]);
+      rgb[i * 3 + 1] = clamp8(rasters[1][i]);
+      rgb[i * 3 + 2] = clamp8(rasters[2][i]);
+    }
+    return { rgb, width: w, height: h };
+  } catch (e) {
+    log.error(`readRgbWindow falhou (${cogUrl.slice(0, 50)}…):`, (e as Error).message);
+    return null;
+  }
+}
+
+const clamp8 = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));

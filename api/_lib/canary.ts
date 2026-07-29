@@ -3,7 +3,7 @@
  * the monitor cron (no extra invocation). Checks the things this system can
  * lose silently: Meta can pause a template any day (dispatch would just skip),
  * a renamed OpenRouter slug turns every farmer reply into the fallback, and
- * the keyless tool APIs (Open-Meteo, SoilGrids, STAC/titiler, Yahoo) degrade
+ * the keyless tool APIs (Open-Meteo, SoilGrids, STAC, Yahoo) degrade
  * tools without an error surfacing anywhere.
  *
  * Anti-noise by design: results persist to canary_runs and founders are
@@ -124,7 +124,6 @@ function externalProbes(): Array<Promise<CanaryCheck>> {
       'https://rest.isric.org/soilgrids/v2.0/properties/query?lon=-45.43&lat=-21.55&property=phh2o&depth=0-5cm&value=mean'
     ),
     probe('stac-sentinel2', 'https://earth-search.aws.element84.com/v1'),
-    probe('titiler', 'https://titiler.xyz/healthz', { okWhen: anyResponse }),
     probe(
       'yahoo-cotações',
       'https://query1.finance.yahoo.com/v8/finance/chart/BRL=X?range=1d&interval=1d',

@@ -7,7 +7,7 @@
  * scaling needed.
  *
  * Data path (free, no key): Earth Search STAC finds the latest low-cloud
- * Sentinel-2 L2A scene over the point; a hosted titiler reads the Red (B04) and
+ * Sentinel-2 L2A scene over the point; lemos o COG direto (range request) nas
  * NIR (B08) COGs at exact lon/lat, handling the UTM reprojection for us.
  *
  * A single 10 m pixel is noise. `fetchFieldNdvi` samples a small grid of
@@ -16,16 +16,16 @@
  * reads as field uniformity, and (c) resilience, since one failed pixel read no
  * longer nulls the whole reply. Everything fails soft to null (like soil) — a
  * satellite hiccup never blocks a farmer's answer. ⚠️ Production should self-host
- * titiler or move to GEE (Startups program) rather than lean on the demo instance.
+ * bandas Red (B04) e NIR (B08) — sem servidor de tiles no meio.
  */
 
-import { readWindow, valueAt } from './cog';
+import { readWindow, valueAt, readRgbWindow } from './cog';
+import { encodePng } from './png';
 import { createLogger } from '../logger';
 
 const log = createLogger('ndvi');
 
 const STAC_URL = 'https://earth-search.aws.element84.com/v1/search';
-const TITILER_BBOX = 'https://titiler.xyz/cog/bbox';
 const TIMEOUT_MS = 9000;
 const LOOKBACK_DAYS = 75;
 /** Hard cloud ceiling: scenes cloudier than this are never used. */
@@ -37,8 +37,6 @@ const SCENE_CANDIDATES = 20;
 
 /** Mini-map: half-width in degrees around the pin (~0.006° ≈ 650 m each side). */
 const THUMB_HALF_DEG = 0.006;
-const THUMB_MAX_SIZE = 384; // px longest edge — small enough to inline in the card
-const THUMB_TIMEOUT_MS = 8000;
 
 /** Field-sampling grid: a (2·ring+1)² lattice at GRID_SPACING_M between points. */
 const GRID_RING = 1; // 3×3 = 9 pixels
@@ -106,7 +104,7 @@ export const NDVI_VIGOR_BREAKS = [
  * otherwise get their rooftop analyzed as "sua lavoura". This gate is the
  * honesty backstop: only an area-mean showing plausible vegetation is asserted
  * as a field; water and built-up read below the bare-soil band and get an honest
- * "is this really your field?" instead. A missing read (clouds / titiler down)
+ * "is this really your field?" instead. A missing read (clouds / rede fora)
  * is 'unknown' so the caller fails OPEN — a flaky satellite never blocks
  * onboarding. NOT an urban classifier: a legitimately bare field (entressafra,
  * pós-colheita) also lands in 'no_vegetation', which is why the caller's copy
@@ -295,10 +293,11 @@ async function findLatestScene(lat: number, lon: number): Promise<Scene | null> 
 
 /**
  * A true-colour Sentinel-2 thumbnail of the field, as an inline PNG data URI —
- * the "sua lavoura vista de cima" mini-map. Crops the scene's visual (TCI) COG to
- * a small bbox around the pin via titiler. Fails soft to null (titiler down, no
- * visual asset, timeout) so the vigor card still renders without the image. ⚠️
- * Same public-titiler caveat as the point reads — self-host for production.
+ * the "sua lavoura vista de cima" mini-map. Recorta o asset visual (TCI) da
+ * cena ao redor do pino lendo o COG direto (range request) e encoda o PNG aqui
+ * — sem titiler, sem dependência de imagem. Falha soft pra null (sem asset
+ * visual, cena não cobre o ponto, timeout) e o card de vigor renderiza sem a
+ * figura.
  */
 export async function fetchSceneThumb(
   lat: number,
@@ -307,25 +306,16 @@ export async function fetchSceneThumb(
   try {
     const scene = await findLatestScene(lat, lon);
     if (!scene?.visual) return null;
-    const bbox = [
-      lon - THUMB_HALF_DEG,
-      lat - THUMB_HALF_DEG,
-      lon + THUMB_HALF_DEG,
-      lat + THUMB_HALF_DEG,
-    ].join(',');
-    const url = `${TITILER_BBOX}/${bbox}.png?url=${encodeURIComponent(scene.visual)}&max_size=${THUMB_MAX_SIZE}`;
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), THUMB_TIMEOUT_MS);
-    try {
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) return null;
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length < 200) return null; // titiler error bodies are tiny
-      return { dataUri: `data:image/png;base64,${buf.toString('base64')}`, date: scene.date };
-    } finally {
-      clearTimeout(timer);
-    }
+    // Meio-lado do recorte em metros. THUMB_HALF_DEG era o raio em graus que o
+    // titiler recebia como bbox; aqui o recorte é feito por nós, e metro é a
+    // unidade honesta (grau de longitude encurta com a latitude).
+    const halfSpanM = THUMB_HALF_DEG * 111_320;
+    const win = await readRgbWindow(scene.visual, lat, lon, halfSpanM);
+    if (!win) return null;
+
+    const png = encodePng(win.rgb, win.width, win.height);
+    return { dataUri: `data:image/png;base64,${png.toString('base64')}`, date: scene.date };
   } catch (e) {
     log.error('fetchSceneThumb failed:', (e as Error).message);
     return null;
