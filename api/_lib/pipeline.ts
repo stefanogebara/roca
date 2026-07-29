@@ -74,6 +74,7 @@ import { parseCrops, joinCrops, isCropsOnlyMessage } from './tools/crops';
 import { parseSourceToken, shouldPromptReferral, referralNudge } from './growth';
 import type { CommodityQuote } from './tools/prices';
 import type { PestCardData } from './cards/pest';
+import { persist, confirmarOuAvisar, validarCoordenada, validarCulturas } from './persist';
 import { withRetry } from './retry';
 import { alertFounders } from './alert';
 import { sendReferralNotification, pingFoundersWhatsApp } from './notify';
@@ -479,8 +480,12 @@ async function buildRouteContext(base: RouteContextBase): Promise<RouteContext> 
   const cropsOnly =
     !!cropAnswer && cropAnswer.length > 0 && !!effective.text && isCropsOnlyMessage(effective.text);
   if (cropAnswer && cropAnswer.length > 0 && !cropsOnly && userId) {
-    await setFarmCrops(userId, cropAnswer);
-    await setAwaiting(userId, null);
+    // O retorno era ignorado: falha aqui apagava a cultura do produtor em
+    // silêncio, e ele seguia achando que a Stevi sabia o que ele planta.
+    const bad = validarCulturas(cropAnswer);
+    const gravou = bad ? { ok: false as const, motivo: bad } : await persist('culturas', () => setFarmCrops(userId, cropAnswer));
+    if (gravou.ok) await setAwaiting(userId, null);
+    else log.error(`não gravei as culturas de ${userId}: ${gravou.motivo}`);
   }
 
   const consentReply =
@@ -573,10 +578,22 @@ const statedLocationResolvedRoute: Route = {
     // the pin to refine. Decouples "onde você está" from "onde é a lavoura".
     const { userId } = ctx;
     const sl = ctx.statedLocation as Extract<StatedLocation, { kind: 'resolved' }>;
-    await setFarmLocation(userId, sl.lat, sl.lon, 'city');
-    if (sl.uf) await setUserState(userId, sl.uf);
-    await setAwaiting(userId, 'crop');
-    return { replyText: confirmLocationReply(sl) };
+    // Antes: confirmava a localização pro produtor SEM saber se salvou. Se a
+    // escrita falhasse, ele seguia achando que a Stevi conhecia a lavoura dele.
+    const ruim = validarCoordenada(sl.lat, sl.lon);
+    const salvo = ruim
+      ? { ok: false as const, motivo: ruim }
+      : await persist('localização da lavoura', () => setFarmLocation(userId, sl.lat, sl.lon, 'city'));
+    if (salvo.ok) {
+      if (sl.uf) await setUserState(userId, sl.uf);
+      await setAwaiting(userId, 'crop');
+    }
+    return {
+      replyText: confirmarOuAvisar(salvo, {
+        confirma: () => confirmLocationReply(sl),
+        avisa: () => 'Deu um problema aqui pra guardar sua localização. 😕 Manda de novo daqui a pouco, por favor — não quero te dar conselho de outro lugar.',
+      }),
+    };
   },
 };
 
