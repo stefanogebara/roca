@@ -223,21 +223,24 @@ describe('ecoDeMaquina — repetição literal, com piso anti-falso-positivo', (
   });
 });
 
-// A lição de hoje: o "1" que o fundador mandou no menu FUNCIONOU — trouxe o
-// Felipe Augusto, o primeiro humano da campanha. Desligar na primeira mensagem
-// automática teria matado esse lead. Uma tentativa educada vale a pena; a
-// terceira é teimosia.
-describe('porteiroEsgotado — uma tentativa vale, duas já é insistência', () => {
-  it('deixa tentar até o limite', () => {
+// O limite foi 2 e virou 1, por MEDIÇÃO. Em 28/jul justifiquei 2 com o caso da
+// Agro.com — o fundador mandou "1" no menu e o Felipe apareceu. O juiz pareado
+// de 29/jul derrubou o raciocínio:
+//   conducao → "a segunda conversa INSISTE ao REPETIR a mesma mensagem"
+//   correcao → "a versão antiga cessou as mensagens; a nova insistiu"
+// O "1" foi um HUMANO navegando o menu, e a Vitória é proibida de navegar menu.
+// A segunda tentativa dela não tem para onde ir: só repete o mesmo pedido — e
+// repetir com robô é o que o porteiro existe para evitar.
+describe('porteiroEsgotado — UMA tentativa, e encerra', () => {
+  it('a primeira tentativa é permitida', () => {
     expect(porteiroEsgotado(0)).toBe(false);
-    expect(porteiroEsgotado(1)).toBe(false);
   });
-  it('para no limite', () => {
+  it('a partir do limite, para', () => {
     expect(porteiroEsgotado(PORTEIRO_MAX)).toBe(true);
     expect(porteiroEsgotado(PORTEIRO_MAX + 5)).toBe(true);
   });
-  it('o limite é 2 — a decisão está no código, não num número mágico', () => {
-    expect(PORTEIRO_MAX).toBe(2);
+  it('o limite é 1 — decisão medida, não número mágico', () => {
+    expect(PORTEIRO_MAX).toBe(1);
   });
 });
 
@@ -286,7 +289,7 @@ describe('silêncio deliberado vs silêncio por falha', () => {
 //                      mensagem inútil"
 describe('dicaDeTurno — o que o modelo precisa saber ANTES de responder', () => {
   it('robô detectado: instrui a pedir o responsável técnico em UMA linha', () => {
-    const d = dicaDeTurno({ robo: true, tentativa: 1 });
+    const d = dicaDeTurno({ robo: true, tentativa: 0 });
     expect(d).toMatch(/autom[áa]tic/i);
     expect(d).toMatch(/respons[áa]vel|t[ée]cnic/i);
     expect(d).toMatch(/uma linha|1 linha/i);

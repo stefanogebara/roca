@@ -180,14 +180,27 @@ export function ecoDeMaquina(
 }
 
 /**
- * Polite attempts to reach a human past a bot before parking the lead.
+ * Tentativas de furar o robô antes de parquear o lead. UMA.
  *
- * Two, not one. On 28/jul the founder answered the Agro.com menu with "1" and
- * it WORKED — a human (Felipe Augusto) picked up, the first of the whole
- * campaign. Giving up on the first automated reply would have killed that lead;
- * a third attempt is just stubbornness.
+ * Era 2, justificado pelo caso da Agro.com de 28/jul: o fundador respondeu "1"
+ * ao menu e FUNCIONOU — o Felipe Augusto apareceu, primeiro humano da campanha.
+ * O raciocínio estava errado, e o juiz pareado de 29/jul mostrou por quê:
+ *
+ *   conducao → "a segunda conversa INSISTE ao REPETIR a mesma mensagem"
+ *   correcao → "a versão antiga cessou as mensagens; a nova insistiu"
+ *
+ * O "1" foi um HUMANO navegando o menu. A Vitória é proibida de navegar menu
+ * (está nas regras do prompt), então a segunda tentativa dela não tem para onde
+ * ir: só pode repetir o mesmo pedido com outras palavras — e repetir com robô é
+ * exatamente o que o porteiro existe para evitar.
+ *
+ * Usei evidência de uma ação humana para justificar comportamento de um agente
+ * que não pode executar aquela ação.
+ *
+ * O caminho do Felipe segue aberto: o fundador manda o "1" pelo painel quando
+ * quiser furar um menu. Isso é decisão humana, não da agente.
  */
-export const PORTEIRO_MAX = 2;
+export const PORTEIRO_MAX = 1;
 
 /** Whether we've already spent our attempts at getting past the bot. */
 export function porteiroEsgotado(tentativas: number): boolean {
