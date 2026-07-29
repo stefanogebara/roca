@@ -69,14 +69,14 @@ export function pricesSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   ${cardShell(W, H)}
 
-  ${brandHeader(M, headerY, 'Cotações de hoje')}
+  ${brandHeader(M, headerY, 'Bolsa hoje')}
   <rect x="${W - M - 96}" y="${headerY - 24}" width="96" height="32" rx="16" fill="${T.pillFlat}"/>
   <text x="${W - M - 48}" y="${headerY - 2}" font-family="DM Sans" font-size="${T.small}" font-weight="700" fill="${T.inkSoft}" text-anchor="middle">${esc(dateLabel)}</text>
 
   ${body}
 
   ${hairline(M, W - M, footY)}
-  <text x="${M}" y="${footY + 32}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">${esc(`${dolar}referência internacional convertida — o preço na sua praça varia com frete e qualidade`)}</text>
+  <text x="${M}" y="${footY + 32}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">${esc(`${dolar}futuros de bolsa — o físico brasileiro sai ABAIXO (indicador CEPEA/ESALQ)`)}</text>
   <text x="${M}" y="${footY + 58}" font-family="DM Sans" font-size="${T.small}" font-weight="800" fill="${C.green}">${esc(waCta('cotação'))}</text>
 </svg>`;
 }

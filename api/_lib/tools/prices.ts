@@ -148,7 +148,15 @@ export function formatPricesReply(quotes: CommodityQuote[], usdBrl: number | nul
   if (quotes.length === 0 || usdBrl == null) {
     return 'Não consegui puxar as cotações agora. 🙈 Tenta de novo daqui a pouco.';
   }
-  const lines: string[] = ['💰 *Cotações de hoje* (referência internacional)', ''];
+  // O cabeçalho corrige a âncora ANTES dos números, de propósito. Medido em
+  // 29/jul: a resposta dava R$ 2.228,75/saca de arábica no dia em que o
+  // indicador CEPEA/ESALQ fechou R$ 1.782,18 — 25% acima, R$ 446 por saca. A
+  // conversão está certa; a REFERÊNCIA é outra (KC=F é arábica lavado em
+  // armazém americano, e o natural brasileiro sai com desconto).
+  // O rodapé antigo dizia "o físico varia" e ficava depois dos números — o
+  // produtor lê R$ 2.228 e ancora nisso. Ressalva pequena embaixo de número
+  // grande é álibi, não honestidade.
+  const lines: string[] = ['📊 *Bolsa hoje* — não é o preço da sua saca', ''];
   for (const q of quotes) {
     const dir =
       q.weekChangePct == null
@@ -161,8 +169,10 @@ export function formatPricesReply(quotes: CommodityQuote[], usdBrl: number | nul
   lines.push(`• Dólar: R$ ${brl(usdBrl)}`);
   lines.push('');
   lines.push(
-    '_Isso é a referência internacional (bolsa) convertida pra saca — o preço físico na sua região ' +
-      'varia com frete, qualidade e praça. Confirme com sua cooperativa ou corretor antes de fechar negócio._'
+    '_Esses são os futuros de bolsa convertidos pra saca. O físico brasileiro sai ABAIXO disso ' +
+      '(frete, qualidade, praça) — quem mede o que você recebe é o indicador CEPEA/ESALQ, que sua ' +
+      'cooperativa acompanha. Use a bolsa pra ler a TENDÊNCIA; pra fechar negócio, confirme o preço ' +
+      'com sua cooperativa ou corretor._'
   );
   return lines.join('\n');
 }

@@ -40,10 +40,36 @@ describe('formatPricesReply', () => {
     expect(t).toMatch(/5,42/); // dólar
   });
 
-  it('is honest that this is an international reference, not the local price', () => {
+  // 29/jul: medido contra a fonte. Nossa resposta dava R$ 2.228,75/saca de
+  // arábica no dia em que o indicador CEPEA/ESALQ fechou R$ 1.782,18 — 25%
+  // acima do preço que o produtor negocia, R$ 446 por saca. A conversão está
+  // certa; a REFERÊNCIA é que é outra (KC=F é arábica lavado em armazém
+  // americano). O rodapé antigo dizia "o físico varia", o que é verdade e
+  // insuficiente: um número grande com ressalva pequena é um número errado
+  // com álibi. A correção precisa vir ANTES dos números — a âncora se forma
+  // na primeira leitura.
+  it('corrige a âncora no CABEÇALHO, não no rodapé', () => {
     const t = formatPricesReply(quotes, 5.42);
-    expect(t).toMatch(/refer[êe]ncia internacional/i);
-    expect(t).toMatch(/cooperativa|corretor|regi[ãa]o/i);
+    const cabecalho = t.split('\n')[0];
+    expect(cabecalho).toMatch(/bolsa/i);
+    expect(cabecalho).toMatch(/n[ãa]o\s+[ée]\s+o\s+pre[çc]o/i);
+  });
+
+  it('nomeia o CEPEA — o produtor precisa saber onde olhar o preço dele', () => {
+    expect(formatPricesReply(quotes, 5.42)).toMatch(/cepea/i);
+  });
+
+  it('diz que o físico brasileiro sai ABAIXO da bolsa, não só que "varia"', () => {
+    const t = formatPricesReply(quotes, 5.42);
+    expect(t).toMatch(/abaixo/i);
+  });
+
+  it('diz pra que a bolsa SERVE — tendência, não fechar preço', () => {
+    expect(formatPricesReply(quotes, 5.42)).toMatch(/tend[êe]ncia/i);
+  });
+
+  it('não some com a orientação de confirmar com quem compra', () => {
+    expect(formatPricesReply(quotes, 5.42)).toMatch(/cooperativa|corretor/i);
   });
 
   it('handles an empty quote list without pretending', () => {
