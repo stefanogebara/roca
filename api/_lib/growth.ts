@@ -70,3 +70,56 @@ export function referralNudge(farmerName: string | null): string {
   const link = `wa.me/${PUBLIC_WA()}?text=${encodeURIComponent(prefill)}`;
   return `\n\n_Conhece outro produtor que ia gostar da Stevi? Manda esse link pra ele: ${link} 🤝_`;
 }
+
+/** Token de origem → nome legível. 'tec-jose' vira 'Tec Jose'. */
+function nomeDaOrigem(source: string): string {
+  return source
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ');
+}
+
+/** Origens que NÃO são nome de pessoa — não dá pra dizer "o X te mandou". */
+const ORIGEM_SEM_NOME = /^(indica[çc][ãa]o|organico|org[âa]nico|whatsapp|instagram|site)$/i;
+
+/**
+ * A primeira resposta a quem chega. Quando veio indicado, cita quem indicou e
+ * pergunta da lavoura DELE — em vez do panfleto de funcionalidades.
+ *
+ * 17/jul: alguém escreveu "Oi! Vim pelo Michel" — indicação nominal de um
+ * agrônomo parceiro, a mensagem mais quente que existe. O sistema gravou
+ * `source='michel'` certinho e respondeu com o cardápio genérico, sem citar o
+ * Michel, terminando em "Como posso ajudar?" — que devolve o trabalho pra quem
+ * chegou. A conversa morreu em 4 segundos e ficou 11 dias em silêncio.
+ *
+ * A informação existia; estava desconectada da decisão. `users.source` era lido
+ * só por cohort.ts e pelo digest: métrica, nunca conversa. Mesmo defeito que a
+ * Vitória tinha com o menu automático, no outro lado do produto.
+ *
+ * O indicado já chega com confiança emprestada — não precisa de lista de
+ * features, precisa de UMA pergunta sobre o problema dele.
+ */
+export function saudacaoDeEntrada(source: string | null | undefined): string {
+  const s = (source ?? '').trim();
+  if (s && !ORIGEM_SEM_NOME.test(s)) {
+    return (
+      `Opa! Que bom que o ${nomeDaOrigem(s)} te mandou aqui. 🌱 Sou a Stevi — ajudo a entender o que ` +
+      `tá acontecendo na lavoura (quem prescreve produto é o agrônomo, isso eu não faço). ` +
+      `Me conta: o que tá te preocupando na sua lavoura agora?`
+    );
+  }
+  if (s) {
+    return (
+      `Opa! Que bom receber uma indicação. 🌱 Sou a Stevi — ajudo a entender o que tá acontecendo ` +
+      `na lavoura (quem prescreve produto é o agrônomo, isso eu não faço). ` +
+      `Me conta: o que tá te preocupando na sua lavoura agora?`
+    );
+  }
+  return (
+    'Opa! Eu sou a Stevi, sua ajudante de lavoura aqui no WhatsApp. 🌱 Você pode me mandar foto de uma ' +
+    'folha ou praga pra eu dar uma olhada, perguntar "posso pulverizar hoje?" (me manda sua localização), ' +
+    'ou tirar dúvidas sobre soja, milho, pasto, café e citros. Importante: eu ajudo a entender e a saber ' +
+    'o que perguntar — quem prescreve produto é o agrônomo. Como posso ajudar?'
+  );
+}

@@ -9,6 +9,7 @@ import {
   renderTemplateText,
 } from '../api/_lib/prospect/personalize';
 import { computeFunnelStats, playbookBlock } from '../api/_lib/prospect/learn';
+import { saudacaoDeEntrada } from '../api/_lib/growth';
 import {
   registryParamCount,
   templateBody,
@@ -200,3 +201,53 @@ describe('templates de continuação (retomada / entrega / despedida)', () => {
     }
   });
 });
+
+// 17/jul: alguém escreveu "Oi! Vim pelo Michel" — a mensagem mais quente que
+// existe, indicação nominal de um agrônomo parceiro. O sistema gravou
+// source='michel' corretamente e respondeu com o panfleto genérico, sem citar
+// o Michel. A conversa morreu em 4 segundos e ficou 11 dias em silêncio.
+// users.source existia só para métrica (cohort.ts e digest) — nunca virava
+// conversa.
+describe('saudacaoDeEntrada — quem chega indicado não recebe panfleto', () => {
+  it('cita quem indicou, com a inicial maiúscula', () => {
+    const t = saudacaoDeEntrada('michel');
+    expect(t).toMatch(/Michel/);
+    expect(t).not.toMatch(/\bmichel\b/); // não repete em minúscula
+  });
+
+  it('termina perguntando da lavoura DELE, não "como posso ajudar"', () => {
+    const t = saudacaoDeEntrada('michel');
+    expect(t).toMatch(/lavoura|ro[çc]a|planta/i);
+    expect(t).not.toMatch(/como posso ajudar/i);
+  });
+
+  it('faz UMA pergunta só', () => {
+    expect((saudacaoDeEntrada('michel').match(/\?/g) ?? []).length).toBe(1);
+  });
+
+  it('não vira lista de funcionalidades — indicado já veio com confiança', () => {
+    const t = saudacaoDeEntrada('michel');
+    // O panfleto antigo enumerava foto/pulverização/geada/culturas.
+    expect(t.length).toBeLessThan(400);
+  });
+
+  it('indicação genérica não inventa nome', () => {
+    const t = saudacaoDeEntrada('indicação');
+    expect(t).toMatch(/indica/i);
+    expect(t).not.toMatch(/Indicação\b.*te mandou/i);
+  });
+
+  it('token de hashtag vira nome legível', () => {
+    expect(saudacaoDeEntrada('tec-jose')).toMatch(/Tec Jose|Jose/i);
+  });
+
+  it('sem indicação, mantém a apresentação completa', () => {
+    const t = saudacaoDeEntrada(null);
+    expect(t).toMatch(/Stevi/);
+    expect(t).toMatch(/agr[oô]nomo/i); // a ressalva de não prescrever
+  });
+
+  it('mantém a ressalva de que quem prescreve é o agrônomo, mesmo no curto', () => {
+    expect(saudacaoDeEntrada('michel')).toMatch(/agr[oô]nomo/i);
+  });
+})

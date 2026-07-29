@@ -924,10 +924,17 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
       userId && effective.kind === 'text'
         ? formatTurnsBlock(await getRecentTurns(userId, msg.messageId))
         : null;
+    // Quem indicou. O users.source persistido cobre quem volta; parsear a
+    // mensagem cobre o PRIMEIRO contato, onde setUserSource já rodou mas o
+    // objeto `user` desta requisição foi lido antes e está desatualizado.
+    const referredBy =
+      (ctx.user as { source?: string | null }).source ?? parseSourceToken(effective.text);
+
     replyText = await reason(effective, intent, {
       userId,
       media,
       history,
+      referredBy,
       onPestCard: (c) => {
         pestCard = c;
       },

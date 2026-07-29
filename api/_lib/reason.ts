@@ -11,6 +11,7 @@ import type { InboundMessage } from './transport/types';
 import type { Intent } from './router';
 import { PEST_HANDOFF_REMINDER } from './prompts/system';
 import { steviSystemPrompt } from './stylepack';
+import { saudacaoDeEntrada } from './growth';
 import { fetchHourlyWeather } from './tools/weather';
 import { sprayWindow, type SprayWindow } from './tools/deltaT';
 import { getFarmLocation, getFarm, getCachedNdvi, setCachedNdvi, getFarmProfile } from './db';
@@ -374,6 +375,9 @@ export interface ReasonDeps {
   /** Gym only: run the LLM voice paths against a specific style-pack body
    * (challenger) instead of the active one. Omit in production. */
   packOverride?: string | null;
+  /** Quem indicou o produtor, quando ele chegou dizendo ("vim pelo Michel").
+   * Existia só como métrica em users.source — ver growth.saudacaoDeEntrada. */
+  referredBy?: string | null;
   /** Photo triage only: called with card data when a pest is identified with
    * enough confidence, so the caller can attach the visual triage card. */
   onPestCard?: (c: PestCardData) => void;
@@ -390,7 +394,7 @@ export async function reason(
   // with history present it must reach the model so the referent resolves —
   // caught live: a ferrugem follow-up got the intro instead of an answer.
   if (intent === 'smalltalk' && !deps.history) {
-    return 'Opa! Eu sou a Stevi, sua ajudante de lavoura aqui no WhatsApp. 🌱 Você pode me mandar foto de uma folha ou praga pra eu dar uma olhada, perguntar "posso pulverizar hoje?" (me manda sua localização), ou tirar dúvidas sobre soja, milho, pasto, café e citros. Importante: eu ajudo a entender e a saber o que perguntar — quem prescreve produto é o agrônomo. Como posso ajudar?';
+    return saudacaoDeEntrada(deps.referredBy);
   }
 
   if (intent === 'spray_window') {
