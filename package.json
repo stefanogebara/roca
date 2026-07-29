@@ -19,6 +19,7 @@
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@supabase/supabase-js": "^2.45.0",
+    "geotiff": "^3.0.5",
     "nodemailer": "^9.0.3",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",

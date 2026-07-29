@@ -19,12 +19,12 @@
  * titiler or move to GEE (Startups program) rather than lean on the demo instance.
  */
 
+import { readWindow, valueAt } from './cog';
 import { createLogger } from '../logger';
 
 const log = createLogger('ndvi');
 
 const STAC_URL = 'https://earth-search.aws.element84.com/v1/search';
-const TITILER_POINT = 'https://titiler.xyz/cog/point';
 const TITILER_BBOX = 'https://titiler.xyz/cog/bbox';
 const TIMEOUT_MS = 9000;
 const LOOKBACK_DAYS = 75;
@@ -43,7 +43,8 @@ const THUMB_TIMEOUT_MS = 8000;
 /** Field-sampling grid: a (2·ring+1)² lattice at GRID_SPACING_M between points. */
 const GRID_RING = 1; // 3×3 = 9 pixels
 const GRID_SPACING_M = 30; // 3 Sentinel pixels apart → independent, ~60×60 m span
-const POINT_CONCURRENCY = 5; // gentle on the public titiler; avoids 429 bursts
+/** Lado do pixel Sentinel-2 nas bandas B04/B08, em metros. */
+const PIXEL_M = 10;
 /** Below this many resolved pixels, spread is too noisy to call uniformity. */
 export const UNIFORMITY_MIN_SAMPLES = 5;
 
@@ -232,10 +233,8 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
 }
 
 async function pointValue(cogUrl: string, lat: number, lon: number): Promise<number | null> {
-  const url = `${TITILER_POINT}/${lon},${lat}?url=${encodeURIComponent(cogUrl)}`;
-  const data = (await fetchJson(url)) as { values?: number[] };
-  const v = data.values?.[0];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  const win = await readWindow(cogUrl, lat, lon, 0);
+  return win ? valueAt(win, 0, 0) : null;
 }
 
 interface Scene {
@@ -344,23 +343,6 @@ async function pointNdvi(scene: Scene, lat: number, lon: number): Promise<number
   return Number.isFinite(ndvi) ? ndvi : null;
 }
 
-/** Run `fn` over items with a bounded number in flight (pool of workers). */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await fn(items[i]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
 
 /**
  * Latest low-cloud Sentinel-2 NDVI at a single point. Returns null on any
@@ -390,10 +372,24 @@ export async function fetchFieldNdvi(lat: number, lon: number): Promise<FieldNdv
     const scene = await findLatestScene(lat, lon);
     if (!scene) return null;
 
-    const pts = gridPoints(lat, lon, GRID_SPACING_M, GRID_RING);
-    const values = await mapWithConcurrency(pts, POINT_CONCURRENCY, (p) =>
-      pointNdvi(scene, p[0], p[1])
-    );
+    // A grade são 9 pontos num quadrado de 60 m — em Sentinel-2 (10 m/px) isso
+    // cabe numa janela de 6×6 pixels, dentro de UM bloco do COG. Antes eram
+    // 9 pontos × 2 bandas = 18 requisições ao titiler; agora são 2 leituras.
+    const raio = (GRID_RING * GRID_SPACING_M) / PIXEL_M + 1;
+    const [red, nir] = await Promise.all([
+      readWindow(scene.red, lat, lon, Math.ceil(raio)),
+      readWindow(scene.nir, lat, lon, Math.ceil(raio)),
+    ]);
+    if (!red || !nir) return null;
+    const passo = Math.round(GRID_SPACING_M / PIXEL_M);
+    const values: Array<number | null> = [];
+    for (let i = -GRID_RING; i <= GRID_RING; i++) {
+      for (let j = -GRID_RING; j <= GRID_RING; j++) {
+        const R = valueAt(red, j * passo, i * passo);
+        const N = valueAt(nir, j * passo, i * passo);
+        values.push(R != null && N != null && R + N !== 0 ? (N - R) / (N + R) : null);
+      }
+    }
     const agg = aggregateNdvi(values.filter((x): x is number => x != null));
     if (!agg) return null;
 
