@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildQueries, toProspectInput } from '../api/_lib/prospect/source';
+import { buildQueries, toProspectInput, ICP_QUERIES } from '../api/_lib/prospect/source';
 import {
   shortName,
   kindHook,
@@ -21,7 +21,10 @@ import {
 describe('sourcing query grid', () => {
   it('bounds the run (maxCities × queries)', () => {
     const qs = buildQueries(['Varginha MG', 'Lavras MG', 'Alfenas MG', 'Machado MG', 'Guaxupé MG'], 2);
-    expect(qs.length).toBe(10); // 2 cities × 5 ICP terms
+    // Derivado, não fixo: o número de termos muda quando o ICP é corrigido
+    // (29/jul trocamos 'agropecuária produtos agrícolas' por dois termos que
+    // forçam o lado agrícola). O contrato é "cidades × termos", não "10".
+    expect(qs.length).toBe(2 * ICP_QUERIES.length);
     expect(qs[0].q).toMatch(/em Varginha MG$/);
     expect(qs[0].city).toBe('Varginha');
   });

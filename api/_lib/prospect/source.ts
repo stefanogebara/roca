@@ -12,6 +12,7 @@
 
 import { normalizePhoneBR } from './core';
 import { importProspects, type ProspectInput } from './db';
+import { motivoForaDoICP } from './icp';
 import { withRetry } from '../retry';
 import { createLogger } from '../logger';
 
@@ -24,7 +25,11 @@ export const ICP_QUERIES: Array<{ kind: string; term: string }> = [
   { kind: 'consultoria', term: 'consultoria agronômica' },
   { kind: 'consultoria', term: 'consultoria agrícola café' },
   { kind: 'revenda', term: 'revenda agrícola' },
-  { kind: 'revenda', term: 'agropecuária produtos agrícolas' },
+  // NÃO usar 'agropecuária' solto: no Brasil isso é ração/pet/veterinário na
+  // fachada, e o Places devolve pet shop. Em 29/jul uma loja só de pecuária
+  // recebeu template de café e respondeu "agrícola não trabalhamos".
+  { kind: 'revenda', term: 'revenda de insumos agrícolas' },
+  { kind: 'revenda', term: 'loja de defensivos agrícolas' },
   { kind: 'cooperativa', term: 'cooperativa de cafeicultores' },
 ];
 
@@ -108,25 +113,41 @@ export interface SourceReport {
   found: number;
   imported: number;
   withPhone: number;
+  /** Quantos o filtro de ICP barrou (pet/ração/veterinária). */
+  descartadosICP: number;
+  /** Quem foi barrado e por qual sinal — descarte silencioso vira base
+   * encolhendo sem explicação. */
+  descartadosExemplos: string[];
   error?: string;
 }
 
-/** Run one sourcing sweep. Bounded (maxCities × 5 queries × 10 results). */
+/** Run one sourcing sweep. Bounded (maxCities × ICP_QUERIES × 10 results). */
 export async function runSourcing(maxCities = 4): Promise<SourceReport> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
     return {
       configured: false, queries: 0, found: 0, imported: 0, withPhone: 0,
+      descartadosICP: 0, descartadosExemplos: [],
       error: 'GOOGLE_PLACES_API_KEY não configurada (Vercel env) — busca automática desligada.',
     };
   }
 
   const queries = buildQueries(ICP_CITIES, maxCities);
   const rows: ProspectInput[] = [];
+  // Reportado, nunca silencioso: um filtro que descarta sem dizer o quê vira
+  // uma base que encolhe sem explicação.
+  const descartados: string[] = [];
   let failures = 0;
   for (const { kind, q, city } of queries) {
     try {
       for (const hit of await searchOnce(apiKey, q)) {
+        // Barrar pet/ração/veterinária ANTES da fila: um disparo errado queima
+        // reputação, gasta cap e arrisca denúncia. Ver icp.ts.
+        const motivo = motivoForaDoICP(hit.name, hit.source);
+        if (motivo) {
+          descartados.push(`${hit.name} (${motivo})`);
+          continue;
+        }
         rows.push(toProspectInput(hit, kind, city));
       }
     } catch (e) {
@@ -152,6 +173,8 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
     found: rows.length,
     imported,
     withPhone: unique.filter((r) => r.phone).length,
+    descartadosICP: descartados.length,
+    descartadosExemplos: descartados.slice(0, 10),
     ...(failures ? { error: `${failures} consulta(s) falharam` } : {}),
   };
   log.info(`sourcing: ${JSON.stringify(report)}`);
