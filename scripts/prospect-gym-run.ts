@@ -24,7 +24,7 @@ try {
 }
 
 async function main(): Promise<void> {
-  const { runProspectGym, advanceRate } = await import('../api/_lib/prospect/gym');
+  const { runProspectGym, advanceRate, AVANCO_AVISO } = await import('../api/_lib/prospect/gym');
   const keys = process.argv.slice(2).flatMap((a) => a.split(',')).map((s) => s.trim()).filter(Boolean);
 
   console.log(`\n🥊 Vitória Gym${keys.length ? ' · ' + keys.join(', ') : ' · todas as personas'}\n`);
@@ -48,6 +48,10 @@ async function main(): Promise<void> {
   console.log(
     `  AVANÇO LIMPO: ${a.advanced}/${a.total} (${a.rate}%) — avançou estágio COM zero violação de regra dura`
   );
+  // A incerteza sai colada no número, não num README que ninguém lê na hora de
+  // decidir. Durante 30/jul este número foi reportado como progresso ("29% →
+  // 42% → 57%") quando a variação inteira cabia no ruído.
+  console.log(`  ⚠️  ${AVANCO_AVISO}`);
   console.log(`  done in ${secs}s · stored in prospect_gym_runs · view in /painel → Treino\n`);
 }
 

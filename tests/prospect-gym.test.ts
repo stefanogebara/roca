@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { PROSPECT_PERSONAS, computeMedias, advanceRate, JUDGE_SYSTEM, JUDGE_MAX_TOKENS } from '../api/_lib/prospect/gym';
+import {
+  PROSPECT_PERSONAS,
+  computeMedias,
+  advanceRate,
+  JUDGE_SYSTEM,
+  JUDGE_MAX_TOKENS,
+  AVANCO_AVISO,
+  type GymVerdict,
+} from '../api/_lib/prospect/gym';
 import { JUDGE_MAX_TOKENS as PAIRED_MAX_TOKENS } from '../api/_lib/prospect/gymPaired';
 
 describe('Vitória gym personas', () => {
@@ -55,7 +63,11 @@ describe('curriculum personas (25/jul)', () => {
 });
 
 describe('advanceRate — the metric that replaces "nota de simpatia"', () => {
+  // `persona` passou a importar: cenários onde parar é o certo saem do
+  // denominador. Aqui usamos uma persona onde avançar É possível, pra estes
+  // testes continuarem medindo o que sempre mediram.
   const v = (o: Partial<{ avancou: boolean; violacoes: string[] }>) => ({
+    persona: 'cetico-preco',
     scores: { naturalidade: 4, missao: 4, seguranca: 5 },
     avancou: o.avancou ?? false,
     violacoes: o.violacoes ?? [],
@@ -75,7 +87,12 @@ describe('advanceRate — the metric that replaces "nota de simpatia"', () => {
   });
 
   it('ignores judge failures (all-zero rows) and survives an empty run', () => {
-    const failed = { scores: { naturalidade: 0, missao: 0, seguranca: 0 }, avancou: false, violacoes: [] };
+    const failed = {
+      persona: 'cetico-preco',
+      scores: { naturalidade: 0, missao: 0, seguranca: 0 },
+      avancou: false,
+      violacoes: [],
+    };
     expect(advanceRate([failed, v({ avancou: true })]).rate).toBe(100);
     expect(advanceRate([]).rate).toBe(0);
   });
@@ -125,5 +142,60 @@ describe('orçamento de tokens do juiz absoluto', () => {
 
   it('é mais folgado que o do juiz pareado — o JSON daqui é maior', () => {
     expect(JUDGE_MAX_TOKENS).toBeGreaterThan(PAIRED_MAX_TOKENS);
+  });
+});
+
+/**
+ * O denominador do avanço limpo, e o que ele NÃO conserta.
+ *
+ * 30/jul, quatro rodadas de código idêntico: avanço limpo deu 29%, 36%, 36% e
+ * 57% — 28 pontos de amplitude sem uma linha diferente. Fui decompor por
+ * persona e apareceram dois problemas distintos.
+ *
+ * 1. TRÊS CENÁRIOS NÃO PODEM AVANÇAR POR CONSTRUÇÃO: auto-atendimento (é um
+ *    menu de bot), pessoa-errada (o certo é captar o redirecionamento) e
+ *    sem-interesse (ele recusou). A rubrica do juiz JÁ diz que parar é o certo
+ *    neles — mas o denominador contava os três, então o teto real da métrica
+ *    era ~79% e ela nunca chegaria a 100% por melhor que a Vitória ficasse.
+ *
+ * 2. CORRIGIR ISSO NÃO REDUZ O RUÍDO — AUMENTA. Com denominador 11 as mesmas
+ *    rodadas viram 36%, 45%, 45% e 73%: a amplitude sobe de 28 para 37 pontos,
+ *    porque o numerador não mudou (esses três nunca somaram) e agora divide-se
+ *    por menos. O ruído mora nas ~6 personas cara-ou-coroa, e nenhuma cirurgia
+ *    no denominador chega lá.
+ *
+ * Então isto é conserto de ACURÁCIA, não de estabilidade — e é por isso que o
+ * aviso impresso junto importa tanto quanto o número.
+ */
+describe('avanço limpo — denominador só com cenários onde avançar é possível', () => {
+  const v = (persona: string, over: Partial<GymVerdict> = {}) =>
+    ({ persona, scores: { naturalidade: 4, missao: 4, seguranca: 4 }, ...over }) as GymVerdict;
+
+  it('cenário onde PARAR é o certo não entra no denominador', () => {
+    const r = advanceRate([
+      v('cetico-preco', { avancou: true }),
+      v('sem-interesse', { avancou: false }),
+      v('auto-atendimento', { avancou: false }),
+      v('pessoa-errada', { avancou: false }),
+    ]);
+    // 1 de 1 possível — não 1 de 4. Contar os três como fracasso é medir a
+    // Vitória por não ter vendido para um menu automático.
+    expect({ advanced: r.advanced, total: r.total, rate: r.rate }).toEqual({ advanced: 1, total: 1, rate: 100 });
+  });
+
+  it('as quatro rodadas de controle: 4/11, 5/11, 5/11, 8/11', () => {
+    // Ancorado nos números reais de 30/jul. Se alguém mexer no conjunto de
+    // personas excluídas, estes valores mudam e o teste conta a história.
+    const possiveis = PROSPECT_PERSONAS.filter((p) => !p.pararEhOCerto).length;
+    expect(possiveis).toBe(11);
+  });
+
+  it('violação continua vetando, mesmo com avanço', () => {
+    const r = advanceRate([v('cetico-preco', { avancou: true, violacoes: ['citou preço'] })]);
+    expect(r.advanced).toBe(0);
+  });
+
+  it('o aviso de ruído acompanha o número — medido, não adjetivo', () => {
+    expect(AVANCO_AVISO).toMatch(/4.*8|rodadas id[êe]nticas/i);
   });
 });

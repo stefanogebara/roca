@@ -34,6 +34,16 @@ export interface ProspectPersona {
   opener: string;
   /** Template params for the intro that opens the transcript. */
   intro: [name: string, hook: string, city: string];
+  /**
+   * Cenário onde PARAR é o desfecho correto — avançar seria erro, não mérito.
+   * Fica fora do denominador do avanço limpo.
+   *
+   * A rubrica do juiz já dizia isso ("nestes casos PARAR é o comportamento
+   * CORRETO e não deve baixar a nota"), mas a métrica contava os três como
+   * fracasso. O teto real era ~79%: a Vitória não chegaria a 100% nem sendo
+   * perfeita, porque não se vende para um menu automático.
+   */
+  pararEhOCerto?: true;
 }
 
 export const PROSPECT_PERSONAS: ProspectPersona[] = [
@@ -89,6 +99,7 @@ export const PROSPECT_PERSONAS: ProspectPersona[] = [
   },
   {
     key: 'pessoa-errada',
+    pararEhOCerto: true,
     label: 'Pessoa errada (indica outro contato)',
     brief:
       'Perfil: funcionário do financeiro de uma cooperativa que recebeu a mensagem por engano. Humor: prestativo mas sem contexto. ' +
@@ -109,6 +120,7 @@ export const PROSPECT_PERSONAS: ProspectPersona[] = [
   },
   {
     key: 'auto-atendimento',
+    pararEhOCerto: true,
     label: 'Auto-atendimento (bot institucional)',
     brief:
       'Perfil: você NÃO é uma pessoa — é o menu automático do WhatsApp de uma cooperativa. ' +
@@ -175,6 +187,7 @@ export const PROSPECT_PERSONAS: ProspectPersona[] = [
   },
   {
     key: 'sem-interesse',
+    pararEhOCerto: true,
     label: 'Sem interesse (encerramento digno)',
     brief:
       'Perfil: consultor que não quer nada disso. Humor: seco mas educado. ' +
@@ -330,15 +343,44 @@ export interface GymVerdict {
   transcript: GymTurn[];
 }
 
-/** Run-level outcome: the metric the curriculum optimizes — share of runs that
- * advanced a stage with ZERO hard-rule breaches. Pure — unit-tested. */
-export function advanceRate(verdicts: Array<Pick<GymVerdict, 'avancou' | 'violacoes' | 'scores'>>): {
+/**
+ * Aviso que acompanha o avanço limpo. Medido, não adjetivo.
+ *
+ * Em 30/jul rodei quatro gyms com código IDÊNTICO e o avanço limpo deu 4, 5, 5
+ * e 8 de 11 — 36%, 45%, 45% e 73%. Um número que varia 37 pontos sem nada ter
+ * mudado não sustenta comparação entre rodadas isoladas, e foi exatamente assim
+ * que ele vinha sendo reportado durante o dia, como se fosse progresso.
+ *
+ * Quem responde "essa mudança ajudou?" é o gym pareado, que tem piso de ruído
+ * medido (MARGEM_MINIMA). Este número é a fotografia de UMA rodada.
+ */
+export const AVANCO_AVISO =
+  '4 rodadas idênticas deram 4-8/11 — não compare rodadas isoladas; use o pareado';
+
+/**
+ * Run-level outcome: share of scenarios that advanced a stage with ZERO
+ * hard-rule breaches. Pure — unit-tested.
+ *
+ * O denominador conta só cenários onde AVANÇAR É POSSÍVEL. Contar bot
+ * institucional, pessoa errada e quem recusou como fracasso media a Vitória por
+ * não ter vendido para um menu automático — e punha um teto de ~79% que nenhuma
+ * versão dela alcançaria. A rubrica do juiz já dizia que parar é o certo ali.
+ *
+ * Isto conserta ACURÁCIA, não estabilidade: em 30/jul, quatro rodadas de código
+ * idêntico deram 4, 5, 5 e 8 de 11. O ruído mora nas ~6 personas cara-ou-coroa,
+ * e mexer no denominador só o divide por menos — a amplitude em pontos
+ * percentuais SOBE (28 → 37). Por isso o número não sai sozinho: ver AVANCO_AVISO.
+ */
+export function advanceRate(
+  verdicts: Array<Pick<GymVerdict, 'persona' | 'avancou' | 'violacoes' | 'scores'>>
+): {
   advanced: number;
   clean: number;
   total: number;
   rate: number;
 } {
-  const valid = verdicts.filter((v) => v.scores.naturalidade > 0);
+  const soParar = new Set(PROSPECT_PERSONAS.filter((p) => p.pararEhOCerto).map((p) => p.key));
+  const valid = verdicts.filter((v) => v.scores.naturalidade > 0 && !soParar.has(v.persona));
   const clean = valid.filter((v) => !v.violacoes?.length);
   const advanced = clean.filter((v) => v.avancou === true);
   return {
