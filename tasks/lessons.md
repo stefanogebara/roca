@@ -467,6 +467,19 @@ Ambas erradas. O banco decidiu: `select channel, count(*) from users` devolve
 sandbox agora") está velho. E a ausência de log era ausência de TRÁFEGO, não de
 execução.
 
+**Terceira correção, no dia seguinte.** "Ausência de tráfego" também estava
+errada. Não havia tráfego porque o `/api/webhook` respondia **500 em toda
+requisição desde 29/jul 14:04** — `ERR_REQUIRE_ESM` no import do geotiff,
+24h de outage que ninguém tinha visto (ver a lição seguinte). Ou seja: expliquei
+o mesmo silêncio de três jeitos diferentes, todos plausíveis, todos errados,
+até um disparo REAL contra produção mostrar o que era. Silêncio não tem uma
+causa óbvia — ele tem a causa que você ainda não mediu.
+
+O `markRead` corrigido só foi verificado em produção em 30/jul 11:12, quando o
+webhook voltou: `[cloud] markRead failed 400 (cosmetic, ignored)` — o catch
+INTERNO dele, prova de que o `this` sobreviveu (sem o bind seria
+`[bg] ERROR markRead lançou na chamada … reading 'inboundPhoneId'`).
+
 O `fireAndForget` fez o trabalho dele (a instância não caiu) e, no mesmo golpe,
 esconder quem chama errado. Fail-soft protege o processo e cega o autor.
 
@@ -505,3 +518,50 @@ esconder quem chama errado. Fail-soft protege o processo e cega o autor.
   commitou tudo no master e o arquivo virou rastreado. Ia apagar "a sobra" e
   teria quebrado o master. Reconfira `git log`/`status` antes de agir sobre um
   plano formado antes.
+
+## Lição — 24h de produção fora, e o canário passou verde todo dia
+
+**Data:** 30/jul/2026
+
+**O que aconteceu:** Fui rodar o simulador de inbound pra verificar um detalhe
+cosmético (o `markRead`) e descobri que o `/api/webhook` respondia **500 em toda
+requisição havia 24 horas**: 162 de 193 nas últimas 24h.
+
+```
+Error [ERR_REQUIRE_ESM]: require() of ES Module quick-lru
+from geotiff/dist-node/source/blockedsource.js
+Node.js process exited with exit status: 1
+```
+
+`quick-lru@6` é ESM puro; o build CJS do geotiff faz `require()` nele. Entrou com
+`a228b20` (29/jul 14:04, "ler o COG direto por range request"). A última linha em
+`users` é de 29/jul 13:00 — bate na hora.
+
+Três coisas conspiraram pra isso durar um dia:
+
+1. **Passou em tudo localmente.** O Node 22 daqui implementa `require(esm)`
+   desde a 22.12; o loader da Vercel (`/opt/rust/nodejs.js` no stack) não. Suíte
+   verde, typecheck limpo, `require('geotiff')` funcionando no terminal — e a
+   função morrendo em produção.
+2. **A cadeia é estática.** `webhook → pipeline → farmcard → tools/ndvi → cog →
+   geotiff`. Um recurso de satélite derrubou TODO o inbound, de produtor e de
+   prospect, porque todos entram pelo mesmo endpoint.
+3. **O canário não bate no webhook.** Ele checa modelo, template, qualidade de
+   número e frescor do Agrofit — tudo menos o único endpoint que recebe
+   mensagem. Rodou verde todo dia enquanto ninguém era atendido.
+
+**Regras:**
+- **O canário tem que exercitar o CAMINHO DO USUÁRIO, não as dependências dele.**
+  Um POST assinado no `/api/webhook` teria gritado em minutos. A ferramenta agora
+  existe: `scripts/simulate-inbound.mjs --cloud`.
+- **Verde local não cobre diferença de runtime.** Onde o bundle/loader do
+  provedor difere do Node local (require(esm), resolução de ESM, `exports`), o
+  teste local é mudo por construção. Dependência nova que entra em caminho
+  crítico pede uma requisição real contra o deploy, não só suíte verde.
+- **Ausência de dado novo é sintoma, não calmaria.** Nenhuma linha em `users`
+  desde 13:00 do dia anterior era o alarme — eu li como "pouco movimento". Se o
+  fluxo normal parou, pergunte o que quebrou ANTES de inventar explicação
+  benigna. Eu inventei três.
+- **Import estático amarra o raio de explosão ao pior componente.** Se um recurso
+  periférico (satélite) não pode derrubar o essencial (responder mensagem), ele
+  não pode estar no import estático do caminho essencial.
