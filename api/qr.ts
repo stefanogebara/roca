@@ -10,20 +10,19 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import QRCode from 'qrcode';
 import { createLogger } from './_lib/logger';
 import { enforcePublicRateLimit } from './_lib/httpRateLimit';
+import { publicWaNumber } from './_lib/waNumber';
 
 const log = createLogger('qr');
 
-// Env-driven so the printed posters don't brick when the BR number goes live —
-// flip PUBLIC_WA_NUMBER in Vercel and every new QR points at it. Same fallback
-// as growth.ts's wa.me links (one number, one env var).
-const WA_NUMBER = process.env.PUBLIC_WA_NUMBER || '19705509125';
 const DEFAULT_TEXT = 'Oi, Stevi! Quero testar.';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (!enforcePublicRateLimit('qr', req.headers, res)) return;
   try {
     const text = typeof req.query.text === 'string' && req.query.text.trim() ? req.query.text : DEFAULT_TEXT;
-    const url = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
+    // Lido por requisição (não no import): pôster impresso segue a env sem
+    // depender de instância nova do Fluid Compute pra pegar o valor novo.
+    const url = `https://wa.me/${publicWaNumber()}?text=${encodeURIComponent(text)}`;
     const png = await QRCode.toBuffer(url, {
       type: 'png',
       width: 720,

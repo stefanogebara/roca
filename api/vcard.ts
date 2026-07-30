@@ -8,9 +8,10 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { steviVCard } from './_lib/contactCard';
+import { publicWaNumber } from './_lib/waNumber';
 
 export default function handler(_req: VercelRequest, res: VercelResponse): void {
-  const number = process.env.PUBLIC_WA_NUMBER || '19705509125';
+  const number = publicWaNumber();
   const vcf = steviVCard(number);
   res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="stevi.vcf"');

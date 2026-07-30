@@ -88,12 +88,18 @@ o hibridismo deixou pendurado.**
 `cards/render.ts`, `growth.ts`, `pipeline.ts`, `contactCard.ts`), **cada um com
 fallback hardcoded `'19705509125'`**.
 
-- [ ] **`web/index.html` tem o número hardcoded em 4 lugares e é estático** — não
-      lê env nenhuma. Trocar `PUBLIC_WA_NUMBER` e esquecer o site deixa a landing
-      apontando pro número morto, que é o pior lugar possível pra isso.
-- [ ] Os 7 fallbacks: se a env falhar em produção, tudo volta silenciosamente pro
-      número americano. Considere `requireEnv` em vez de fallback — falhar alto é
-      melhor que apontar pro número errado.
+- [x] ~~`web/index.html` hardcoded em 4 lugares e estático~~ — **feito**. O
+      `build-web.mjs` agora substitui no build (`vercel.json` já roda ele no
+      deploy, então a env da Vercel chega ao HTML), e avisa alto no log do build
+      quando `PUBLIC_WA_NUMBER` não está setada.
+- [x] ~~Os 7 fallbacks silenciosos~~ — **feito**, mas NÃO como eu tinha proposto.
+      Ia trocar por `requireEnv`/falha alta; os comentários originais mostraram
+      que o fallback foi decisão consciente — *"an unset env must never silently
+      erase the card's way back to Stevi (that IS the acquisition channel)"* — e
+      lançar no meio da resposta ao produtor trocaria número velho por resposta
+      que não chega. O problema era o **silêncio e a duplicação**, não o fallback.
+      Agora tudo passa por `api/_lib/waNumber.ts`: um lugar, log alto uma vez, o
+      mesmo fallback deliberado. Zero literal do número fora dele.
 - [ ] O que já saiu não volta: QR impresso, `.vcf` compartilhado, cards antigos
       com rodapé, legendas de WhatsApp. Cards já enviados carregam o número
       antigo pra sempre.

@@ -81,6 +81,7 @@ import { alertFounders } from './alert';
 import { sendReferralNotification, pingFoundersWhatsApp } from './notify';
 import { maskWa } from './opsData';
 import { createLogger } from './logger';
+import { publicWaNumber } from './waNumber';
 
 const log = createLogger('pipeline');
 
@@ -214,9 +215,9 @@ const CARD_SHARE_PROMPT: Partial<Record<Intent, string>> = {
 /** Caption for the card message: a shareable wa.me deep link (static per TYPE,
  * never per user). Empty when PUBLIC_WA_NUMBER isn't configured. */
 function cardShareCaption(intent: Intent): string {
-  // Fallback matches growth.ts/verificar.ts: an unset env can't be allowed to
-  // silently drop the forward's way back (the declared acquisition loop).
-  const digits = (process.env.PUBLIC_WA_NUMBER || '19705509125').replace(/\D/g, '');
+  // O fallback (e o motivo) vive em _lib/waNumber.ts: env sem valor não pode
+  // derrubar caladinho a volta do encaminhamento (o loop de aquisição).
+  const digits = publicWaNumber();
   const prompt = CARD_SHARE_PROMPT[intent] ?? 'Oi, Stevi!';
   return `Compartilha à vontade 👉 wa.me/${digits}?text=${encodeURIComponent(prompt)}`;
 }

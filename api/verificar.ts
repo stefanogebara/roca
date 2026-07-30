@@ -8,10 +8,11 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifierHtml } from './_lib/verifierPage';
+import { publicWaNumber } from './_lib/waNumber';
 
 export default function handler(_req: VercelRequest, res: VercelResponse): void {
   const html = verifierHtml({
-    waNumber: process.env.PUBLIC_WA_NUMBER || '19705509125',
+    waNumber: publicWaNumber(),
     responsible: process.env.VERIFIER_RESPONSIBLE || null,
     agronomo: process.env.VERIFIER_AGRONOMO || null,
     crea: process.env.VERIFIER_CREA || null,

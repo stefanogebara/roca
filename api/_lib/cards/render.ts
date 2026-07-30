@@ -12,6 +12,7 @@
 import { Resvg } from '@resvg/resvg-js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { publicWaNumber } from '../waNumber';
 
 /** Brand palette (matches the landing page / ops console). */
 // "Campo Editorial" (just-br-derived) — matches web/styles.css so the cards a
@@ -165,9 +166,9 @@ export function sparkline(
  * Stevi that survives a forward (screenshots included). Static per card TYPE —
  * never per user (a per-user link would leak who forwarded it). */
 export function waCta(prompt: string): string {
-  // Same fallback as growth.ts/verificar.ts — an unset env must never silently
-  // erase the card's way back to Stevi (that IS the acquisition channel).
-  const digits = (process.env.PUBLIC_WA_NUMBER || '19705509125').replace(/\D/g, '');
+  // O fallback (e o motivo dele) vive em _lib/waNumber.ts: env sem valor não
+  // pode APAGAR a volta do card pra Stevi, que é o canal de aquisição.
+  const digits = publicWaNumber();
   return `wa.me/${digits} · manda "${prompt}"`;
 }
 

@@ -14,6 +14,8 @@
  *    never on a compliance-gated reply, never on a pin-ask.
  */
 
+import { publicWaNumber } from './waNumber';
+
 const SOURCE_MAX = 40;
 
 // "vim pelo José", "vim pela Maria", "vim pelo cartaz do armazém"
@@ -60,7 +62,7 @@ export function shouldPromptReferral(ctx: ReferralContext, now: Date): boolean {
   return true;
 }
 
-const PUBLIC_WA = () => process.env.PUBLIC_WA_NUMBER || '19705509125';
+const PUBLIC_WA = () => publicWaNumber();
 
 /** The forwardable nudge line. First name only — the link's pre-filled text
  * becomes the NEXT farmer's source token. */
