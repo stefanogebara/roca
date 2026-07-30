@@ -344,6 +344,30 @@ export async function runPairedGym(
   return { resultados, placar: apurarCenarios(resultados), ignoradas };
 }
 
+/**
+ * Persiste a rodada pareada em prospect_gym_paired_runs (painel → Treino).
+ *
+ * Até 30/jul o placar que decidia promover/reverter prompt só existia no
+ * terminal de quem rodou; o painel mostrava apenas o gym absoluto. Fail-soft:
+ * uma falha aqui não pode derrubar um julgamento que já custou ~40 chamadas
+ * de LLM — o placar impresso continua valendo, e o erro fica no log.
+ */
+export async function savePairedRun(
+  db: { from: (t: string) => { insert: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }> } },
+  runAId: string,
+  runBId: string,
+  r: PairedRun
+): Promise<boolean> {
+  const { error } = await db.from('prospect_gym_paired_runs').insert({
+    run_a: runAId,
+    run_b: runBId,
+    placar: r.placar,
+    resultados: r.resultados,
+  });
+  if (error) log.error('savePairedRun failed:', error.message);
+  return !error;
+}
+
 // ── Seleção do par a comparar ───────────────────────────────────────────────
 
 /** O mínimo que uma rodada precisa expor para entrar (ou não) numa comparação. */

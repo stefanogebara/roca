@@ -110,6 +110,17 @@ async function main(): Promise<void> {
           ? `⚪ inconclusivo — margem ${margem} está dentro do ruído (piso: ${MARGEM_MINIMA})`
           : '⚪ empate — sem sinal pra promover nada';
   console.log(`  ${veredito}`);
+
+  // Persistir SÓ comparações completas: um recorte --personas gravado como
+  // rodada normal viraria um placar de 3 cenários com cara de 14 no painel.
+  if (escopo.length === 0) {
+    const { savePairedRun } = await import('../api/_lib/prospect/gymPaired');
+    const { getDb } = await import('../api/_lib/db');
+    const ok = await savePairedRun(getDb(), runA.id, runB.id, r);
+    console.log(ok ? '  stored in prospect_gym_paired_runs · view in /painel → Treino' : '  ⚠️  não gravou no banco — placar só neste terminal');
+  } else {
+    console.log('  (recorte --personas: não gravado no banco de propósito)');
+  }
   console.log(`  done in ${secs}s\n`);
 }
 

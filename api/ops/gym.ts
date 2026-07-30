@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (!requireOps(req, res)) return;
   try {
     const db = getDb();
-    const [{ data }, { data: vitoriaRuns }, { data: goldenRuns }] = await Promise.all([
+    const [{ data }, { data: vitoriaRuns }, { data: goldenRuns }, { data: pairedRuns }] = await Promise.all([
       db
         .from('gym_runs')
         .select('id, ran_at, champion, challenger, tally, recommended, reason, verdicts')
@@ -31,8 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .select('id, ran_at, pack_version, total, passed, rate, failures')
         .order('ran_at', { ascending: false })
         .limit(10),
+      db
+        .from('prospect_gym_paired_runs')
+        .select('id, ran_at, run_a, run_b, placar')
+        .order('ran_at', { ascending: false })
+        .limit(10),
     ]);
-    const { PROSPECT_PERSONAS } = await import('../_lib/prospect/gym');
+    const { PROSPECT_PERSONAS, advanceRate, AVANCO_AVISO } = await import('../_lib/prospect/gym');
     res.status(200).json({
       success: true,
       data: {
@@ -41,7 +46,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         golden: goldenRuns ?? [],
         vitoria: {
           personas: PROSPECT_PERSONAS.map((p) => ({ key: p.key, label: p.label })),
-          runs: vitoriaRuns ?? [],
+          // avanco calculado aqui (não no browser): o denominador certo — só
+          // cenários onde avançar é possível — mora em advanceRate, e duplicar
+          // a regra no painel é como ela dessincroniza.
+          runs: (vitoriaRuns ?? []).map((r) => ({
+            ...(r as Record<string, unknown>),
+            avanco: advanceRate(((r as { verdicts?: unknown }).verdicts ?? []) as never),
+          })),
+          aviso: AVANCO_AVISO,
+          paired: pairedRuns ?? [],
         },
       },
     });

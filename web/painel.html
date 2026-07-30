@@ -52,7 +52,6 @@
     .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
     .tab { background: none; border: none; padding: 10px 14px; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .tab.active { color: var(--green); border-bottom-color: var(--leaf); }
-    .tab .em-breve { font-size: 10px; background: var(--line); color: var(--muted); border-radius: 6px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
 
     .panel { display: none; }
     .panel.active { display: block; }
@@ -583,6 +582,16 @@
     function renderFunnel() {
       const funnel = $('#p-funnel'); if (!funnel) return;
       funnel.innerHTML = '';
+      // Conversões CUMULATIVAS (quem passou pelo estágio), calculadas no
+      // servidor — ver funnel.ts. Os cards abaixo contam quem está em cada
+      // estágio AGORA; as taxas respondem "a máquina converte?".
+      const f = lastMeta.funnel;
+      if (f && f.contatados > 0) {
+        const bits = [`resposta ${f.taxaResposta ?? '—'}% (${f.responderam}/${f.contatados})`];
+        if (f.responderam > 0) bits.push(`parceria ${f.taxaParceria ?? '—'}% (${f.parceiros}/${f.responderam})`);
+        for (const k of (f.porTipo || []).slice(0, 3)) bits.push(`${k.kind}: ${k.taxaResposta ?? '—'}%`);
+        funnel.append(el('div', 'countnote', '📈 Conversão · ' + bits.join(' · ')));
+      }
       const stages = Object.keys(P_STATUS);
       stages.forEach((s, i) => {
         const st = P_STATUS[s];
@@ -855,15 +864,45 @@
       intro.append(pw);
       p.append(intro);
 
+      // Comparações A/B (pareadas): é AQUI que se decide se um prompt novo é
+      // melhor — não comparando notas absolutas entre rodadas. O vencedor já
+      // vem com o piso de ruído aplicado (margem <3 = inconclusivo; medido com
+      // 4 controles de código idêntico, que deram margens 0–1).
+      if ((vit.paired || []).length) {
+        const pc = el('div', 'card');
+        pc.append(el('h3', null, '⚖️ Comparações A/B (o que decide promoção de prompt)'));
+        for (const pr of vit.paired) {
+          const pl = pr.placar || {};
+          const margem = Math.abs((pl.a||0) - (pl.b||0));
+          const line = el('div', 'meta');
+          const pill = el('span', 'pill',
+            pl.vencedor === 'B' ? '✅ nova melhor' : pl.vencedor === 'A' ? '❌ antiga melhor' : margem > 0 ? '⚪ inconclusivo (ruído)' : '⚪ empate');
+          pill.style.cssText = 'color:#fff;background:' + (pl.vencedor === 'B' ? '#2e9e63' : pl.vencedor === 'A' ? '#b3452e' : '#8a7a5c');
+          line.append(pill, document.createTextNode(
+            ` ${fmtDate(pr.ran_at)} · B ${pl.b||0} × ${pl.a||0} A · ${pl.empates||0} empates em ${pl.total||0} cenários`));
+          pc.append(line);
+        }
+        p.append(pc);
+      }
+
       if (!(vit.runs || []).length) {
         p.append(el('div', 'empty', 'Nenhum treino da Vitória ainda.'));
         return;
       }
+      // O aviso sai COLADO nos números, igual ao terminal: 4 rodadas idênticas
+      // deram 4–8/11 — rodada isolada não sustenta comparação.
+      if (vit.aviso) p.append(el('div', 'countnote', '⚠️ ' + vit.aviso));
       for (const r of vit.runs) {
         const card = el('div', 'card');
         card.append(el('div', 'when', fmtDate(r.ran_at)));
         const hd = el('div', 'toolbar');
         hd.append(scoreChip('naturalidade', r.medias?.naturalidade), scoreChip('missão', r.medias?.missao), scoreChip('segurança', r.medias?.seguranca));
+        if (r.avanco && r.avanco.total > 0) {
+          const av = el('span', 'spill', `avanço limpo ${r.avanco.advanced}/${r.avanco.total}`);
+          av.title = 'Avançou estágio com zero violação de regra dura, contando só cenários onde avançar é possível. ' + (vit.aviso || '');
+          av.style.background = '#3b6fb2';
+          hd.append(av);
+        }
         card.append(hd);
         for (const v of (r.verdicts || [])) {
           const det = el('details');

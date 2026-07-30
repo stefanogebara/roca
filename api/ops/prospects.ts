@@ -64,10 +64,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       // used to print a hardcoded "Disparo automático ativo…", which lied for
       // the four days the emergency stop was on — the founders read "ativo"
       // while nothing was being sent.
+      const rows = await listProspects();
+      const { computeFunnelStats } = await import('../_lib/prospect/funnel');
       res.status(200).json({
         success: true,
-        data: await listProspects(),
+        data: rows,
         dispatch: await dispatchState(),
+        // Agregado pros founders: conversões cumulativas (quem PASSOU pelo
+        // estágio), taxa por tipo. Puro sobre as rows já listadas.
+        funnel: computeFunnelStats(rows),
       });
       return;
     }
