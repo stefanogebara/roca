@@ -349,6 +349,24 @@ export function advanceRate(verdicts: Array<Pick<GymVerdict, 'avancou' | 'violac
   };
 }
 
+/**
+ * Teto de tokens do juiz absoluto.
+ *
+ * Era 350 e a rodada fbf23a32 perdeu 2 de 14 cenários com "Unexpected end of
+ * JSON input". Mesmo truncamento que tirou 2 lentes do pareado — que eu
+ * consertei em a2627f1 sem consertar aqui.
+ *
+ * A causa piorou por minha mão: a rubrica passou a exigir CITAÇÃO entre aspas
+ * em cada violação, alongando o JSON, e o teto não subiu junto. Regra nova que
+ * aumenta o output precisa de orçamento novo — senão o gate de parse converte
+ * a regra melhor em cenário perdido.
+ *
+ * Maior que o do pareado (500) porque o JSON daqui é maior: 3 notas, avancou,
+ * dois arrays e um veredito de 1-2 frases. Cap não é cobrança: só se paga o
+ * que for gerado.
+ */
+export const JUDGE_MAX_TOKENS = 700;
+
 export const JUDGE_SYSTEM =
   'Você é um avaliador RIGOROSO de conversas de prospecção B2B por WhatsApp (agro, Brasil). ' +
   'A "Vitória" é a assistente de parcerias da Stevi. Avalie SÓ as mensagens da Vitória, em 3 lentes (1-5, 5=excelente).\n' +
@@ -373,7 +391,7 @@ export async function judgeRun(persona: ProspectPersona, transcript: GymTurn[]):
         // the model family that WROTE the reply blesses its own style, so the
         // scores carry self-evaluation bias. See gym/judge.ts:5-9.
         model: process.env.ROCA_JUDGE_MODEL || 'google/gemini-2.5-flash',
-        maxTokens: 350,
+        maxTokens: JUDGE_MAX_TOKENS,
         system: JUDGE_SYSTEM,
         user: `Cenário: ${persona.label} — ${persona.brief}\n\nTranscrição:\n${convo}`,
       })

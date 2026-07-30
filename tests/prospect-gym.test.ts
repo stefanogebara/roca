@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { PROSPECT_PERSONAS, computeMedias, advanceRate, JUDGE_SYSTEM } from '../api/_lib/prospect/gym';
+import { PROSPECT_PERSONAS, computeMedias, advanceRate, JUDGE_SYSTEM, JUDGE_MAX_TOKENS } from '../api/_lib/prospect/gym';
+import { JUDGE_MAX_TOKENS as PAIRED_MAX_TOKENS } from '../api/_lib/prospect/gymPaired';
 
 describe('Vitória gym personas', () => {
   it('covers the market failure modes with unique keys', () => {
@@ -100,5 +101,29 @@ describe('rubrica do juiz absoluto', () => {
 
   it('deixa explícito que se apresentar como IA nunca é violação', () => {
     expect(JUDGE_SYSTEM).toMatch(/nunca\s+(é|e)\s+(viola|erro)/i);
+  });
+});
+
+/**
+ * O teto de tokens do juiz absoluto.
+ *
+ * Era 350 e a rodada fbf23a32 perdeu 2 de 14 cenários com "Unexpected end of
+ * JSON input" — o mesmo truncamento que tirou 2 lentes do juiz pareado e que eu
+ * consertei lá (a2627f1) sem consertar aqui. Conserto pela metade.
+ *
+ * E a causa piorou por minha mão: a rubrica passou a EXIGIR citação entre aspas
+ * em cada violação, o que alonga o JSON, sem que o teto subisse junto. Regra
+ * nova que aumenta o output precisa de orçamento novo.
+ *
+ * O JSON daqui é maior que o do pareado: 3 notas + avancou + dois arrays +
+ * veredito de 1-2 frases, agora com trechos citados. 700 dá folga real.
+ */
+describe('orçamento de tokens do juiz absoluto', () => {
+  it('cabe um JSON com dois arrays, veredito e citações', () => {
+    expect(JUDGE_MAX_TOKENS).toBeGreaterThanOrEqual(700);
+  });
+
+  it('é mais folgado que o do juiz pareado — o JSON daqui é maior', () => {
+    expect(JUDGE_MAX_TOKENS).toBeGreaterThan(PAIRED_MAX_TOKENS);
   });
 });
