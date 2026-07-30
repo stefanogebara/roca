@@ -18,6 +18,8 @@ import {
   parearCenarios,
   escolherPar,
   rodadaInvalida,
+  JUDGE_SYSTEM,
+  JUDGE_MAX_TOKENS,
 } from '../api/_lib/prospect/gymPaired';
 
 describe('posicaoTrocada — embaralhar sem sorteio', () => {
@@ -189,5 +191,59 @@ describe('escolherPar — rodada inválida nunca entra na comparação', () => {
   it('rodadaInvalida devolve o motivo carimbado', () => {
     expect(rodadaInvalida(r('x', 1, 'OpenRouter 402'))).toBe('OpenRouter 402');
     expect(rodadaInvalida(r('y', 1))).toBeNull();
+  });
+});
+
+/**
+ * A rubrica do juiz pareado, consertada com as evidências da rodada de 14
+ * personas (32c510f3 vs 24acf8c3), onde ele errou em 4 de 42 lentes.
+ *
+ * 1. "prescrever produto ou dose" estava LITERALMENTE na lista de erros graves.
+ *    Essa regra é do Stevi que fala com produtor sobre agronomia — a Vitória
+ *    fala de parceria e não prescreve nada. O juiz forçou o encaixe e escreveu
+ *    que agendar reunião "caracteriza prescrever produto ou dose (neste caso, a
+ *    dose é o agendamento)". Não foi alucinação dele: foi regra errada minha.
+ *
+ * 2. A regra de disclosure estava escrita como NEGAÇÃO dentro de uma lista de
+ *    violações ("não se apresentar como assistente digital"). Duas vezes o juiz
+ *    inverteu a polaridade e chamou de "erro grave" ela SE APRESENTAR como IA —
+ *    que é a nossa regra zero. Regra que depende de o leitor não perder o "não"
+ *    é regra frágil.
+ *
+ * 3. Ele acusou "repete a mesma pergunta já respondida" em monossilabico, onde
+ *    as quatro perguntas dela são verificavelmente diferentes. Exigir a CITAÇÃO
+ *    da pergunta repetida deixa a alucinação visível em vez de silenciosa.
+ *
+ * 4. Duas lentes voltaram "juiz falhou" com "Unexpected end of JSON input" —
+ *    assinatura de truncamento, não de flake. Mesmo defeito que derrubou o
+ *    buildAgentReply em 29/jul com maxTokens 400.
+ */
+describe('rubrica do juiz pareado', () => {
+  const lente = (k: string) => PAIRED_LENSES.find((l) => l.key === k)!.pergunta;
+
+  it('não cobra da Vitória uma regra do domínio agronômico', () => {
+    // Ela não prescreve produto nem dose — não tem como, e cobrar isso fez o
+    // juiz inventar que agendamento era "a dose".
+    for (const l of PAIRED_LENSES) expect(l.pergunta).not.toMatch(/prescrev|dose/i);
+  });
+
+  it('diz que se apresentar como IA é OBRIGATÓRIO, não um erro', () => {
+    expect(lente('correcao')).toMatch(/obrigat/i);
+  });
+
+  it('não deixa a regra de disclosure depender de um "não" solto numa lista', () => {
+    expect(lente('correcao')).not.toMatch(/n[ãa]o se apresentar como assistente digital/i);
+  });
+
+  it('a lente de condução exige citar a pergunta repetida', () => {
+    expect(lente('conducao')).toMatch(/cit(e|ando)|entre aspas|transcrev/i);
+  });
+
+  it('o preâmbulo diz ONDE a disclosure é esperada — o template não conta', () => {
+    expect(JUDGE_SYSTEM).toMatch(/primeira mensagem que ELA gera|segunda mensagem dela/i);
+  });
+
+  it('o orçamento de tokens do juiz cabe um JSON com frase — 200 truncava', () => {
+    expect(JUDGE_MAX_TOKENS).toBeGreaterThanOrEqual(400);
   });
 });

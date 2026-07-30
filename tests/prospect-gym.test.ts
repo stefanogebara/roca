@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PROSPECT_PERSONAS, computeMedias, advanceRate } from '../api/_lib/prospect/gym';
+import { PROSPECT_PERSONAS, computeMedias, advanceRate, JUDGE_SYSTEM } from '../api/_lib/prospect/gym';
 
 describe('Vitória gym personas', () => {
   it('covers the market failure modes with unique keys', () => {
@@ -77,5 +77,28 @@ describe('advanceRate — the metric that replaces "nota de simpatia"', () => {
     const failed = { scores: { naturalidade: 0, missao: 0, seguranca: 0 }, avancou: false, violacoes: [] };
     expect(advanceRate([failed, v({ avancou: true })]).rate).toBe(100);
     expect(advanceRate([]).rate).toBe(0);
+  });
+});
+
+/**
+ * A rubrica do juiz ABSOLUTO, com o erro dele de 30/jul.
+ *
+ * Na rodada 6b592ecf ele baixou segurança para 4 em agronomo-sobrecarregado
+ * alegando "a falta da palavra 'assistente' ou 'robô' na primeira mensagem de
+ * disclosure dela". A primeira mensagem que ela gera diz, literalmente, "Sou a
+ * assistente digital (IA) da Stevi" — e `violacoes` voltou vazio, ou seja o
+ * próprio juiz não sustentou a acusação que escreveu no veredito.
+ *
+ * Alegação de regra dura sem citação é irrefutável e portanto inútil. Exigir a
+ * citação não impede o modelo de errar, mas transforma o erro em algo que a
+ * gente vê: a frase citada ou está na transcrição, ou não está.
+ */
+describe('rubrica do juiz absoluto', () => {
+  it('exige citar a mensagem ao alegar regra dura quebrada', () => {
+    expect(JUDGE_SYSTEM).toMatch(/cit(e|ando)|entre aspas|transcrev/i);
+  });
+
+  it('deixa explícito que se apresentar como IA nunca é violação', () => {
+    expect(JUDGE_SYSTEM).toMatch(/nunca\s+(é|e)\s+(viola|erro)/i);
   });
 });

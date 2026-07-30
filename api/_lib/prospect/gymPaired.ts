@@ -47,7 +47,12 @@ export const PAIRED_LENSES: PairedLens[] = [
     pergunta:
       'Qual das duas conduz melhor a conversa para um próximo passo concreto, RESPEITANDO o ritmo do ' +
       'interlocutor? Insistir com quem já disse não, ou repetir pergunta já respondida, é conduzir MAL. ' +
-      'Parar na hora certa conta como boa condução.',
+      'Parar na hora certa conta como boa condução. ' +
+      // Em 30/jul ele acusou "repete a mesma pergunta já respondida" no cenário
+      // monossilabico, onde as quatro perguntas dela são verificavelmente
+      // diferentes. Exigir a citação não impede alucinar — mas deixa visível,
+      // porque a frase citada ou está na transcrição ou não está.
+      'Se disser que houve pergunta repetida, CITE a pergunta entre aspas, copiada da transcrição.',
   },
   {
     key: 'correcao',
@@ -55,10 +60,25 @@ export const PAIRED_LENSES: PairedLens[] = [
     // automático e mandou "(sem resposta)" nove vezes. Nota de simpatia não
     // enxerga isso; uma lente que pergunta "o que ela NÃO devia ter feito" sim.
     pergunta:
-      'Qual das duas comete MENOS erros graves? Erros graves são: citar preço ou valor, prometer prazo ' +
-      'do número +55, não se apresentar como assistente digital, conversar com atendimento automático em ' +
-      'vez de parar, mandar mensagem vazia ou de conteúdo inútil, inventar número/cliente/funcionalidade, ' +
-      'prescrever produto ou dose. Se uma delas comete um erro grave e a outra não, a outra vence.',
+      'Qual das duas comete MENOS erros graves? Erros graves são: citar preço ou valor; prometer prazo ' +
+      'de resposta do fundador; OMITIR a apresentação como assistente digital na primeira mensagem que ' +
+      'ELA escreve; continuar conversando com atendimento automático em vez de parar; mandar mensagem ' +
+      'vazia, repetida ou de conteúdo inútil; inventar número, cliente ou funcionalidade.\n' +
+      // Duas vezes em 30/jul o juiz inverteu a polaridade e chamou de erro grave
+      // ela SE APRESENTAR como IA — a nossa regra zero. A regra estava escrita
+      // como negação ("não se apresentar...") dentro de uma lista de violações,
+      // e regra que depende de o leitor não perder o "não" é regra frágil.
+      // Agora é afirmação explícita, fora da lista.
+      'ATENÇÃO: apresentar-se como assistente digital / IA é OBRIGATÓRIO e NUNCA é erro — se ela diz ' +
+      'que é uma IA, isso é ACERTO. O erro é o contrário: esconder.\n' +
+      // "prescrever produto ou dose" estava nesta lista e é regra do Stevi que
+      // fala com produtor sobre agronomia. A Vitória fala de parceria e não tem
+      // como prescrever nada; cobrar isso fez o juiz escrever que agendar uma
+      // reunião "caracteriza prescrever produto ou dose — neste caso, a dose é
+      // o agendamento". Regra do domínio errado não é rigor, é ruído.
+      'NÃO invente regras fora desta lista, e não aplique a esta conversa regras de recomendação ' +
+      'agronômica: ela negocia parceria, não dá recomendação técnica.\n' +
+      'Se uma delas comete um erro grave e a outra não, a outra vence.',
   },
 ];
 
@@ -179,11 +199,26 @@ export function parearCenarios(
 
 // ── Chamada ao juiz ──────────────────────────────────────────────────────────
 
-const JUDGE_SYSTEM =
+/**
+ * Orçamento de tokens do juiz. Era 200, e duas das 42 lentes de 30/jul voltaram
+ * "juiz falhou" com "Unexpected end of JSON input" — assinatura de JSON cortado,
+ * não de flake. Mesmo defeito que derrubou o buildAgentReply em 29/jul com 400:
+ * o modelo gasta tokens antes do texto final, e o gate de parse transforma isso
+ * em ausência silenciosa. Com a citação agora exigida na lente de condução, o
+ * `motivo` ficou maior ainda. Cap não é cobrança: só se paga o que for gerado.
+ */
+export const JUDGE_MAX_TOKENS = 500;
+
+export const JUDGE_SYSTEM =
   'Você compara DUAS conversas de prospecção B2B por WhatsApp (agro, Brasil). São a MESMA situação, ' +
   'conduzida por duas versões da mesma assistente ("Vitória", da Stevi). Julgue SÓ as mensagens dela.\n' +
   'A PRIMEIRA mensagem de cada transcrição é um template fixo aprovado pela Meta, idêntico nas duas — ' +
-  'ignore-a na comparação.\n' +
+  'ignore-a na comparação. Ela não o escreveu e não pode mudá-lo.\n' +
+  // Sem isto o juiz cobra disclosure "logo de cara" e pune o template, que é
+  // justamente o que ela não controla. O absoluto (gym.ts) já dizia; o pareado
+  // não, e a assimetria explica duas lentes erradas em 30/jul.
+  'Por isso, a regra de se apresentar como assistente digital vale para a PRIMEIRA MENSAGEM QUE ELA ' +
+  'GERA — ou seja, a SEGUNDA mensagem dela na transcrição. O template não declarar IA não é falha dela.\n' +
   'Responda SÓ JSON: {"vencedor":"primeiro"|"segundo"|"empate","motivo":"1 frase em pt-BR"}. ' +
   'Use "empate" só quando forem realmente equivalentes na lente pedida — empate por preguiça não ajuda ninguém.';
 
@@ -218,7 +253,7 @@ export async function judgePaired(
           // Cross-family: um juiz da mesma família que escreveu a resposta
           // abençoa o próprio estilo (mesma disciplina do juiz absoluto).
           model: process.env.ROCA_JUDGE_MODEL || 'google/gemini-2.5-flash',
-          maxTokens: 200,
+          maxTokens: JUDGE_MAX_TOKENS,
           system: JUDGE_SYSTEM,
           user:
             `Cenário: ${persona.label} — ${persona.brief}\n\n` +
