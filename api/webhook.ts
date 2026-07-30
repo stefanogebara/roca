@@ -119,7 +119,12 @@ export default async function handler(
     // mas a interface (transport/types.ts) não obriga ninguém a isso, e um
     // adapter futuro que lançasse derrubaria a instância junto com requisições
     // de outros produtores. O contrato passa a ser garantido aqui, não confiado.
-    const markRead = adapter.markRead;
+    // O bind não é enfeite: markRead é método de protótipo e lê
+    // this.inboundPhoneId ANTES do próprio try/catch. Solto da instância, `this`
+    // é undefined e ele morre de TypeError — que o fireAndForget engole. Ficaria
+    // "sem erro" e sem read receipt nenhum, que é o oposto do que ele existe pra
+    // fazer. (Marcar como lido por outro número da WABA a Meta rejeita.)
+    const markRead = adapter.markRead?.bind(adapter);
     if (markRead) fireAndForget(() => markRead(msg.messageId), 'markRead');
     await handleInbound(adapter, msg);
     ack();

@@ -26,6 +26,7 @@ const m = vi.hoisted(() => ({
   handleInbound: vi.fn(),
   applyProspectStatuses: vi.fn(),
   alertFounders: vi.fn(),
+  cloudMarkRead: vi.fn(),
 }));
 
 vi.mock('../api/_lib/alert', () => ({ alertFounders: m.alertFounders }));
@@ -40,8 +41,14 @@ vi.mock('../api/_lib/transport/twilio', () => ({
 vi.mock('../api/_lib/transport/cloud', () => ({
   CloudApiAdapter: class {
     provider = 'cloud' as const;
+    /** O markRead real lê este campo do `this` — é o que prova o receptor. */
+    inboundPhoneId = 'phone-do-inbound';
     verifySignature = m.cloudVerify;
     parseInbound = m.cloudParse;
+    // Método (não arrow) de propósito: só funciona se o chamador preservar `this`.
+    markRead(messageId: string) {
+      return m.cloudMarkRead(messageId, this.inboundPhoneId);
+    }
   },
   verifyCloudChallenge: m.verifyCloudChallenge,
   parseCloudStatuses: m.parseCloudStatuses,
@@ -106,6 +113,45 @@ beforeEach(() => {
   m.verifyCloudChallenge.mockReturnValue('CHALLENGE-123');
   m.handleInbound.mockResolvedValue(undefined);
   m.applyProspectStatuses.mockResolvedValue(undefined);
+  m.cloudMarkRead.mockResolvedValue(undefined);
+});
+
+describe('markRead — cosmético, disparado sem esperar', () => {
+  const postCloud = () =>
+    handler(makeReq({ headers: { 'x-hub-signature-256': 'sha256=abc' }, body: '{}' }), makeRes());
+
+  it('roda com o adapter como receptor (senão perderia o phone id do inbound)', async () => {
+    m.cloudParse.mockResolvedValue({ from: '+5535999990000', kind: 'text', text: 'oi', messageId: 'wamid-1' });
+
+    await postCloud();
+
+    // Marcar como lido por OUTRO número da mesma WABA é rejeitado pela Meta:
+    // se o `this` se perder no caminho, isso volta undefined e quebra em prod
+    // de um jeito que nenhum teste veria (o markRead engole o próprio erro).
+    expect(m.cloudMarkRead).toHaveBeenCalledWith('wamid-1', 'phone-do-inbound');
+  });
+
+  it('um markRead que rejeita não vira unhandled rejection nem tira o ack', async () => {
+    m.cloudParse.mockResolvedValue({ from: '+5535999990000', kind: 'text', text: 'oi', messageId: 'wamid-2' });
+    m.cloudMarkRead.mockRejectedValue(new Error('meta caiu'));
+    const soltas: unknown[] = [];
+    const capturar = (e: unknown) => soltas.push(e);
+    process.on('unhandledRejection', capturar);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const res = makeRes();
+    try {
+      await handler(makeReq({ headers: { 'x-hub-signature-256': 'sha256=abc' }, body: '{}' }), res);
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+    } finally {
+      process.off('unhandledRejection', capturar);
+      stderr.mockRestore();
+    }
+
+    expect(soltas).toEqual([]);
+    expect(res.out.json).toEqual({ received: true }); // o produtor recebeu resposta
+    expect(m.handleInbound).toHaveBeenCalledTimes(1); // e o trabalho de verdade rodou
+  });
 });
 
 describe('GET', () => {
