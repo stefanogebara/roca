@@ -64,7 +64,7 @@ async function main(): Promise<void> {
     .filter(Boolean);
   const ids = argv.filter((a) => !a.startsWith('--')).flatMap((a) => a.split(',')).map((s) => s.trim()).filter(Boolean);
   const [runA, runB] = await carregar(ids);
-  const { runPairedGym } = await import('../api/_lib/prospect/gymPaired');
+  const { runPairedGym, MARGEM_MINIMA } = await import('../api/_lib/prospect/gymPaired');
   const { PROSPECT_PERSONAS } = await import('../api/_lib/prospect/gym');
 
   console.log(`\n⚖️  Juiz pareado da Vitória`);
@@ -97,12 +97,18 @@ async function main(): Promise<void> {
     // 4×2 em 14 com 8 fora é outra bem diferente.
     console.log(`  ⚠️  fora do placar (só existiam numa rodada): ${r.ignoradas.join(', ')}`);
   }
+  // Diferenciar "deu igual" de "a diferença cabe dentro do ruído": um controle
+  // com código idêntico dos dois lados deu 6×5 em 30/jul. Quem lê um 6×5 sem
+  // essa frase conclui que uma versão é melhor.
+  const margem = Math.abs(p.a - p.b);
   const veredito =
     p.vencedor === 'B'
       ? '✅ a rodada NOVA é melhor — mudança vale a pena'
       : p.vencedor === 'A'
         ? '❌ a rodada ANTIGA era melhor — reverta a mudança'
-        : '⚪ empate — sem sinal pra promover nada';
+        : margem > 0
+          ? `⚪ inconclusivo — margem ${margem} está dentro do ruído (piso: ${MARGEM_MINIMA})`
+          : '⚪ empate — sem sinal pra promover nada';
   console.log(`  ${veredito}`);
   console.log(`  done in ${secs}s\n`);
 }

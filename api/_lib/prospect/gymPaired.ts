@@ -159,15 +159,38 @@ export interface PairedTally {
 }
 
 /**
+ * Margem mínima de cenários para declarar um vencedor.
+ *
+ * Medido, não chutado. Em 30/jul rodei o pareado com o MESMO código da Vitória
+ * dos dois lados (fbf23a32 vs 457a19f4) e saiu:
+ *
+ *     B 5 × 6 A · 3 empates  →  "❌ a rodada ANTIGA era melhor — reverta"
+ *
+ * Um veredito de reversão para uma mudança que não existe. Margem 1 é o que o
+ * instrumento produz sozinho; declarar vencedor aí é gerar decisão aleatória
+ * com cara de conclusão — e duas vezes nesse dia esse veredito quase me fez
+ * reverter trabalho que a medição depois mostrou bom.
+ *
+ * 3 é conservador de propósito. UMA amostra de controle prova que margem 1
+ * acontece com código idêntico, mas não diz onde fica o limiar de verdade.
+ * Com 3-4 controles isto vira calibragem; até lá, é prudência explícita.
+ */
+export const MARGEM_MINIMA = 3;
+
+/**
  * Placar final: quantos CENÁRIOS cada versão venceu. Deliberadamente não é
  * média de nota — média esconde que uma versão ganhou muito num cenário e
  * perdeu pouco em três.
+ *
+ * A contagem sai sempre exata; o piso mexe SÓ no veredito. Esconder os números
+ * seria trocar um veredito ruim por cegueira — quem lê precisa ver o 6×5 e
+ * decidir por si. O que o piso impede é chamarem isso de vitória.
  */
 export function apurarCenarios(resultados: ScenarioResult[]): PairedTally {
   const a = resultados.filter((r) => r.vencedor === 'A').length;
   const b = resultados.filter((r) => r.vencedor === 'B').length;
   const empates = resultados.length - a - b;
-  const vencedor: Vencedor = a > b ? 'A' : b > a ? 'B' : 'empate';
+  const vencedor: Vencedor = Math.abs(a - b) < MARGEM_MINIMA ? 'empate' : a > b ? 'A' : 'B';
   return { a, b, empates, total: resultados.length, vencedor };
 }
 

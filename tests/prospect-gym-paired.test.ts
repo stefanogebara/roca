@@ -14,6 +14,8 @@ import {
   resolverVoto,
   apurarLentes,
   apurarCenarios,
+  MARGEM_MINIMA,
+  type ScenarioResult,
   PAIRED_LENSES,
   parearCenarios,
   escolherPar,
@@ -95,8 +97,14 @@ describe('apurarCenarios — promoção por vitórias, não por média', () => {
     expect(t).toMatchObject({ a: 1, b: 2, empates: 1, total: 4 });
   });
 
-  it('vence quem ganhou mais cenários', () => {
-    expect(apurarCenarios([r('p1', 'B'), r('p2', 'B'), r('p3', 'A')]).vencedor).toBe('B');
+  it('vence quem ganhou mais cenários — desde que fora do ruído', () => {
+    // Contrato estreitado em 30/jul com medição: era 2×1 e virou margem ≥3.
+    // O controle com código idêntico dos dois lados deu 6×5, então "ganhou
+    // mais" sozinho não distingue mudança de sorte. Ver MARGEM_MINIMA.
+    expect(
+      apurarCenarios([r('p1', 'B'), r('p2', 'B'), r('p3', 'B'), r('p4', 'B'), r('p5', 'A')]).vencedor
+    ).toBe('B');
+    expect(apurarCenarios([r('p1', 'B'), r('p2', 'B'), r('p3', 'A')]).vencedor).toBe('empate');
   });
 
   it('empate em cenários = empate geral: sem sinal, não promove', () => {
@@ -245,5 +253,58 @@ describe('rubrica do juiz pareado', () => {
 
   it('o orçamento de tokens do juiz cabe um JSON com frase — 200 truncava', () => {
     expect(JUDGE_MAX_TOKENS).toBeGreaterThanOrEqual(400);
+  });
+});
+
+/**
+ * O piso de ruído do placar.
+ *
+ * 30/jul, experimento de controle: rodei o pareado com o MESMO código da
+ * Vitória dos dois lados (fbf23a32 vs 457a19f4 — só o teto de tokens do juiz
+ * mudou entre elas, o que não altera o que ela escreve). Resultado:
+ *
+ *     B 5 × 6 A · 3 empates  →  "❌ a rodada ANTIGA era melhor — reverta"
+ *
+ * Ele mandou reverter uma mudança que não existe. `apurarCenarios` declarava
+ * vencedor com margem 1, sem piso nenhum, então bastava um cenário virar por
+ * acaso pra sair um veredito com cara de conclusão. Duas vezes hoje esse
+ * veredito quase me fez reverter trabalho que a medição depois confirmou bom.
+ *
+ * O piso não torna o juiz mais certo — torna o APURADOR honesto sobre o que
+ * ele não consegue distinguir. Margem 3 é conservadora e calibrável: uma
+ * amostra de controle prova que margem 1 acontece com código idêntico, mas não
+ * diz onde exatamente fica o limiar. Quando houver 3-4 controles, recalibra
+ * com número em vez de prudência.
+ */
+describe('piso de ruído — não declarar vencedor dentro do erro do instrumento', () => {
+  const cenarios = (a: number, b: number, empates = 0): ScenarioResult[] => [
+    ...Array.from({ length: a }, (_, i) => ({ persona: `a${i}`, vencedor: 'A' as const, votos: [] })),
+    ...Array.from({ length: b }, (_, i) => ({ persona: `b${i}`, vencedor: 'B' as const, votos: [] })),
+    ...Array.from({ length: empates }, (_, i) => ({ persona: `e${i}`, vencedor: 'empate' as const, votos: [] })),
+  ];
+
+  it('o controle real de 30/jul (6×5) vira EMPATE, não "reverta"', () => {
+    const t = apurarCenarios(cenarios(6, 5, 3));
+    expect(t.vencedor).toBe('empate');
+  });
+
+  it('margem 2 ainda é ruído', () => {
+    expect(apurarCenarios(cenarios(6, 4, 4)).vencedor).toBe('empate');
+  });
+
+  it('margem 3 já declara', () => {
+    expect(apurarCenarios(cenarios(3, 6, 5)).vencedor).toBe('B');
+    expect(apurarCenarios(cenarios(6, 3, 5)).vencedor).toBe('A');
+  });
+
+  it('o placar dos dois gates (9×2) continua sendo sinal — margem 7', () => {
+    expect(apurarCenarios(cenarios(2, 9, 3)).vencedor).toBe('B');
+  });
+
+  it('a CONTAGEM não muda — o piso mexe só no veredito', () => {
+    // Esconder os números seria trocar um veredito ruim por cegueira. Quem lê
+    // precisa ver 6×5 e decidir; o que muda é não chamarem isso de vitória.
+    const t = apurarCenarios(cenarios(6, 5, 3));
+    expect({ a: t.a, b: t.b, empates: t.empates, total: t.total }).toEqual({ a: 6, b: 5, empates: 3, total: 14 });
   });
 });
