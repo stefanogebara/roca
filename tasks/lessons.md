@@ -485,6 +485,13 @@ esconder quem chama errado. Fail-soft protege o processo e cega o autor.
   vazava rejeição para o listener do vitest; era contenção de CPU (`tsc` rodando
   junto com o `vitest`). Reproduza isolado ANTES de escrever a conclusão numa
   mensagem de commit — eu escrevi, e tive que corrigir depois.
+- **Recorte de grep/sed não é o arquivo.** Quatro conclusões erradas neste
+  episódio saíram do mesmo mecanismo: um `grep -oE "(WHATSAPP|META)_[A-Z_]+"`
+  casou o SUFIXO de `TWILIO_WHATSAPP_FROM` e me fez inventar uma var
+  `WHATSAPP_FROM` que não existe em lugar nenhum; e um `sed -n '25,50p'` cortou
+  na linha 50, órfãou o comentário "fonte ÚNICA" da sua var na 52 e eu colei o
+  comentário na var errada. Antes de afirmar que algo existe (ou não existe),
+  abra as linhas em volta. Padrão de sufixo sem `\b` inventa símbolos.
 - **Ausência de log em janela sem tráfego não é prova de caminho morto.** Zero
   linha de `markRead` em 24h parecia "branch dormente"; era madrugada. Antes de
   declarar código inerte, mostre que ele foi EXERCITADO e não reagiu — ou vá ao

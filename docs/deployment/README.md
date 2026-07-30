@@ -11,8 +11,8 @@ environment, run migrations, deploy to Vercel, and wire the WhatsApp webhook.
 - [1. Supabase: schema and migrations](#1-supabase-schema-and-migrations)
 - [2. Agrofit data slice](#2-agrofit-data-slice)
 - [3. Deploy to Vercel](#3-deploy-to-vercel)
-- [4. Point the Twilio sandbox webhook](#4-point-the-twilio-sandbox-webhook)
-- [5. (Optional) Meta WhatsApp Cloud API](#5-optional-meta-whatsapp-cloud-api)
+- [4. Twilio sandbox webhook (legacy path — kept, do not delete)](#4-twilio-sandbox-webhook-legacy-path--kept-do-not-delete)
+- [5. Meta WhatsApp Cloud API (active transport)](#5-meta-whatsapp-cloud-api-active-transport)
 - [6. Daily monitor cron](#6-daily-monitor-cron)
 - [Verifying the deployment](#verifying-the-deployment)
 - [Cost notes](#cost-notes)
@@ -151,7 +151,13 @@ vercel --prod
 Set every production env var from the [table above](#environment-variables) in the
 Vercel project settings before sending real traffic.
 
-## 4. Point the Twilio sandbox webhook
+## 4. Twilio sandbox webhook (legacy path — kept, do not delete)
+
+> **Not the active transport.** Production inbound runs on the Cloud API
+> ([step 5](#5-meta-whatsapp-cloud-api-active-transport)). Keep Twilio configured
+> anyway: it is the no-redeploy rollback, and it is what registers a **new** number
+> with Meta — Meta places a voice call reading the code aloud and `api/twiml-otp.ts`
+> records/transcribes it, because voice-only BR landlines never get the SMS.
 
 1. In the Twilio Console, open **Messaging → Try it out → Send a WhatsApp message**
    and activate the sandbox.
@@ -169,11 +175,17 @@ Twilio signs each request; the webhook verifies `X-Twilio-Signature` against
 `TWILIO_AUTH_TOKEN`. If verification fails you get `403` and no reply — a wrong or
 missing auth token is the usual cause.
 
-## 5. (Optional) Meta WhatsApp Cloud API
+## 5. Meta WhatsApp Cloud API (active transport)
 
-The Cloud API adapter (`api/_lib/transport/cloud.ts`) is implemented and unit-tested;
-it coexists with Twilio at the **same** webhook URL (the handler picks the adapter by
-request shape). To switch the endgame transport on:
+**This is what production runs on.** Every inbound message arrives here — farmer
+triage and prospect replies alike; `users.channel` holds no `twilio` row, and
+`prospect_messages` inbound comes through this webhook. Outbound prospecting sends
+approved templates via `cloud.sendTemplate`.
+
+The adapter (`api/_lib/transport/cloud.ts`) coexists with Twilio at the **same**
+webhook URL (the handler picks the adapter by request shape), which is what makes
+[step 4](#4-twilio-sandbox-webhook-legacy-path--kept-do-not-delete) a
+configuration-only rollback. The setup, for the record or for a new number:
 
 1. Create a Meta app with WhatsApp, get the **permanent access token**
    (`WHATSAPP_CLOUD_TOKEN`), **phone number id** (`WHATSAPP_CLOUD_PHONE_NUMBER_ID`),

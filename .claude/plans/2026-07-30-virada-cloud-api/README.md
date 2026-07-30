@@ -36,9 +36,17 @@ o hibridismo deixou pendurado.**
 - [ ] `docs/deployment/README.md` §5 — hoje é *"(Optional) Meta WhatsApp Cloud
       API"*. Não é opcional, é o que roda. Trocar de "como ligar" pra "como
       está ligado", e mover o Twilio pra seção de legado.
-- [ ] `.env.example:39-41` — documenta `WHATSAPP_FROM` como "fonte ÚNICA do
-      número". **Nenhum código lê essa var.** A fonte real é `PUBLIC_WA_NUMBER`
-      (`.env.example:52`). Remover a var fantasma ou apontar pra certa.
+- [ ] `.env.example:30-35` — rotula Twilio como "transporte de origem" e Cloud como
+      "de destino". O destino já é o presente. Trocar por LEGADO / ATIVO, e dizer no
+      próprio arquivo por que o Twilio continua preenchido (rollback + registro de
+      número via `twiml-otp`), senão alguém limpa a env achando que é morta.
+
+> Nota: uma versão anterior desta checklist listava aqui uma var fantasma
+> `WHATSAPP_FROM` documentada como "fonte única do número". **Não existe** — todo
+> hit é `TWILIO_WHATSAPP_FROM`, e o comentário "fonte ÚNICA" pertence ao
+> `PUBLIC_WA_NUMBER` (`.env.example:52`), correto como está. O erro veio de um
+> `grep -o` casando sufixo e de uma janela de `sed` que cortou o comentário da sua
+> var. Ver `tasks/lessons.md`.
 
 ## 2. Twilio: o que ainda depende dele (NÃO desligue antes de checar)
 

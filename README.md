@@ -59,9 +59,11 @@ api/cron/monitor.ts  1×/dia — transições de vazio sanitário + validade do 
 ```
 
 O transporte é abstraído em `_lib/transport/`. **Twilio e Meta Cloud API coexistem
-na mesma URL** — o webhook escolhe o adapter pelo formato da requisição, então virar
-pro Cloud API é só apontar o webhook da Meta pra cá (sem redeploy). O compute é
-stateless por mensagem; o estado vive no Supabase.
+na mesma URL** — o webhook escolhe o adapter pelo formato da requisição. O **Cloud
+API é o transporte ativo** (todo inbound entra por ele; `users.channel` não tem uma
+linha `twilio`); o Twilio segue plugado, o que torna o rollback uma mudança de
+configuração — despontar o callback da Meta, sem redeploy. O compute é stateless
+por mensagem; o estado vive no Supabase.
 
 **LLM via OpenRouter** (uma chave, tiers por env): `anthropic/claude-haiku-4.5`
 (roteador), `anthropic/claude-sonnet-5` (raciocínio/visão), `google/gemini-2.5-flash`
@@ -91,14 +93,19 @@ Twilio reais). Documentação completa em [`docs/`](./docs/).
 ## Setup
 
 1. **Supabase** — crie o projeto e rode as migrações (`supabase db push`).
-2. **Twilio WhatsApp Sandbox** — ative, pegue `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN`,
-   e aponte "When a message comes in" para `https://<deploy>/api/webhook`.
-3. **OpenRouter** — gere `OPENROUTER_API_KEY`.
-4. Preencha `.env` a partir de `.env.example`, configure as env vars na Vercel, deploy.
-5. Do seu celular: entre no sandbox (`join <código>`) e teste foto, "posso pulverizar
-   hoje?", um pin e um áudio.
+2. **Meta WhatsApp Cloud API** (transporte ativo) — app na Meta, token permanente,
+   phone number id, app secret e verify token; callback em
+   `https://<deploy>/api/webhook`, assinando o campo `messages`. Passo a passo no
+   runbook §5.
+3. **Twilio** (legado, mas preencha) — rollback sem redeploy e registro de número
+   novo na Meta. Runbook §4.
+4. **OpenRouter** — gere `OPENROUTER_API_KEY`.
+5. Preencha `.env` a partir de `.env.example`, configure as env vars na Vercel, deploy.
+6. Do seu celular, mandando pro número da Stevi: foto, "posso pulverizar hoje?",
+   um pin e um áudio. Confirme os dois tiques azuis e o "digitando" — é a prova de
+   que o `markRead` do Cloud está de pé.
 
-Runbook detalhado (env vars, migrações, cron, transição pro Cloud API):
+Runbook detalhado (env vars, migrações, cron, os dois transportes):
 [`docs/deployment/`](./docs/deployment/).
 
 ## Escopo (disciplina)
@@ -111,7 +118,9 @@ pro agrônomo (com consentimento específico + DPA), e mais culturas.
 ## Decisões travadas (dossiê Parte 11)
 
 - **Culturas**: soja, milho, pastagem, café, citros.
-- **Transporte**: Twilio sandbox agora; Cloud API já implementado e plugável (mesma URL).
+- **Transporte**: Meta Cloud API é o ativo desde jul/2026; Twilio coexiste na mesma
+  URL como rollback — e não pode ser desligado, é ele que registra número novo na
+  Meta (OTP por voz, `api/twiml-otp.ts`: fixo BR de voz não recebe SMS).
 - **Voz**: entrada por áudio (ASR); respostas em texto.
 - **Modelo de negócio**: ferramenta gratuita → encaminhamento pro agrônomo (lead-gen),
   nunca comissão por produto prescrito. O `referral_requests` já registra o opt-in.
