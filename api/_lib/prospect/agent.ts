@@ -399,13 +399,7 @@ export async function buildAgentReply(
 
 ${learned}` : ''),
         maxTokens: 1200,
-        user:
-          user +
-          `
-
-[CORREÇÃO] Você acabou de escrever isto, que REPETE algo que já disse nesta conversa: ` +
-          `"${action.texto.slice(0, 200)}". Ele já respondeu. Avance pro próximo assunto ou proponha o ` +
-          `próximo passo. Se não houver assunto novo, responda só ${SILENCE_SENTINEL}.`,
+        user: user + '\n\n' + blocoCorrecao(action.texto),
       });
       const a2 = resolverSilencio(
         interpretAgentOutput(r2.text, r2.finishReason ?? undefined),
@@ -630,5 +624,34 @@ export function repeticaoNossa(
   if (novo.size < REPETICAO_MIN_PALAVRAS) return false;
   return thread.some(
     (m) => m.direction === 'out' && sobreposicao(novo, palavras(m.text ?? '')) >= REPETICAO_LIMIAR
+  );
+}
+
+/**
+ * O bloco que corrige uma pergunta repetida — sem endurecer a voz.
+ *
+ * 30/jul o juiz pareado promoveu o gate de repetição (B 3×1 A) e cobrou o preço
+ * numa lente só: naturalidade caiu em 3 dos 4 cenários, sempre com as mesmas
+ * palavras — "script pré-programado", "rigidez de robô corporativo",
+ * "reconfirmação desnecessária". A causa era este bloco. Ele é a ÚLTIMA coisa
+ * que o modelo lê antes de escrever, falava só de tarefa ("avance", "proponha o
+ * próximo passo") e nada de registro; e mandava propor passo novo até para quem
+ * tinha acabado de dizer que estava no campo sem tempo — a crítica literal no
+ * agronomo-sobrecarregado ("repete perguntas e adiciona steps, sem atender a
+ * urgência").
+ *
+ * Então ele passa a dizer o que NÃO muda. Trocar o assunto é o pedido; a voz é
+ * a mesma pessoa falando.
+ */
+export function blocoCorrecao(textoRepetido: string): string {
+  return (
+    `[CORREÇÃO] Isto que você acabou de escrever repete algo que já disse nesta conversa: ` +
+    `"${textoRepetido.slice(0, 200)}". Ele já respondeu isso.\n` +
+    `Troque o ASSUNTO, não o tom: a mensagem nova tem que soar como a mesma pessoa falando — ` +
+    `mesmo registro de WhatsApp falado, no máximo uma pergunta, e não mais longa que a anterior ` +
+    `(mais curta é melhor).\n` +
+    `NÃO reconfirme o que ele acabou de dizer, NÃO recomece a apresentação, NÃO repita o pitch. ` +
+    `Se ele demonstrou pressa ou pouco tempo, NÃO empilhe um passo novo — encurte.\n` +
+    `Se não houver assunto novo que valha a mensagem, responda só ${SILENCE_SENTINEL}.`
   );
 }

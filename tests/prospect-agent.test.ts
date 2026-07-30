@@ -14,6 +14,8 @@ import {
   dicaDeTurno,
   resolverSilencio,
   repeticaoNossa,
+  blocoCorrecao,
+  SILENCE_SENTINEL,
 } from '../api/_lib/prospect/agent';
 import { parseVcards } from '../api/_lib/transport/vcard';
 
@@ -438,3 +440,60 @@ describe('repeticaoNossa — não perguntar de novo o que já perguntamos', () =
     expect(repeticaoNossa([] as never, P)).toBe(false);
   });
 })
+
+/**
+ * O bloco de correção anti-repetição.
+ *
+ * 30/jul o juiz pareado promoveu o gate (B 3×1 A) mas cobrou o preço numa lente
+ * só: naturalidade caiu em 3 dos 4 cenários, com as mesmas palavras — "script
+ * pré-programado", "rigidez de robô corporativo", "reconfirmação desnecessária".
+ * A causa estava no próprio bloco: ele é a ÚLTIMA coisa que o modelo lê, falava
+ * só de tarefa ("avance", "proponha o próximo passo") e nada de registro. Pior,
+ * mandava propor um passo novo até para quem tinha acabado de dizer que estava
+ * no campo sem tempo — que foi exatamente a crítica no agronomo-sobrecarregado
+ * ("repete perguntas e adiciona steps, sem atender a urgência").
+ *
+ * A correção tem que trocar o ASSUNTO sem trocar a VOZ.
+ */
+describe('blocoCorrecao — corrigir o assunto sem endurecer o tom', () => {
+  const REPETIDA = 'Vocês aceitariam receber lead triado, e em quanto tempo conseguem atender?';
+  const b = blocoCorrecao(REPETIDA);
+
+  it('mostra ao modelo o que ele repetiu — senão ele não sabe o que evitar', () => {
+    expect(b).toContain(REPETIDA.slice(0, 60));
+  });
+
+  it('manda trocar o assunto mantendo o tom, que é o ponto todo', () => {
+    expect(b).toMatch(/assunto/i);
+    expect(b).toMatch(/\btom\b|registro/i);
+  });
+
+  it('NÃO manda mais propor um próximo passo de forma incondicional', () => {
+    // A construção afirmativa é o que não pode existir. O bloco ainda fala de
+    // "passo" — para PROIBIR empilhar um — e asserção de substring crua aqui
+    // acusaria a própria proibição (a armadilha de 29/jul).
+    expect(b).not.toMatch(/proponha o pr[óo]ximo passo/i);
+  });
+
+  it('proíbe empilhar passo em quem está com pressa', () => {
+    expect(b).toMatch(/pressa|corrido|sem tempo/i);
+  });
+
+  it('proíbe a reconfirmação que o juiz chamou de desnecessária', () => {
+    expect(b).toMatch(/reconfirm|n[ãa]o repita o que ele/i);
+  });
+
+  it('põe teto de tamanho e de uma pergunta — rigidez vem de mensagem inflada', () => {
+    expect(b).toMatch(/mais (curta|curto)|tamanho|n[ãa]o mais longa/i);
+    expect(b).toMatch(/uma pergunta/i);
+  });
+
+  it('mantém a saída pelo silêncio quando não há assunto novo', () => {
+    expect(b).toContain(SILENCE_SENTINEL);
+  });
+
+  it('não deixa a citação inflar o prompt', () => {
+    const gigante = 'x'.repeat(900);
+    expect(blocoCorrecao(gigante).length).toBeLessThan(900);
+  });
+});
