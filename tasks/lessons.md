@@ -452,17 +452,20 @@ variável, não: `markRead` é método de protótipo e lê `this.inboundPhoneId`
 helper engole como ruído de fundo. O contrato "never throws" passou a ser
 cumprido pelo pior caminho possível: nunca lança porque nunca funciona.
 
-E aqui está a parte que quase me fez errar o diagnóstico duas vezes: **nenhum
-produtor sentiu isso ainda.** O transporte ativo é o sandbox do Twilio, e o
-`TwilioAdapter` não implementa `markRead` — só o `CloudApiAdapter`. O branch está
-dormente, confirmado nos logs de produção (54 invocações do webhook em 24h, zero
-linha de `markRead`, incluindo as ~10h em que o bug esteve no ar). O bug estava
-**armado pra virada pro Cloud API**, que a arquitetura vende como plugável "sem
-redeploy": ele apareceria no dia em que ninguém estivesse olhando pra esse
-código, sem teste, sem log e sem reclamação — porque o helper engole o
-`TypeError` e o próprio `markRead` engole os erros dele por contrato. A suíte
-seguia 815/815, 0 unhandled, e `webhook.test.ts` não tinha uma linha sobre
-`markRead`: aquele call site estava descoberto.
+O bug ficou ~10h em produção, no caminho real, e escapou por sorte: entre o
+deploy (29/jul 22:18) e o fix (30/jul 08:21) não chegou UMA mensagem — último
+usuário 29/jul 13:00, último inbound de prospect 11:10. Madrugada. A suíte seguia
+815/815, 0 unhandled, e `webhook.test.ts` não tinha uma linha sobre `markRead`:
+aquele call site estava descoberto.
+
+E aqui está o erro que eu cometi **duas vezes** ao avaliar a gravidade, que é a
+lição mais afiada deste episódio. Primeiro afirmei que produtores estavam sem
+read receipt. Depois corrigi para "branch dormente, o transporte ativo é o
+Twilio" — apoiado no README e na ausência de linhas de `markRead` nos logs.
+Ambas erradas. O banco decidiu: `select channel, count(*) from users` devolve
+**zero `twilio`** e sete `cloud`. Todo inbound entra pelo Cloud; o README ("Twilio
+sandbox agora") está velho. E a ausência de log era ausência de TRÁFEGO, não de
+execução.
 
 O `fireAndForget` fez o trabalho dele (a instância não caiu) e, no mesmo golpe,
 esconder quem chama errado. Fail-soft protege o processo e cega o autor.
@@ -482,6 +485,14 @@ esconder quem chama errado. Fail-soft protege o processo e cega o autor.
   vazava rejeição para o listener do vitest; era contenção de CPU (`tsc` rodando
   junto com o `vitest`). Reproduza isolado ANTES de escrever a conclusão numa
   mensagem de commit — eu escrevi, e tive que corrigir depois.
+- **Ausência de log em janela sem tráfego não é prova de caminho morto.** Zero
+  linha de `markRead` em 24h parecia "branch dormente"; era madrugada. Antes de
+  declarar código inerte, mostre que ele foi EXERCITADO e não reagiu — ou vá ao
+  estado persistido, que não tem retenção de 1 dia. Foi `users.channel` que
+  desempatou, não o log.
+- **Doc de arquitetura não é evidência de runtime.** O README dizia "Twilio
+  sandbox agora" e eu tratei como fato do presente; o banco diz Cloud em 100% do
+  inbound. Para "o que está ativo agora", pergunte ao dado, não ao doc.
 - **Premissa de minutos atrás expira.** Comecei a tarefa com o teste do
   `fireAndForget` untracked na árvore principal; no meio, uma sessão paralela
   commitou tudo no master e o arquivo virou rastreado. Ia apagar "a sobra" e
