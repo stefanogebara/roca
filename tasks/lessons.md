@@ -450,11 +450,19 @@ O `void adapter.markRead(id)` de antes preservava o `this`. Extraído para
 variável, não: `markRead` é método de protótipo e lê `this.inboundPhoneId`
 **antes** do próprio try/catch, então `this` undefined vira `TypeError` — e o
 helper engole como ruído de fundo. O contrato "never throws" passou a ser
-cumprido pelo pior caminho possível: nunca lança porque nunca funciona. Em
-produção, nenhum "lido" e nenhum "digitando" chegava ao produtor — justamente a
-percepção de velocidade que aquela chamada existe pra dar a quem espera 15-30s
-no 3G. A suíte seguia 815/815, 0 unhandled, e `webhook.test.ts` não tinha uma
-linha sobre `markRead`: aquele call site estava descoberto.
+cumprido pelo pior caminho possível: nunca lança porque nunca funciona.
+
+E aqui está a parte que quase me fez errar o diagnóstico duas vezes: **nenhum
+produtor sentiu isso ainda.** O transporte ativo é o sandbox do Twilio, e o
+`TwilioAdapter` não implementa `markRead` — só o `CloudApiAdapter`. O branch está
+dormente, confirmado nos logs de produção (54 invocações do webhook em 24h, zero
+linha de `markRead`, incluindo as ~10h em que o bug esteve no ar). O bug estava
+**armado pra virada pro Cloud API**, que a arquitetura vende como plugável "sem
+redeploy": ele apareceria no dia em que ninguém estivesse olhando pra esse
+código, sem teste, sem log e sem reclamação — porque o helper engole o
+`TypeError` e o próprio `markRead` engole os erros dele por contrato. A suíte
+seguia 815/815, 0 unhandled, e `webhook.test.ts` não tinha uma linha sobre
+`markRead`: aquele call site estava descoberto.
 
 O `fireAndForget` fez o trabalho dele (a instância não caiu) e, no mesmo golpe,
 esconder quem chama errado. Fail-soft protege o processo e cega o autor.
