@@ -31,20 +31,24 @@ interface StoredRun {
   id: string;
   ran_at: string;
   verdicts: Array<{ persona: string; label: string; transcript: unknown[] }>;
+  /** Onde vive o carimbo `invalida` — ver rodadaInvalida em gymPaired.ts. */
+  medias?: { invalida?: string } | null;
 }
 
 async function carregar(ids: string[]): Promise<StoredRun[]> {
   const { getDb } = await import('../api/_lib/db');
+  const { escolherPar } = await import('../api/_lib/prospect/gymPaired');
   const db = getDb();
-  const q = db.from('prospect_gym_runs').select('id, ran_at, verdicts');
+  // `medias` entra no select porque é onde vive o carimbo de inválida — sem ele
+  // o filtro não teria o que ler.
+  const q = db.from('prospect_gym_runs').select('id, ran_at, verdicts, medias');
+  // Sem ids, busca 10 e não 2: a inválida de 29/jul era uma das duas mais
+  // recentes, e filtrar DEPOIS de um limit(2) deixaria uma só.
   const { data, error } = ids.length
     ? await q.in('id', ids)
-    : await q.order('ran_at', { ascending: false }).limit(2);
+    : await q.order('ran_at', { ascending: false }).limit(10);
   if (error) throw new Error(`não consegui ler prospect_gym_runs: ${error.message}`);
-  const runs = (data ?? []) as StoredRun[];
-  if (runs.length < 2) throw new Error(`preciso de 2 rodadas pra comparar, achei ${runs.length}`);
-  // Mais antiga primeiro: A = antes, B = depois.
-  return runs.sort((x, y) => Date.parse(x.ran_at) - Date.parse(y.ran_at)).slice(0, 2);
+  return escolherPar((data ?? []) as StoredRun[]);
 }
 
 async function main(): Promise<void> {

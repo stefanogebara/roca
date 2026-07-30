@@ -16,6 +16,8 @@ import {
   apurarCenarios,
   PAIRED_LENSES,
   parearCenarios,
+  escolherPar,
+  rodadaInvalida,
 } from '../api/_lib/prospect/gymPaired';
 
 describe('posicaoTrocada — embaralhar sem sorteio', () => {
@@ -140,5 +142,52 @@ describe('parearCenarios — casar duas rodadas persona a persona', () => {
 
   it('sem interseção não inventa comparação', () => {
     expect(parearCenarios(run(['a']) as never, run(['z']) as never)).toEqual([]);
+  });
+});
+
+/**
+ * Rodada carimbada como inválida não serve de base de comparação.
+ *
+ * 29/jul o gym rodou sem crédito no OpenRouter: nenhuma conversa aconteceu,
+ * nenhum juízo rodou, e a linha foi gravada com médias 0. Carimbei
+ * `medias.invalida` e nada lia o carimbo — então `gym:vitoria:paired` sem
+ * argumentos compararia a rodada nova contra o vazio, e o placar sairia com
+ * cara de conclusão. É o padrão do dia inteiro: o dado existia e não estava
+ * ligado na decisão.
+ *
+ * Recusar é melhor que comparar errado. Um placar 12×0 contra nada é pior que
+ * nenhum placar, porque parece resposta.
+ */
+describe('escolherPar — rodada inválida nunca entra na comparação', () => {
+  const r = (id: string, min: number, invalida?: string) => ({
+    id,
+    ran_at: new Date(Date.UTC(2026, 6, 29, 22, min)).toISOString(),
+    medias: invalida ? { invalida } : { missao: 4 },
+  });
+
+  it('pula a inválida e pega as duas válidas mais recentes', () => {
+    const [a, b] = escolherPar([r('nova', 47, 'sem credito'), r('boa2', 36), r('boa1', 15), r('velha', 5)]);
+    expect([a.id, b.id]).toEqual(['boa1', 'boa2']);
+  });
+
+  it('A é a mais ANTIGA — inverter isso inverteria toda a conclusão', () => {
+    const [a, b] = escolherPar([r('depois', 40), r('antes', 10)]);
+    expect(a.id).toBe('antes');
+    expect(b.id).toBe('depois');
+  });
+
+  it('recusa quando não sobram duas válidas, e diz que foi por inválida', () => {
+    expect(() => escolherPar([r('nova', 47, 'sem credito'), r('boa', 36)])).toThrow(/inválida/i);
+  });
+
+  it('recusa a inválida mesmo quando pedida pelo id, e nomeia qual', () => {
+    // Comparar contra uma rodada onde nada rodou não fica válido só porque
+    // alguém digitou o id.
+    expect(() => escolherPar([r('boa', 36), r('a5b46c09', 47, 'sem credito')])).toThrow(/a5b46c09/);
+  });
+
+  it('rodadaInvalida devolve o motivo carimbado', () => {
+    expect(rodadaInvalida(r('x', 1, 'OpenRouter 402'))).toBe('OpenRouter 402');
+    expect(rodadaInvalida(r('y', 1))).toBeNull();
   });
 });

@@ -285,3 +285,47 @@ export async function runPairedGym(
 
   return { resultados, placar: apurarCenarios(resultados), ignoradas };
 }
+
+// ── Seleção do par a comparar ───────────────────────────────────────────────
+
+/** O mínimo que uma rodada precisa expor para entrar (ou não) numa comparação. */
+export interface RodadaComparavel {
+  id: string;
+  ran_at: string;
+  medias?: { invalida?: string } | null;
+}
+
+/**
+ * Motivo pelo qual a rodada não serve de base de comparação, ou null.
+ *
+ * 29/jul o gym rodou sem crédito: nenhuma conversa, nenhum juízo, linha gravada
+ * com zeros. Carimbei `medias.invalida` — isto é o que lê o carimbo.
+ */
+export function rodadaInvalida(r: RodadaComparavel): string | null {
+  const motivo = r.medias?.invalida;
+  return typeof motivo === 'string' && motivo.trim() ? motivo : null;
+}
+
+/**
+ * Escolhe o par a comparar: A = a mais ANTIGA (antes), B = a mais NOVA (depois).
+ * Inválidas nunca entram — nem quando pedidas pelo id, porque comparar contra
+ * uma rodada onde nada rodou não fica válido só porque alguém digitou o id. Um
+ * placar contra o vazio é pior que placar nenhum: parece resposta.
+ */
+export function escolherPar<T extends RodadaComparavel>(rodadas: T[]): [T, T] {
+  const invalidas = rodadas.filter((r) => rodadaInvalida(r));
+  const validas = rodadas
+    .filter((r) => !rodadaInvalida(r))
+    .sort((x, y) => Date.parse(y.ran_at) - Date.parse(x.ran_at)) // recentes primeiro
+    .slice(0, 2)
+    .sort((x, y) => Date.parse(x.ran_at) - Date.parse(y.ran_at)); // A = antes
+
+  if (validas.length < 2) {
+    const descarte = invalidas.map((r) => `${r.id} (${rodadaInvalida(r)})`).join('; ');
+    throw new Error(
+      `preciso de 2 rodadas válidas pra comparar, achei ${validas.length}` +
+        (descarte ? ` — descartei como inválida: ${descarte}` : '')
+    );
+  }
+  return [validas[0], validas[1]];
+}
