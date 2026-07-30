@@ -329,8 +329,15 @@ describe('silêncio com HUMANO do outro lado vira encerramento', () => {
     expect(a.tipo).toBe('silencio');
   });
 
-  it('humano: silêncio deliberado vira UMA linha de encerramento', () => {
-    const a = resolverSilencio({ tipo: 'silencio', motivo: 'x', deliberado: true }, { robo: false }, 'Coop');
+  it('humano QUE RECUSOU: silêncio deliberado vira UMA linha de encerramento', () => {
+    // Contrato estreitado em 30/jul, com evidência: encerrar deixou de ser o
+    // default de "não tenho o que dizer". O gym mostrou ela respondendo "não vou
+    // insistir" a um "qualquer coisa me chama! 👍". Encerrar é um ato, e exige
+    // que ele tenha recusado.
+    const a = resolverSilencio({ tipo: 'silencio', motivo: 'x', deliberado: true }, { robo: false }, 'Coop', {
+      jaSeDespediu: false,
+      recusou: true,
+    });
     expect(a.tipo).toBe('responder');
     if (a.tipo === 'responder') {
       expect((a.texto.match(/\?/g) ?? []).length).toBe(0); // encerra, não pergunta

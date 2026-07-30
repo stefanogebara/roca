@@ -321,7 +321,7 @@ export interface ThreadTurn {
 }
 
 /** O que o bloco de correção precisa consertar — muda o diagnóstico que ele dá. */
-export type MotivoCorrecao = 'repeticao' | 'duas-perguntas';
+export type MotivoCorrecao = 'repeticao' | 'duas-perguntas' | 'prazo';
 
 export function formatThreadBlock(turns: ThreadTurn[], name: string): string {
   const lines = turns
@@ -382,13 +382,13 @@ export async function buildAgentReply(
   // Silêncio diante de gente vira encerramento; diante de robô, continua
   // silêncio. Ver resolverSilencio.
   // Uma vez despedida, silencio nao pode virar a mesma despedida de novo.
-  const despedidaJaMandada = jaSeDespediu(thread);
+  const fecho = { jaSeDespediu: jaSeDespediu(thread), recusou: recusou(inboundText) };
 
   let action = resolverSilencio(
     interpretAgentOutput(raw, finishReason ?? undefined),
     turno,
     prospectName,
-    despedidaJaMandada
+    fecho
   );
 
   // Gate de repetição: o juiz pareado pegou "repetiu a mesma pergunta após uma
@@ -404,7 +404,9 @@ export async function buildAgentReply(
         ? 'repeticao'
         : perguntasDemais(action.texto)
           ? 'duas-perguntas'
-          : null;
+          : prometeuPrazo(action.texto)
+            ? 'prazo'
+            : null;
 
   if (action.tipo === 'responder' && motivo) {
     log.error(`agent ${motivo} — 1 retentativa: "${action.texto.slice(0, 70)}"`);
@@ -421,7 +423,7 @@ ${learned}` : ''),
         interpretAgentOutput(r2.text, r2.finishReason ?? undefined),
         turno,
         prospectName,
-        despedidaJaMandada
+        fecho
       );
       // Reincidir NÃO vira mais silêncio. Silêncio deliberado diante de gente é
       // convertido em DESPEDIDA por resolverSilencio ("não vou insistir"), e o
@@ -430,7 +432,10 @@ ${learned}` : ''),
       // "ele não quer falar comigo" estavam na mesma ação — não estão mais.
       // Pergunta meio repetida custa pouco; despedida com prospect vivo custa o
       // lead. Mando a segunda tentativa e registro.
-      if (a2.tipo === 'responder' && (repeticaoNossa(thread, a2.texto) || perguntasDemais(a2.texto)))
+      if (
+        a2.tipo === 'responder' &&
+        (repeticaoNossa(thread, a2.texto) || perguntasDemais(a2.texto) || prometeuPrazo(a2.texto))
+      )
         log.error(`retentativa ainda ${motivo} — mando assim mesmo, despedida é pior`);
       action = a2;
     } catch (e) {
@@ -538,14 +543,20 @@ export function resolverSilencio(
   ctx: { robo: boolean },
   prospectName: string,
   /**
-   * Se a despedida já foi mandada nesta conversa. Aí silêncio é silêncio DE
-   * VERDADE: repetir o mesmo texto canned é pior que não mandar nada. O gym das
-   * 14 personas pegou a despedida duplicada palavra por palavra em sem-interesse.
+   * O que autoriza (ou proíbe) encerrar agora.
+   *
+   * A despedida era resposta UNIVERSAL: o mesmo "não vou insistir" saía para
+   * "ele recusou", "ele está animado" e "não tenho o que dizer". No gym de
+   * 30/jul ela respondeu isso a um "fica ligado, qualquer coisa me chama! 👍",
+   * como se o cara tivesse batido a porta. Encerrar é um ATO, não um default.
    */
-  despedidaJaMandada = false
+  fecho: { jaSeDespediu: boolean; recusou: boolean } = { jaSeDespediu: false, recusou: false }
 ): AgentAction {
   if (acao.tipo !== 'silencio' || !acao.deliberado || ctx.robo) return acao;
-  if (despedidaJaMandada) return acao;
+  // Só encerra quem recusou, e só uma vez. Nos outros casos silêncio deliberado
+  // é silêncio de verdade — não mandar nada é melhor que mandar despedida a
+  // quem não se despediu.
+  if (!fecho.recusou || fecho.jaSeDespediu) return acao;
   const nome = (prospectName ?? '').trim();
   return {
     tipo: 'responder',
@@ -747,6 +758,45 @@ export function repeticaoNossa(
   return novas.some((nova) => jaFeitas.some((antiga) => sobreposicao(nova, antiga) >= REPETICAO_LIMIAR));
 }
 
+// Expressão de tempo curto. "já vou pedir" NÃO entra: é ela agindo agora, não
+// promessa sobre quando o outro responde.
+// Sem \b no fim: "já" termina em acento, e o \b do JS é ASCII — a fronteira não
+// fecha depois de "á". Mesma armadilha documentada no PRICE_INTENT do pipeline.
+// Foi ela que fez este gate não pegar o caso real na primeira tentativa.
+const PRAZO_CURTO_RE =
+  /\bj[áa]\s+j[áa](?![\wÀ-ÿ])|\b(em\s+breve|logo\s+mais|ainda\s+hoje|hoje\s+ainda|em\s+instantes|daqui\s+a\s+pouco|nas\s+pr[óo]ximas\s+horas)\b/i;
+// Verbo de resposta/contato — o que transforma tempo em PROMESSA de agenda alheia.
+const RESPOSTA_RE = /\b(retorn\w*|respond\w*|contat\w*|cham\w*|fal[ae]\w*|liga\w*|entra\s+em\s+contato)\b/i;
+
+/**
+ * Se a mensagem promete QUANDO um terceiro responde.
+ *
+ * Ela não controla a agenda do Stefano. Prometer "já já ele te dá um retorno"
+ * deixa o prospect esperando por algo que ela não pode entregar — e se ele não
+ * responder, quem mentiu foi a gente. Destino sim, prazo não.
+ *
+ * A regra já estava no prompt desde e1011d4 e não tinha gate: em 30/jul o
+ * "já já ele te dá um retorno por aqui" passou por fora, e o juiz pareado — já
+ * com a rubrica corrigida — pegou como erro grave. Sétima vez no dia em que
+ * regra escrita não é mecanismo.
+ */
+export function prometeuPrazo(texto: string): boolean {
+  const t = texto ?? '';
+  return PRAZO_CURTO_RE.test(t) && RESPOSTA_RE.test(t);
+}
+
+// Recusa explícita — o ÚNICO caso que autoriza encerrar. Deliberadamente
+// estreito: "tá bom, valeu" é acolhimento e "qualquer coisa me chama" é
+// engajamento, e tratar os dois como recusa foi o que fez a Vitória se despedir
+// de quem estava dentro.
+const RECUSA_RE =
+  /\bn[ãa]o\s+(tenho|temos)\s+interesse\b|\bn[ãa]o\s+(quero|queremos|precis\w+|interessa)\b|\bsem\s+interesse\b|\bn[ãa]o\s+d[áa]\s+pra\s+seguir\b/i;
+
+/** Se a mensagem DELE é uma recusa explícita de continuar. */
+export function recusou(texto: string | null | undefined): boolean {
+  return RECUSA_RE.test(texto ?? '');
+}
+
 /** A marca da despedida que resolverSilencio produz. */
 const DESPEDIDA_RE = /n[ãa]o vou insistir/i;
 
@@ -781,7 +831,10 @@ export function blocoCorrecao(textoRepetido: string, motivo: MotivoCorrecao = 'r
   const diagnostico =
     motivo === 'duas-perguntas'
       ? `tem MAIS DE UMA pergunta. Escolha a que importa agora e guarde a outra pro próximo turno`
-      : `repete uma pergunta que você já fez nesta conversa. Ele já respondeu isso`;
+      : motivo === 'prazo'
+        ? `PROMETE QUANDO o Stefano responde, e você não controla a agenda dele. Diga o destino ` +
+          `("vou passar pro Stefano") sem prazo nenhum — nada de "já já", "em breve", "ainda hoje"`
+        : `repete uma pergunta que você já fez nesta conversa. Ele já respondeu isso`;
   return (
     `[CORREÇÃO] Isto que você acabou de escrever ${diagnostico}: ` +
     `"${textoRepetido.slice(0, 200)}".\n` +

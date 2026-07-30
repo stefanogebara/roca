@@ -38,6 +38,8 @@ import {
   repeticaoNossa,
   buildAgentReply,
   jaSeDespediu,
+  prometeuPrazo,
+  recusou,
   resolverSilencio,
 } from '../api/_lib/prospect/agent';
 
@@ -264,12 +266,15 @@ describe('jaSeDespediu / resolverSilencio — encerrar é uma vez só', () => {
   });
 
   it('já despedida, silêncio vira silêncio DE VERDADE — não a mesma despedida de novo', () => {
-    const a = resolverSilencio(silencio, { robo: false }, 'Coop', true);
+    const a = resolverSilencio(silencio, { robo: false }, 'Coop', { jaSeDespediu: true, recusou: true });
     expect(a.tipo).toBe('silencio');
   });
 
-  it('primeira vez, continua encerrando com dignidade — isso não regride', () => {
-    const a = resolverSilencio(silencio, { robo: false }, 'Coop', false);
+  it('primeira vez APÓS RECUSA, continua encerrando com dignidade — isso não regride', () => {
+    // Contrato estreitado de propósito: antes bastava ser a primeira vez. O gym
+    // mostrou que "primeira vez" incluía prospect animado, e ela se despedia de
+    // quem estava dentro. Agora encerrar exige recusa.
+    const a = resolverSilencio(silencio, { robo: false }, 'Coop', { jaSeDespediu: false, recusou: true });
     expect(a.tipo).toBe('responder');
     if (a.tipo === 'responder') expect(a.texto).toMatch(/n[ãa]o vou insistir/i);
   });
@@ -290,5 +295,95 @@ describe('buildAgentReply — não manda a segunda despedida', () => {
     });
 
     expect(acao.tipo).toBe('silencio');
+  });
+});
+
+/**
+ * Os dois defeitos que o gym das 14 personas mostrou com a rubrica corrigida —
+ * as duas acusações que eu conferi no transcript e que se sustentam.
+ *
+ * 1. PRAZO DO FUNDADOR. quer-fechar-agora, turno 7: "Vou chamar o Stefano […]
+ *    já já ele te dá um retorno por aqui". Prometer quando um TERCEIRO responde
+ *    é regra dura, e o commit e1011d4 existia pra matar isso — no prompt. Sem
+ *    gate, "já já" passou por fora. Sétima vez no dia: a regra existe e não tem
+ *    mecanismo.
+ *
+ * 2. A DESPEDIDA VIROU RESPOSTA UNIVERSAL. resolverSilencio devolve o mesmo
+ *    "não vou insistir" para três situações diferentes: ele recusou, ele está
+ *    animado, e ela não tem o que dizer. No mesmo cenário, turno 11, o prospect
+ *    diz "fica ligado, qualquer coisa me chama! 👍" e ela responde "não vou
+ *    insistir", como se ele tivesse recusado. Em sem-interesse ela encerra bem
+ *    no turno 3 e encerra DE NOVO no turno 5, com texto diferente — a duplicata
+ *    quase idêntica que eu tinha barrado não pega isso.
+ *
+ *    A regra que sobrevive aos dois casos: encerrar só quando a ÚLTIMA mensagem
+ *    dele é recusa. "Tá bom, valeu" e "qualquer coisa me chama" não são recusa.
+ */
+describe('prometeuPrazo — destino sim, prazo não', () => {
+  it('pega o caso real: "já já ele te dá um retorno"', () => {
+    expect(
+      prometeuPrazo('Vou chamar o Stefano pra ele falar direto com vocês. Obrigada pela abertura, já já ele te dá um retorno por aqui! 🌱')
+    ).toBe(true);
+  });
+
+  it('pega as outras formas de prometer a agenda de terceiro', () => {
+    for (const t of [
+      'Em breve ele entra em contato com você',
+      'Ele te responde ainda hoje',
+      'Logo mais o Stefano te chama',
+      'Em instantes ele retorna',
+    ]) {
+      expect(prometeuPrazo(t), t).toBe(true);
+    }
+  });
+
+  it('NÃO acusa quando ela recusa dar prazo — que é o comportamento certo', () => {
+    // Turno 5 real do mesmo cenário: ela faz exatamente a coisa certa.
+    expect(prometeuPrazo('Entendi! Data eu não confirmo, isso é com o Stefano direto.')).toBe(false);
+  });
+
+  it('NÃO acusa o nosso próprio fallback de escalada', () => {
+    expect(
+      prometeuPrazo('Essa parte é com o Stefano (fundador) — já vou pedir pra ele te responder direto por aqui.')
+    ).toBe(false);
+  });
+
+  it('NÃO acusa tempo que não é sobre resposta de ninguém', () => {
+    expect(prometeuPrazo('A janela de pulverização abre logo mais na semana que vem.')).toBe(false);
+  });
+});
+
+describe('recusou — o que autoriza encerrar', () => {
+  it('reconhece a recusa explícita', () => {
+    expect(recusou('Não tenho interesse, obrigado')).toBe(true);
+    expect(recusou('não quero, valeu')).toBe(true);
+  });
+
+  it('NÃO trata acolhimento como recusa — foi assim que ela se despediu duas vezes', () => {
+    expect(recusou('Tá bom, valeu.')).toBe(false);
+  });
+
+  it('NÃO trata prospect ENGAJADO como recusa — o erro do turno 11', () => {
+    expect(recusou('Blz! Fica ligado que vou ficar atento no WhatsApp. Qualquer coisa me chama! 👍')).toBe(false);
+  });
+});
+
+describe('resolverSilencio — encerrar só quando ele recusou', () => {
+  const silencio = { tipo: 'silencio' as const, motivo: 'nada a dizer', deliberado: true };
+
+  it('ele recusou: encerra com dignidade, como sempre fez', () => {
+    const a = resolverSilencio(silencio, { robo: false }, 'Coop', { jaSeDespediu: false, recusou: true });
+    expect(a.tipo).toBe('responder');
+    if (a.tipo === 'responder') expect(a.texto).toMatch(/n[ãa]o vou insistir/i);
+  });
+
+  it('ele está engajado: silêncio de verdade, não despedida', () => {
+    const a = resolverSilencio(silencio, { robo: false }, 'Coop', { jaSeDespediu: false, recusou: false });
+    expect(a.tipo).toBe('silencio');
+  });
+
+  it('já encerrou antes: não encerra de novo nem depois de recusa', () => {
+    const a = resolverSilencio(silencio, { robo: false }, 'Coop', { jaSeDespediu: true, recusou: true });
+    expect(a.tipo).toBe('silencio');
   });
 });
