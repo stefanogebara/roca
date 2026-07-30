@@ -6,6 +6,7 @@
 
 import { requireEnv, MODELS } from './env';
 import { withRetry, isTransient } from './retry';
+import { fireAndForget } from './fireAndForget';
 import { createLogger } from './logger';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -90,7 +91,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     // fica muda e ninguém sabe. O alerta NUNCA altera o resultado da chamada —
     // o erro segue subindo para quem chamou decidir.
     const msg = (e as Error).message ?? '';
-    if (isCreditError(msg)) void alertarCredito(msg);
+    if (isCreditError(msg)) fireAndForget(() => alertarCredito(msg), 'alerta de crédito');
     throw e;
   }
 }
@@ -242,22 +243,19 @@ export function deveAlertarCredito(ultimoAlertaMs: number | null, agoraMs: numbe
 let ultimoAlertaCredito: number | null = null;
 
 /**
- * Avisa os fundadores que o modelo está sem saldo. Fail-soft e com import
- * dinâmico: um alerta que derruba a chamada de LLM seria pior que o problema
- * que ele reporta.
+ * Avisa os fundadores que o modelo está sem saldo. O import é dinâmico para não
+ * criar ciclo (alert → logger, e nada mais). Quem chama passa por fireAndForget,
+ * que segura qualquer erro: um alerta que derruba a chamada de LLM seria pior
+ * que o problema que ele reporta.
  */
 async function alertarCredito(msg: string): Promise<void> {
   const agora = Date.now();
   if (!deveAlertarCredito(ultimoAlertaCredito, agora)) return;
   ultimoAlertaCredito = agora;
-  try {
-    const { alertFounders } = await import('./alert');
-    await alertFounders(
-      `💳 MODELO SEM SALDO no OpenRouter. A Stevi e a Vitória ficam MUDAS enquanto isso — ` +
-        `prospect que responder não recebe nada, e produtor também não. ` +
-        `Adicione crédito em openrouter.ai/settings/credits. (${msg.slice(0, 90)})`
-    );
-  } catch (e) {
-    log.error('alerta de crédito falhou:', (e as Error).message);
-  }
+  const { alertFounders } = await import('./alert');
+  await alertFounders(
+    `💳 MODELO SEM SALDO no OpenRouter. A Stevi e a Vitória ficam MUDAS enquanto isso — ` +
+      `prospect que responder não recebe nada, e produtor também não. ` +
+      `Adicione crédito em openrouter.ai/settings/credits. (${msg.slice(0, 90)})`
+  );
 }

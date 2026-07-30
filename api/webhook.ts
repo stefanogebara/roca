@@ -17,6 +17,7 @@ import { handleInbound } from './_lib/pipeline';
 import type { TransportAdapter, TransportRequest } from './_lib/transport/types';
 import { alertFounders } from './_lib/alert';
 import { createLogger } from './_lib/logger';
+import { fireAndForget } from './_lib/fireAndForget';
 
 // Disable Vercel's automatic body parsing so we can read raw bytes for HMAC.
 export const config = { api: { bodyParser: false } };
@@ -114,8 +115,12 @@ export default async function handler(
       return;
     }
     // Perceived speed: flag "read + typing" before the heavy work starts.
-    // Fire-and-forget — markRead is cosmetic and never throws by contract.
-    if (adapter.markRead) void adapter.markRead(msg.messageId);
+    // markRead é cosmético e o adapter da Cloud já engole os próprios erros —
+    // mas a interface (transport/types.ts) não obriga ninguém a isso, e um
+    // adapter futuro que lançasse derrubaria a instância junto com requisições
+    // de outros produtores. O contrato passa a ser garantido aqui, não confiado.
+    const markRead = adapter.markRead;
+    if (markRead) fireAndForget(() => markRead(msg.messageId), 'markRead');
     await handleInbound(adapter, msg);
     ack();
   } catch (e) {

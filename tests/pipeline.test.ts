@@ -430,3 +430,35 @@ describe('non-field pin never ships a "SUA LAVOURA" card image', () => {
     expect(adapter.send.mock.calls[1][0].mediaUrl).toMatch(/type=farm/);
   });
 });
+
+/**
+ * A escrita de telemetria da triagem é disparada sem await. Se ela rejeitar e
+ * ninguém segurar, o Node 22 derruba o processo — e no Fluid Compute a instância
+ * é reusada entre requisições concorrentes, então isso derruba a resposta de
+ * OUTRO produtor em voo. Este arquivo já provava o bug sem afirmar nada: os
+ * mocks não cobrem insertTriageEvent, o getDb() real explode por falta de
+ * SUPABASE_URL, e a suíte reportava 4 "Unhandled Rejection" com 806 testes
+ * verdes. Verde não é o mesmo que são.
+ */
+describe('telemetria não pode matar a instância', () => {
+  it('escrita de triagem que falha não vira unhandled rejection', async () => {
+    const soltas: unknown[] = [];
+    const capturar = (e: unknown) => soltas.push(e);
+    process.on('unhandledRejection', capturar);
+    try {
+      vi.mocked(routeIntent).mockResolvedValue('pest_triage');
+      vi.mocked(reason).mockImplementation(async (_m, _i, deps) => {
+        deps.onPestCard?.({ pest: 'ferrugem', confidence: 'alta', crop: 'café', evidence: 'x', products: 3, groups: ['C3'] });
+        return 'triagem honesta';
+      });
+
+      await handleInbound(makeAdapter(), msgFixture({ text: 'que praga é essa no café' }));
+      // A rejeição só chega no tick seguinte; sem isso o teste passa por engano.
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+    } finally {
+      process.off('unhandledRejection', capturar);
+    }
+    expect(soltas.map((e) => (e as Error)?.message)).toEqual([]);
+  });
+});

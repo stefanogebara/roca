@@ -394,3 +394,40 @@ confiasse só no snippet erraria de outro jeito.
   nenhum dos lados.
 - Um dado com endereço e nome certos ainda pode estar velho. O que valida é a
   **fonte atual**, não a plausibilidade.
+
+## Lição — Verde não é o mesmo que são: a suíte avisou e ninguém leu
+**Data:** 29/jul/2026
+
+**O que aconteceu:** Rodei a suíte depois do alerta de crédito: `806 passed`,
+zero falha. Também dizia, três linhas abaixo, `Errors 4`. Quatro
+`Unhandled Rejection: Missing required environment variable: SUPABASE_URL`, com
+stack em `reasonFallback → handleInbound` — o caminho do webhook de produção.
+Verifiquei com `git stash` e eram pré-existentes; isto é, a suíte vinha
+reportando isso havia tempo, e o número que todo mundo olha (806/806) dizia que
+estava tudo bem.
+
+A causa era um `void insertTriageEvent(...)`: promise solta, sem catch. No Node
+22 unhandled rejection encerra o processo por padrão, e no Fluid Compute a
+instância é **reusada entre requisições concorrentes** — então uma gravação de
+telemetria falhando pode derrubar a resposta de OUTRO produtor que estava em voo
+na mesma instância. Um produtor pagaria com a própria resposta por um dado que
+existe só pra nós.
+
+O grep achou três `void` em `api/`. Um era meu, do commit anterior, no mesmo
+dia — eu tinha posto try/catch interno, mas por sorte, não por regra.
+
+**Regras:**
+- **Leia a linha `Errors` do vitest, não só `Tests`.** Rejeição solta não conta
+  como teste falhando. O relatório separa as duas coisas e o hábito olha uma só.
+- **Todo disparo sem await passa por `fireAndForget(() => ..., escopo)`**
+  (`api/_lib/fireAndForget.ts`). `grep "void " api/` deve voltar zero. A regra
+  vale mais que o caso: um `void` novo é bug novo, mesmo que a função chamada
+  trate os próprios erros hoje.
+- **O helper recebe thunk, não promise.** `getDb()` lança na hora quando falta
+  env; um catch que só olhasse a promise pronta não pegaria o throw de montagem.
+  Foi exatamente assim que essas quatro nasceram.
+- **Telemetria nunca pode matar a resposta.** Se o dado é só pra nós, a falha
+  dele é log, não incidente do usuário.
+- Contrato garantido em comentário não é contrato. `markRead` tinha
+  "never throws by contract" escrito no call site e a interface não obrigava
+  ninguém — a única implementação cumpria por coincidência. Garanta no código.

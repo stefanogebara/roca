@@ -12,6 +12,7 @@ import { buildFarmCard, isFarmConfirmYes } from './farmcard';
 import { buildAgronomoBrief } from './brief';
 import { handleProspectInbound, respondAsProspectAgent, recordProspectOutbound } from './prospect/inbound';
 import { normalizePhoneBR } from './prospect/core';
+import { fireAndForget } from './fireAndForget';
 import {
   findPartnerByPhone,
   buildDossierReply,
@@ -947,14 +948,22 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
   // prose. Structured now — crop × pest × region × date is the dataset that
   // compounds (and the "resolveu?" follow-up will stamp the outcome onto it).
   if (pestCard?.pest) {
+    // Congelado num const: pestCard é `let`, e o que gravamos tem que ser o
+    // veredito desta decisão, não o que a variável virar depois. (Era isso que
+    // o tsc estava reclamando ao perder o narrowing dentro do closure.)
+    const triage = pestCard;
     const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
-    void insertTriageEvent({
-      userId,
-      crop: pestCard.crop ?? profile.crop?.[0] ?? null,
-      pest: pestCard.pest,
-      confidence: pestCard.confidence ?? null,
-      uf: profile.uf,
-    });
+    fireAndForget(
+      () =>
+        insertTriageEvent({
+          userId,
+          crop: triage.crop ?? profile.crop?.[0] ?? null,
+          pest: triage.pest,
+          confidence: triage.confidence ?? null,
+          uf: profile.uf,
+        }),
+      'triage_events'
+    );
   }
   return { intent, replyText, pestCard };
 }
