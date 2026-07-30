@@ -431,3 +431,51 @@ dia — eu tinha posto try/catch interno, mas por sorte, não por regra.
 - Contrato garantido em comentário não é contrato. `markRead` tinha
   "never throws by contract" escrito no call site e a interface não obrigava
   ninguém — a única implementação cumpria por coincidência. Garanta no código.
+
+## Lição — Blindar contra erro solto pode trocar a quebra por silêncio
+
+**Data:** 30/jul/2026
+
+**O que aconteceu:** A lição acima termina dizendo "contrato garantido em
+comentário não é contrato — garanta no código". Foi ao garantir no código que o
+`markRead` quebrou. O commit que passou os três disparos sem await pelo
+`fireAndForget` escreveu, no `api/webhook.ts`:
+
+```ts
+const markRead = adapter.markRead;              // perdeu o receptor
+if (markRead) fireAndForget(() => markRead(msg.messageId), 'markRead');
+```
+
+O `void adapter.markRead(id)` de antes preservava o `this`. Extraído para
+variável, não: `markRead` é método de protótipo e lê `this.inboundPhoneId`
+**antes** do próprio try/catch, então `this` undefined vira `TypeError` — e o
+helper engole como ruído de fundo. O contrato "never throws" passou a ser
+cumprido pelo pior caminho possível: nunca lança porque nunca funciona. Em
+produção, nenhum "lido" e nenhum "digitando" chegava ao produtor — justamente a
+percepção de velocidade que aquela chamada existe pra dar a quem espera 15-30s
+no 3G. A suíte seguia 815/815, 0 unhandled, e `webhook.test.ts` não tinha uma
+linha sobre `markRead`: aquele call site estava descoberto.
+
+O `fireAndForget` fez o trabalho dele (a instância não caiu) e, no mesmo golpe,
+esconder quem chama errado. Fail-soft protege o processo e cega o autor.
+
+**Regras:**
+- **Rotear uma chamada nova pelo fail-soft é mudança de comportamento, não
+  blindagem.** Vai junto no mesmo commit um teste do call site — senão você não
+  removeu a falha, promoveu ela a silenciosa.
+- **Extrair método para variável perde o `this`.** Se for passar método adiante,
+  `obj.metodo.bind(obj)` ou chame `obj.metodo(...)` dentro do thunk. Vale para
+  qualquer callback, não só `fireAndForget`.
+- **Prove que o teste discrimina: tire o fix e veja falhar.** Foi tirando o
+  `bind` e vendo `Cannot read properties of undefined (reading
+  'inboundPhoneId')` que a regressão ficou provada. Teste novo em código que já
+  passa não vale nada até você vê-lo vermelho.
+- **Não diagnostique com barulho concorrente.** Concluí que um teste de controle
+  vazava rejeição para o listener do vitest; era contenção de CPU (`tsc` rodando
+  junto com o `vitest`). Reproduza isolado ANTES de escrever a conclusão numa
+  mensagem de commit — eu escrevi, e tive que corrigir depois.
+- **Premissa de minutos atrás expira.** Comecei a tarefa com o teste do
+  `fireAndForget` untracked na árvore principal; no meio, uma sessão paralela
+  commitou tudo no master e o arquivo virou rastreado. Ia apagar "a sobra" e
+  teria quebrado o master. Reconfira `git log`/`status` antes de agir sobre um
+  plano formado antes.
