@@ -565,3 +565,42 @@ Três coisas conspiraram pra isso durar um dia:
 - **Import estático amarra o raio de explosão ao pior componente.** Se um recurso
   periférico (satélite) não pode derrubar o essencial (responder mensagem), ele
   não pode estar no import estático do caminho essencial.
+
+## 2026-07-30 — O dia em que o instrumento quase mandou reverter trabalho bom (duas vezes)
+
+O juiz pareado disse "reverta" de manhã (3×8) e de tarde (5×8). Nas duas vezes
+a leitura dos transcripts mostrou outra coisa: rubrica com regra do domínio
+errado ("prescrever dose" numa conversa de parceria), negação frágil que o
+modelo invertia (punia a Vitória por SE APRESENTAR como IA — nossa regra zero),
+e JSON truncado contado como "juiz falhou". Depois de consertar a rubrica, um
+experimento de CONTROLE — mesmo código dos dois lados — deu "B 5 × 6 A →
+reverta". Cinco controles depois: margens 0, 1, 1, 1, 2. O apurador declarava
+vencedor com margem 1.
+
+**Regras:**
+- **Antes de obedecer um veredito automático, meça o ruído do instrumento.**
+  Um controle (mesma coisa dos dois lados) custa uma rodada e diz se o placar
+  significa algo. Margem dentro do ruído não é veredito, é moeda ao ar.
+- **Piso conservador primeiro, calibragem depois.** Escolhi margem ≥3 com UMA
+  amostra de controle; o quinto controle deu margem 2 — um piso "calibrado" em
+  2 teria declarado reversão falsa em menos de duas horas. Com poucas amostras,
+  o lado certo de errar é o conservador.
+- **Rubrica de juiz: sem regras de outro domínio, sem negações em lista, e
+  alegação de regra dura exige CITAÇÃO da transcrição.** Citação não impede o
+  modelo de errar — torna o erro visível, porque a frase citada ou está lá ou
+  não está.
+- **Regra nova que alonga o output pede orçamento novo de tokens.** Exigi
+  citação e não subi o maxTokens; o gate de parse converteu a rubrica melhor em
+  cenários perdidos. E o mesmo conserto aplicado num juiz só (pareado, não
+  absoluto) é meia-correção que volta a morder no mesmo dia.
+- **Métrica-manchete precisa da incerteza COLADA nela, onde a decisão é
+  tomada.** "Avanço limpo 29% → 42% → 57%" foi reportado como progresso; era
+  ruído de uma métrica binária com denominador 11-14. Quatro rodadas idênticas:
+  4-8/11. O aviso agora é impresso junto do número (terminal e painel).
+- **Denominador só com quem PODE converter.** Três cenários onde parar é o
+  comportamento correto contavam como fracasso de avanço (teto real ~79%). E
+  conversão de funil é sobre quem PASSOU pelo estágio: contar só quem está
+  parado nele faz cada promoção "melhorar" a taxa esvaziando o denominador.
+- **Placar que decide coisa não pode morrer no terminal.** O pareado decidia
+  promoção de prompt e não persistia; painel só mostrava o absoluto. Se um
+  número muda decisão, ele vai pro banco e pra tela dos founders.
