@@ -15,6 +15,13 @@
  * devolve, em Varginha, Alfenas e Três Pontas (EPSG 32723 nos três).
  */
 
+// ATENÇÃO ao mexer na versão do geotiff: o build CJS dele faz require() de
+// quick-lru, e a v6 é ESM puro. O Node 22 local engole isso (require(esm)), o
+// loader da Vercel não — e como este arquivo entra na cadeia ESTÁTICA
+// webhook → pipeline → farmcard → ndvi → cog, o ERR_REQUIRE_ESM matava a função
+// no import e derrubava TODO o webhook (24h de outage em 29-30/jul). Preso na
+// v5, que é CJS, pelo "overrides" do package.json. O geotiff só usa { maxSize },
+// idêntico nas duas versões.
 import { fromUrl, type GeoTIFFImage } from 'geotiff';
 import { latLonToUtm, utmEpsg } from './utm';
 import { createLogger } from '../logger';
