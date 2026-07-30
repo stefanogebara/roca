@@ -113,11 +113,14 @@ fallback hardcoded `'19705509125'`**.
 ## 6. Verificação — e a lacuna do simulador
 
 - [ ] `GET /api/webhook` → `{ status: "ok", service: "stevi-webhook" }`.
-- [ ] **`scripts/simulate-inbound.mjs` não serve pro Cloud**: ele assina
-      `X-Twilio-Signature` (linha 63). Não existe simulador que assine
-      `X-Hub-Signature-256`, então o caminho que roda em produção **só se testa
-      com mensagem real**. Vale um `--cloud` no script — é a diferença entre
-      poder ensaiar e ter que usar produção como ensaio.
+- [x] ~~`scripts/simulate-inbound.mjs` não serve pro Cloud~~ — **feito**. Agora
+      tem `--cloud` (assina `X-Hub-Signature-256` sobre os bytes crus),
+      `--media-id` (mídia no Cloud é ID, não URL), `--voice`, `--url=` pra apontar
+      num preview em vez de produção, e `--dry-run` pra ver o que sairia sem
+      enviar. Os builders viraram `scripts/simulate-payload.mjs`, puros, e
+      `tests/simulate-inbound.test.ts` alimenta os **adapters de verdade** com o
+      que o simulador monta — é isso que impede o simulador de desgarrar do
+      verificador e devolver 200 no ensaio enquanto a produção 403.
 - [ ] Do celular: foto → triagem; "posso pulverizar hoje?" → pin → Delta T;
       áudio. Confirmar **2 tiques azuis + "digitando"** (é a prova do `markRead`).
 - [ ] Logs no **mesmo dia** — retenção é 1 dia no plano Pro.
@@ -131,9 +134,28 @@ requisição, então o rollback é de configuração, não de deploy: despontar 
 callback da Meta devolve o tráfego pro Twilio **sem redeploy**. Requisito: as env
 `TWILIO_*` continuarem lá (§2).
 
-Ressalva: rollback não migra conversa. Quem estava falando por um transporte não
-reaparece no outro com histórico — o `wa_id` é a chave, e o número muda com o
-transporte.
+Ressalva séria, medida no banco: **o `wa_id` racha por transporte.** O Twilio
+entrega `+5511…` (só tira o `whatsapp:`), a Meta entrega `5511…` sem `+`, e
+`upsertUser(msg.from, …)` (`pipeline.ts:1039`) grava o valor **cru**, sem
+normalizar. O dado confirma:
+
+| channel | formato do wa_id | linhas |
+|---|---|---|
+| `cloud` | sem `+` | 7 |
+| `(null)` (era Twilio) | com `+` | 6 |
+
+Então o mesmo produtor que falou nos dois transportes tem **duas linhas em
+`users`** — histórico, culturas, fazenda e consentimento LGPD divididos entre
+elas. Consequências práticas:
+
+- [ ] Rollback pro Twilio faz quem voltar aparecer como usuário novo, sem
+      histórico e sem consentimento registrado.
+- [ ] Antes de qualquer migração de número ou de transporte, decidir o que fazer
+      com as 6 linhas antigas: normalizar `wa_id` (migração + dedupe, com cuidado
+      no consentimento) ou aceitar o racha e documentar.
+- [ ] Não é urgente hoje (o Twilio não recebe tráfego), mas é uma armadilha
+      armada pro dia do rollback — exatamente o cenário em que ninguém tem tempo
+      de investigar.
 
 ## 8. Risco que não é técnico
 
