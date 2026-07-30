@@ -320,6 +320,9 @@ export interface ThreadTurn {
   text: string | null;
 }
 
+/** O que o bloco de correção precisa consertar — muda o diagnóstico que ele dá. */
+export type MotivoCorrecao = 'repeticao' | 'duas-perguntas';
+
 export function formatThreadBlock(turns: ThreadTurn[], name: string): string {
   const lines = turns
     .filter((t) => t.text)
@@ -390,8 +393,17 @@ export async function buildAgentReply(
   // do que ele acabou de repetir. Se repetir de novo, é sinal de que não há
   // assunto novo: vira silêncio deliberado, que diante de gente resolverSilencio
   // converte em encerramento.
-  if (action.tipo === 'responder' && repeticaoNossa(thread, action.texto)) {
-    log.error(`agent repetiu pergunta já feita — 1 retentativa: "${action.texto.slice(0, 70)}"`);
+  const motivo: MotivoCorrecao | null =
+    action.tipo !== 'responder'
+      ? null
+      : repeticaoNossa(thread, action.texto)
+        ? 'repeticao'
+        : perguntasDemais(action.texto)
+          ? 'duas-perguntas'
+          : null;
+
+  if (action.tipo === 'responder' && motivo) {
+    log.error(`agent ${motivo} — 1 retentativa: "${action.texto.slice(0, 70)}"`);
     try {
       const r2 = await chatDetailed({
         model: MODELS.reasoning(),
@@ -399,18 +411,23 @@ export async function buildAgentReply(
 
 ${learned}` : ''),
         maxTokens: 1200,
-        user: user + '\n\n' + blocoCorrecao(action.texto),
+        user: user + '\n\n' + blocoCorrecao(action.texto, motivo),
       });
       const a2 = resolverSilencio(
         interpretAgentOutput(r2.text, r2.finishReason ?? undefined),
         turno,
         prospectName
       );
-      action =
-        a2.tipo === 'responder' && repeticaoNossa(thread, a2.texto)
-          ? { tipo: 'silencio', motivo: 'repetiu a pergunta duas vezes — sem assunto novo', deliberado: true }
-          : a2;
-      if (action.tipo === 'silencio') action = resolverSilencio(action, turno, prospectName);
+      // Reincidir NÃO vira mais silêncio. Silêncio deliberado diante de gente é
+      // convertido em DESPEDIDA por resolverSilencio ("não vou insistir"), e o
+      // juiz pareado mediu isso como erro grave em quer-fechar-agora: despedir
+      // de quem está entusiasmado esfria o lead. "Não tenho pergunta nova" e
+      // "ele não quer falar comigo" estavam na mesma ação — não estão mais.
+      // Pergunta meio repetida custa pouco; despedida com prospect vivo custa o
+      // lead. Mando a segunda tentativa e registro.
+      if (a2.tipo === 'responder' && (repeticaoNossa(thread, a2.texto) || perguntasDemais(a2.texto)))
+        log.error(`retentativa ainda ${motivo} — mando assim mesmo, despedida é pior`);
+      action = a2;
     } catch (e) {
       log.error('retentativa anti-repetição falhou:', (e as Error).message);
     }
@@ -582,9 +599,17 @@ export function decidirTurno(e: EstadoDoTurno): DecisaoTurno {
 // ── Não repetir o que já perguntamos ────────────────────────────────────────
 
 /** Abaixo disso, repetir é humano: "Perfeito!", "Combinado", "Obrigada". */
-const REPETICAO_MIN_PALAVRAS = 6;
-/** Sobreposição de palavras a partir da qual duas mensagens dizem o mesmo. */
-const REPETICAO_LIMIAR = 0.7;
+// Piso de 4 palavras significativas: "faz sentido pra vocês?" (4) tem conteúdo
+// suficiente pra ser repetição; "e hoje?" (1) não distingue nada.
+const REPETICAO_MIN_PALAVRAS = 4;
+/**
+ * Limiar de sobreposição entre duas PERGUNTAS. Mais alto que o Jaccard antigo
+ * porque a métrica mudou: coeficiente de sobreposição divide pelo conjunto
+ * menor, então tolera a pergunta repetida com palavras a mais em vez de ser
+ * punido por ela. Medido nos transcripts: repetição real dá 1,0; pergunta
+ * diferente que divide vocabulário dá 0,2-0,4.
+ */
+const REPETICAO_LIMIAR = 0.75;
 
 const palavras = (s: string): Set<string> =>
   new Set(
@@ -596,12 +621,55 @@ const palavras = (s: string): Set<string> =>
       .filter((w) => w.length > 2) // artigos e preposições não distinguem nada
   );
 
-/** Jaccard entre os conjuntos de palavras. */
+/**
+ * Coeficiente de sobreposição: interseção sobre o conjunto MENOR.
+ *
+ * Era Jaccard (interseção sobre a união), e a união era o problema: repetir a
+ * mesma pergunta com três palavras a mais inflava o denominador e derrubava a
+ * similaridade justamente no caso que a gente quer pegar.
+ */
 function sobreposicao(a: Set<string>, b: Set<string>): number {
   if (!a.size || !b.size) return 0;
+  // Assimetria grande não é "a mesma pergunta de novo", é uma FÓRMULA curta
+  // dentro de uma pergunta maior. Medido: "Faz sentido pra vocês?" (4 palavras)
+  // casava 0,75 com "Faz sentido eu marcar uma conversa com o Stefano...?" (17),
+  // que é pergunta nova — o único falso positivo dos 125 turnos reais. Repetição
+  // de verdade veio quase do mesmo tamanho (13 vs 14, 10 vs 11).
+  if (Math.min(a.size, b.size) / Math.max(a.size, b.size) < 0.5) return 0;
   let inter = 0;
   for (const w of a) if (b.has(w)) inter++;
-  return inter / (a.size + b.size - inter);
+  return inter / Math.min(a.size, b.size);
+}
+
+/**
+ * As perguntas de uma mensagem, cada uma sem o contexto que a precede.
+ *
+ * A unidade que o juiz julga é a PERGUNTA, não a mensagem. As mensagens dela têm
+ * 150-200 chars — contexto, calor humano, e a pergunta no fim. Comparar mensagem
+ * inteira dilui: duas mensagens com a mesma pergunta e contexto diferente nem
+ * chegavam perto do limiar, e o gate ficou 0/20 numa rodada em que o juiz
+ * apontou repetição.
+ */
+export function perguntas(texto: string): string[] {
+  const achadas: string[] = [];
+  for (const trecho of (texto ?? '').match(/[^?]*\?/g) ?? []) {
+    // Corta no último fim de frase: "Perfeito, anotado! Vocês atendem onde?"
+    // vira só a pergunta. ':' entra porque ela abre pergunta com "pra alinhar:".
+    const q = trecho.split(/(?<=[.!?:])\s+|\n+/).pop()?.trim();
+    if (q) achadas.push(q);
+  }
+  return achadas;
+}
+
+/**
+ * Mais de uma pergunta na mesma mensagem.
+ *
+ * "NO MÁXIMO uma pergunta por mensagem" já estava no prompt — sem gate. Medido
+ * em 30/jul: 9 de 125 mensagens dela (7%) mandavam duas. Sexta vez no mesmo
+ * padrão: regra escrita não é mecanismo.
+ */
+export function perguntasDemais(texto: string): boolean {
+  return perguntas(texto).length > 1;
 }
 
 /**
@@ -620,11 +688,18 @@ export function repeticaoNossa(
   thread: Array<{ direction: string; text: string | null }>,
   candidato: string
 ): boolean {
-  const novo = palavras(candidato);
-  if (novo.size < REPETICAO_MIN_PALAVRAS) return false;
-  return thread.some(
-    (m) => m.direction === 'out' && sobreposicao(novo, palavras(m.text ?? '')) >= REPETICAO_LIMIAR
-  );
+  const novas = perguntas(candidato)
+    .map(palavras)
+    .filter((p) => p.size >= REPETICAO_MIN_PALAVRAS);
+  if (!novas.length) return false;
+
+  const jaFeitas = thread
+    .filter((m) => m.direction === 'out')
+    .flatMap((m) => perguntas(m.text ?? ''))
+    .map(palavras)
+    .filter((p) => p.size >= REPETICAO_MIN_PALAVRAS);
+
+  return novas.some((nova) => jaFeitas.some((antiga) => sobreposicao(nova, antiga) >= REPETICAO_LIMIAR));
 }
 
 /**
@@ -643,10 +718,14 @@ export function repeticaoNossa(
  * Então ele passa a dizer o que NÃO muda. Trocar o assunto é o pedido; a voz é
  * a mesma pessoa falando.
  */
-export function blocoCorrecao(textoRepetido: string): string {
+export function blocoCorrecao(textoRepetido: string, motivo: MotivoCorrecao = 'repeticao'): string {
+  const diagnostico =
+    motivo === 'duas-perguntas'
+      ? `tem MAIS DE UMA pergunta. Escolha a que importa agora e guarde a outra pro próximo turno`
+      : `repete uma pergunta que você já fez nesta conversa. Ele já respondeu isso`;
   return (
-    `[CORREÇÃO] Isto que você acabou de escrever repete algo que já disse nesta conversa: ` +
-    `"${textoRepetido.slice(0, 200)}". Ele já respondeu isso.\n` +
+    `[CORREÇÃO] Isto que você acabou de escrever ${diagnostico}: ` +
+    `"${textoRepetido.slice(0, 200)}".\n` +
     `Troque o ASSUNTO, não o tom: a mensagem nova tem que soar como a mesma pessoa falando — ` +
     `mesmo registro de WhatsApp falado, no máximo uma pergunta, e não mais longa que a anterior ` +
     `(mais curta é melhor).\n` +
