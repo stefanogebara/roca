@@ -37,6 +37,8 @@ import {
   perguntasDemais,
   repeticaoNossa,
   buildAgentReply,
+  jaSeDespediu,
+  resolverSilencio,
 } from '../api/_lib/prospect/agent';
 
 const nossa = (text: string) => ({ direction: 'out' as const, text });
@@ -203,5 +205,90 @@ describe('repeticaoNossa — fórmula curta não é repetição', () => {
         'qual dia da semana costuma ser melhor pra vocês, e prefere manhã ou tarde?'
       )
     ).toBe(true);
+  });
+});
+
+/**
+ * Os dois defeitos que o gym das 14 personas entregou, em sem-interesse.
+ *
+ * Turnos 5 e 7 da rodada 24acf8c3 são a MESMA despedida, palavra por palavra:
+ *   "Tudo bem, Consultoria Pinheiro, não vou insistir. 🌱 Fico à disposição…"
+ *
+ * Duas causas somadas:
+ * 1. resolverSilencio devolve o mesmo texto canned toda vez que o modelo escolhe
+ *    calar. Encerrar uma vez é digno; encerrar duas é defeito.
+ * 2. Eu estreitei o detector para PERGUNTAS no commit anterior — e despedida não
+ *    tem "?". `perguntas()` devolve [], então nada barrava. O Jaccard antigo,
+ *    sobre a mensagem inteira, pegaria isso (texto idêntico = 1,0). Consertei
+ *    diluição e perdi cobertura de mensagem repetida sem pergunta.
+ */
+describe('mensagem quase idêntica também é repetição, mesmo sem pergunta', () => {
+  const DESP = 'Tudo bem, Consultoria Pinheiro, não vou insistir. 🌱 Fico à disposição por aqui se um dia fizer sentido receber produtores da região.';
+
+  it('pega a despedida repetida palavra por palavra — o caso real do gym', () => {
+    expect(repeticaoNossa([nossa(DESP)], DESP)).toBe(true);
+  });
+
+  it('pega a mesma mensagem com uma variação mínima', () => {
+    expect(repeticaoNossa([nossa(DESP)], DESP.replace('Tudo bem', 'Beleza'))).toBe(true);
+  });
+
+  it('NÃO acusa duas mensagens diferentes que dividem vocabulário', () => {
+    expect(
+      repeticaoNossa(
+        [nossa('Vou passar pro Stefano organizar o piloto com vocês.')],
+        'Perfeito, anotado. O Stefano confirma o piloto direto com você.'
+      )
+    ).toBe(false);
+  });
+
+  it('não acusa quando foi ELE que repetiu', () => {
+    expect(repeticaoNossa([dele(DESP)], DESP)).toBe(false);
+  });
+});
+
+describe('jaSeDespediu / resolverSilencio — encerrar é uma vez só', () => {
+  const DESP = 'Tudo bem, Coop, não vou insistir. 🌱 Fico à disposição por aqui.';
+  const silencio = { tipo: 'silencio' as const, motivo: 'o agente escolheu não responder', deliberado: true };
+
+  it('reconhece que a despedida já foi mandada', () => {
+    expect(jaSeDespediu([nossa(DESP), dele('Valeu, sucesso aí.')])).toBe(true);
+  });
+
+  it('não confunde conversa normal com despedida', () => {
+    expect(jaSeDespediu([nossa('Hoje como chega cliente novo pra vocês?')])).toBe(false);
+  });
+
+  it('não conta despedida DELE como nossa', () => {
+    expect(jaSeDespediu([dele('Valeu, não vou insistir mais nisso, abraço.')])).toBe(false);
+  });
+
+  it('já despedida, silêncio vira silêncio DE VERDADE — não a mesma despedida de novo', () => {
+    const a = resolverSilencio(silencio, { robo: false }, 'Coop', true);
+    expect(a.tipo).toBe('silencio');
+  });
+
+  it('primeira vez, continua encerrando com dignidade — isso não regride', () => {
+    const a = resolverSilencio(silencio, { robo: false }, 'Coop', false);
+    expect(a.tipo).toBe('responder');
+    if (a.tipo === 'responder') expect(a.texto).toMatch(/n[ãa]o vou insistir/i);
+  });
+});
+
+describe('buildAgentReply — não manda a segunda despedida', () => {
+  const DESP = 'Tudo bem, Consultoria Pinheiro, não vou insistir. 🌱 Fico à disposição por aqui.';
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('modelo cala e a despedida já foi: não sai mensagem nenhuma', async () => {
+    vi.mocked(chatDetailed).mockResolvedValue({ text: 'SILENCIO', finishReason: 'stop' });
+    const thread = [nossa(DESP), dele('Valeu, Vitória. Sucesso aí.')];
+
+    const acao = await buildAgentReply('Consultoria Pinheiro', thread, 'Valeu, sucesso aí.', {
+      robo: false,
+      tentativa: 0,
+    });
+
+    expect(acao.tipo).toBe('silencio');
   });
 });

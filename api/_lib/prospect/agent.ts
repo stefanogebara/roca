@@ -381,10 +381,14 @@ export async function buildAgentReply(
 
   // Silêncio diante de gente vira encerramento; diante de robô, continua
   // silêncio. Ver resolverSilencio.
+  // Uma vez despedida, silencio nao pode virar a mesma despedida de novo.
+  const despedidaJaMandada = jaSeDespediu(thread);
+
   let action = resolverSilencio(
     interpretAgentOutput(raw, finishReason ?? undefined),
     turno,
-    prospectName
+    prospectName,
+    despedidaJaMandada
   );
 
   // Gate de repetição: o juiz pareado pegou "repetiu a mesma pergunta após uma
@@ -416,7 +420,8 @@ ${learned}` : ''),
       const a2 = resolverSilencio(
         interpretAgentOutput(r2.text, r2.finishReason ?? undefined),
         turno,
-        prospectName
+        prospectName,
+        despedidaJaMandada
       );
       // Reincidir NÃO vira mais silêncio. Silêncio deliberado diante de gente é
       // convertido em DESPEDIDA por resolverSilencio ("não vou insistir"), e o
@@ -531,9 +536,16 @@ export function dicaDeTurno(ctx: TurnoContexto): string {
 export function resolverSilencio(
   acao: AgentAction,
   ctx: { robo: boolean },
-  prospectName: string
+  prospectName: string,
+  /**
+   * Se a despedida já foi mandada nesta conversa. Aí silêncio é silêncio DE
+   * VERDADE: repetir o mesmo texto canned é pior que não mandar nada. O gym das
+   * 14 personas pegou a despedida duplicada palavra por palavra em sem-interesse.
+   */
+  despedidaJaMandada = false
 ): AgentAction {
   if (acao.tipo !== 'silencio' || !acao.deliberado || ctx.robo) return acao;
+  if (despedidaJaMandada) return acao;
   const nome = (prospectName ?? '').trim();
   return {
     tipo: 'responder',
@@ -610,6 +622,16 @@ const REPETICAO_MIN_PALAVRAS = 4;
  * diferente que divide vocabulário dá 0,2-0,4.
  */
 const REPETICAO_LIMIAR = 0.75;
+/**
+ * Limiar de mensagem quase idêntica, sobre o texto INTEIRO. Alto e com Jaccard
+ * (simétrico) porque duplicata não precisa de tolerância: o caso real do gym era
+ * a mesma despedida palavra por palavra.
+ *
+ * Medido: mensagem idêntica dá 1,0; a mesma despedida com uma palavra trocada dá
+ * 0,83; duas mensagens genuinamente diferentes que citam Stefano e piloto dão
+ * 0,23. 0,80 fica com folga dos dois lados.
+ */
+const DUPLICATA_LIMIAR = 0.8;
 
 const palavras = (s: string): Set<string> =>
   new Set(
@@ -628,6 +650,14 @@ const palavras = (s: string): Set<string> =>
  * mesma pergunta com três palavras a mais inflava o denominador e derrubava a
  * similaridade justamente no caso que a gente quer pegar.
  */
+/** Jaccard: interseção sobre união. Severo, e é o que queremos pra duplicata. */
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const w of a) if (b.has(w)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+
 function sobreposicao(a: Set<string>, b: Set<string>): number {
   if (!a.size || !b.size) return 0;
   // Assimetria grande não é "a mesma pergunta de novo", é uma FÓRMULA curta
@@ -688,18 +718,47 @@ export function repeticaoNossa(
   thread: Array<{ direction: string; text: string | null }>,
   candidato: string
 ): boolean {
+  const nossas = thread.filter((m) => m.direction === 'out');
+
+  // Camada 1: mensagem quase idêntica, com pergunta ou sem. Comparar só
+  // pergunta foi um estreitamento que custou cobertura: no gym das 14 personas
+  // ela mandou a MESMA despedida duas vezes (turnos 5 e 7 de sem-interesse,
+  // rodada 24acf8c3), e como despedida não tem "?", nada barrava. Jaccard aqui
+  // — simétrico e severo — porque duplicata é o caso fácil e não precisa de
+  // tolerância nenhuma.
+  const inteiro = palavras(candidato);
+  if (inteiro.size >= REPETICAO_MIN_PALAVRAS) {
+    for (const m of nossas) {
+      if (jaccard(inteiro, palavras(m.text ?? '')) >= DUPLICATA_LIMIAR) return true;
+    }
+  }
+
+  // Camada 2: a mesma PERGUNTA, ainda que o texto em volta seja outro.
   const novas = perguntas(candidato)
     .map(palavras)
     .filter((p) => p.size >= REPETICAO_MIN_PALAVRAS);
   if (!novas.length) return false;
 
-  const jaFeitas = thread
-    .filter((m) => m.direction === 'out')
+  const jaFeitas = nossas
     .flatMap((m) => perguntas(m.text ?? ''))
     .map(palavras)
     .filter((p) => p.size >= REPETICAO_MIN_PALAVRAS);
 
   return novas.some((nova) => jaFeitas.some((antiga) => sobreposicao(nova, antiga) >= REPETICAO_LIMIAR));
+}
+
+/** A marca da despedida que resolverSilencio produz. */
+const DESPEDIDA_RE = /n[ãa]o vou insistir/i;
+
+/**
+ * Se JÁ nos despedimos nesta conversa.
+ *
+ * resolverSilencio devolve sempre o mesmo texto canned, então cada silêncio
+ * deliberado repetia a despedida. Encerrar uma vez é digno; encerrar duas é
+ * defeito — o gym pegou palavra por palavra em sem-interesse.
+ */
+export function jaSeDespediu(thread: Array<{ direction: string; text: string | null }>): boolean {
+  return thread.some((m) => m.direction === 'out' && DESPEDIDA_RE.test(m.text ?? ''));
 }
 
 /**
