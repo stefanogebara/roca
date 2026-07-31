@@ -14,7 +14,7 @@
  * é pior que nenhum, porque vira envio queimando reputação.
  */
 import { describe, it, expect } from 'vitest';
-import { extrairWhatsAppDeHtml } from '../api/_lib/prospect/enrich';
+import { extrairWhatsAppDeHtml, candidatosBackfill, mesmoNegocio } from '../api/_lib/prospect/enrich';
 
 describe('extrairWhatsAppDeHtml — só evidência positiva', () => {
   it('acha o wa.me clássico', () => {
@@ -53,5 +53,62 @@ describe('extrairWhatsAppDeHtml — só evidência positiva', () => {
   it('html sem nada devolve null, sem explodir', () => {
     expect(extrairWhatsAppDeHtml('<html><body>Bem-vindo à loja</body></html>')).toBeNull();
     expect(extrairWhatsAppDeHtml('')).toBeNull();
+  });
+});
+
+/**
+ * Backfill da fila velha — enriquecer quem JÁ está na base.
+ *
+ * Por quê: 31/jul, 6 convites saíram e 5 bateram em número sem WhatsApp — tudo
+ * fila antiga, importada antes do enriquecimento existir (44 fixos crus). O
+ * sourcing novo enriquece na entrada; o backfill re-consulta o Places pelo nome
+ * pra achar o site de quem já está dentro.
+ *
+ * O risco central: casar com OUTRA empresa e gravar o WhatsApp do negócio
+ * errado — que depois vira template indo pra quem nunca ouviu falar da gente.
+ * Por isso o gate é TELEFONE, não nome: só aceitamos o hit do Places se o
+ * número dele bater com o que já temos na linha. Nome parecido não basta.
+ */
+describe('backfill — seleção de candidatos', () => {
+  const row = (over = {}) => ({
+    id: 'x', name: 'Agro Teste', city: 'Lavras', status: 'ready',
+    phone: '+553538211234', wa_phone_source: null, send_status: null, ...over,
+  });
+
+  it('seleciona ready/discovered com fixo cru, nunca já-enriquecido', () => {
+    const rows = [
+      row({ id: 'fixo-ready' }),
+      row({ id: 'ja-enriquecido', wa_phone_source: 'https://site.com' }),
+      row({ id: 'celular', phone: '+5535999887766' }),
+      row({ id: 'ja-enviado', send_status: 'sent' }),
+      row({ id: 'descoberto', status: 'discovered' }),
+      row({ id: 'descartado', status: 'discarded' }),
+    ];
+    expect(candidatosBackfill(rows, 10).map((r) => r.id)).toEqual(['fixo-ready', 'descoberto']);
+  });
+
+  it('ready vem antes de discovered — a fila de disparo é quem manda', () => {
+    const rows = [row({ id: 'b', status: 'discovered' }), row({ id: 'a' })];
+    expect(candidatosBackfill(rows, 10).map((r) => r.id)).toEqual(['a', 'b']);
+  });
+
+  it('respeita o limite por rodada', () => {
+    const rows = Array.from({ length: 9 }, (_, i) => row({ id: 'r' + i }));
+    expect(candidatosBackfill(rows, 3)).toHaveLength(3);
+  });
+});
+
+describe('backfill — gate de identidade por telefone', () => {
+  it('aceita quando o telefone do Places bate com o nosso', () => {
+    expect(mesmoNegocio('+553538211234', '(35) 3821-1234')).toBe(true);
+  });
+
+  it('recusa telefone diferente — nome parecido não é a mesma empresa', () => {
+    expect(mesmoNegocio('+553538211234', '(35) 3821-9999')).toBe(false);
+  });
+
+  it('recusa quando o Places não traz telefone — sem âncora, sem match', () => {
+    expect(mesmoNegocio('+553538211234', null)).toBe(false);
+    expect(mesmoNegocio(null, '(35) 3821-1234')).toBe(false);
   });
 });

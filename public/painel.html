@@ -551,6 +551,22 @@
           } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro na busca: '+e.message; }
           finally { srcBtn.disabled = false; srcBtn.textContent = '🌐 Buscar na web'; }
         });
+        const enrBtn = el('button', 'btn small ghost', '📱 Procurar WhatsApp da fila');
+        enrBtn.title = 'Pra quem só temos telefone fixo: procuramos o site da empresa e, se ela publica um link de WhatsApp, passamos a usar esse número. Mensagem pra número citado é ~7× mais lida.';
+        enrBtn.addEventListener('click', async () => {
+          enrBtn.disabled = true; enrBtn.textContent = 'Procurando…';
+          try {
+            const rep = await api('prospects', { method:'POST', body: JSON.stringify({ action:'enrich' }) });
+            const msg = !rep.configurado ? rep.error
+              : rep.candidatos === 0 ? 'Ninguém precisando: todo mundo na fila já tem celular ou WhatsApp confirmado.'
+              : `Procurei em ${rep.candidatos} empresas: ${rep.enriquecidos} agora têm WhatsApp confirmado 📱` +
+                (rep.enriquecidos ? ` (${rep.exemplos.join(', ')})` : '') +
+                (rep.candidatos >= 15 ? ' · tem mais na fila — clique de novo pra continuar' : '');
+            await refreshProspects();
+            note.textContent = msg;
+          } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro na procura: '+e.message; }
+          finally { enrBtn.disabled = false; enrBtn.textContent = '📱 Procurar WhatsApp da fila'; }
+        });
         const simBtn = el('button', 'btn small ghost', '👁 Ver quem sai no próximo lote');
         const goBtn = el('button', 'btn small', '📤 Enviar convites agora');
         const runDispatch = async (dryRun) => {
@@ -567,7 +583,7 @@
         };
         simBtn.addEventListener('click', () => runDispatch(true));
         goBtn.addEventListener('click', () => runDispatch(false));
-        act.append(srcBtn, simBtn, goBtn);
+        act.append(srcBtn, enrBtn, simBtn, goBtn);
         p.append(act);
         // Estado REAL do motor (vem de /api/ops/prospects → dispatch). O texto
         // fixo que existia aqui dizia "ativo" mesmo com a parada de emergência

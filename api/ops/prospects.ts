@@ -108,6 +108,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
+    if (action === 'enrich') {
+      // Backfill da fila velha: procurar o WhatsApp citado no site de quem já
+      // está na base com fixo cru. Interno e idempotente — só grava número com
+      // evidência e com o telefone batendo (mesmoNegocio).
+      const { runBackfill } = await import('../_lib/prospect/enrich');
+      res.status(200).json({ success: true, data: await runBackfill() });
+      return;
+    }
+
     if (action === 'thread') {
       const id = String((body as { id?: unknown }).id ?? '');
       if (!id) {
