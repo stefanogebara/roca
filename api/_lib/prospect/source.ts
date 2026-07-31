@@ -53,15 +53,39 @@ export interface PlaceHit {
   website: string | null;
 }
 
-/** Compose the Places text queries for one run (bounded). */
-export function buildQueries(cities: string[] = ICP_CITIES, maxCities = 4): Array<{ kind: string; q: string; city: string }> {
+/**
+ * Compose the Places text queries for one run (bounded).
+ *
+ * `offset` rotaciona a janela de cidades. Sem ele, toda rodada varria as MESMAS
+ * 4 primeiras da lista — Varginha, Três Pontas, Guaxupé e Alfenas desde 25/jul,
+ * e as outras oito NUNCA. O dedup descartava quase tudo e a busca parecia
+ * esgotada quando nunca tinha saído do mesmo quadrante.
+ */
+export function buildQueries(
+  cities: string[] = ICP_CITIES,
+  maxCities = 4,
+  offset = 0
+): Array<{ kind: string; q: string; city: string }> {
   const out: Array<{ kind: string; q: string; city: string }> = [];
-  for (const city of cities.slice(0, maxCities)) {
+  const n = cities.length;
+  const janela = n
+    ? Array.from({ length: Math.min(maxCities, n) }, (_, i) => cities[(offset + i) % n])
+    : [];
+  for (const city of janela) {
     for (const { kind, term } of ICP_QUERIES) {
       out.push({ kind, q: `${term} em ${city}`, city: city.replace(/\s+MG$/, '') });
     }
   }
   return out;
+}
+
+/** Offset do dia (BRT): a rotação avança sozinha a cada dia de varredura. */
+export function offsetDoDia(now: Date = new Date()): number {
+  const brt = new Date(now.getTime() - 3 * 3600_000);
+  const inicioAno = Date.UTC(brt.getUTCFullYear(), 0, 0);
+  const diaDoAno = Math.floor((brt.getTime() - inicioAno) / 86_400_000);
+  // ×4 = a cada dia a janela pula uma janela inteira, cobrindo as 12 em 3 dias.
+  return (diaDoAno * 4) % ICP_CITIES.length;
 }
 
 /** Map a Places result to a ProspectInput (validated phone or invalid). */
@@ -143,7 +167,7 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
     };
   }
 
-  const queries = buildQueries(ICP_CITIES, maxCities);
+  const queries = buildQueries(ICP_CITIES, maxCities, offsetDoDia());
   // O site acompanha o input ate a fase de enriquecimento (toProspectInput nao
   // o carrega — website nao e coluna do prospect, e insumo).
   const rows: Array<{ input: ProspectInput; website: string | null }> = [];

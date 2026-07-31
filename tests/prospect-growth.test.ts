@@ -251,3 +251,31 @@ describe('saudacaoDeEntrada — quem chega indicado não recebe panfleto', () =>
     expect(saudacaoDeEntrada('michel')).toMatch(/agr[oô]nomo/i);
   });
 })
+
+/**
+ * Rotação de cidades no sourcing.
+ *
+ * buildQueries pegava SEMPRE as 4 primeiras da lista: Varginha, Três Pontas,
+ * Guaxupé e Alfenas foram varridas em toda rodada desde 25/jul, e as outras
+ * oito cidades da grade NUNCA. O dedup então descartava quase tudo — a "busca
+ * na web" parecia esgotada quando na verdade nunca saiu do mesmo quadrante.
+ */
+describe('buildQueries — rotação para a grade inteira ser varrida', () => {
+  const cidades = ['A MG', 'B MG', 'C MG', 'D MG', 'E MG', 'F MG'];
+
+  it('offset desloca a janela de cidades', () => {
+    const qs = buildQueries(cidades, 2, 2);
+    const usadas = [...new Set(qs.map((q) => q.city))];
+    expect(usadas).toEqual(['C', 'D']);
+  });
+
+  it('a janela dá a volta no fim da lista', () => {
+    const qs = buildQueries(cidades, 3, 5);
+    expect([...new Set(qs.map((q) => q.city))]).toEqual(['F', 'A', 'B']);
+  });
+
+  it('sem offset, comporta como sempre — as primeiras N', () => {
+    const qs = buildQueries(cidades, 2);
+    expect([...new Set(qs.map((q) => q.city))]).toEqual(['A', 'B']);
+  });
+});
