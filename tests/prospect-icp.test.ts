@@ -67,3 +67,19 @@ describe('motivoForaDoICP — o descarte tem que ser auditável', () => {
     expect(motivoForaDoICP('Cocatrel - Cooperativa dos Cafeicultores', null)).toBeNull();
   });
 });
+
+describe('autopeças — o caso Jocape (31/jul)', () => {
+  // Primeira varredura com rotação: o Places devolveu "Jocape" para a query
+  // "revenda agrícola em Boa Esperança" e o site é jocapeautopecas.com.br —
+  // loja de autopeças. Mesma família do caso pecuária: o nome não denuncia,
+  // mas a FONTE (site/uri) sim, e o filtro já recebe as duas.
+  it('barra autopeças pelo sinal no nome ou na fonte', () => {
+    expect(motivoForaDoICP('Jocape', 'http://www.jocapeautopecas.com.br/')).toMatch(/autope/i);
+    expect(motivoForaDoICP('Central das Autopeças', 'maps://x')).toMatch(/autope/i);
+    expect(motivoForaDoICP('Auto Peças São Jorge', 'maps://y')).toMatch(/autope/i);
+  });
+
+  it('NÃO barra revenda agro legítima', () => {
+    expect(motivoForaDoICP('Corpal Comércio e Representações', 'https://www.corpal.com.br/')).toBeNull();
+  });
+});

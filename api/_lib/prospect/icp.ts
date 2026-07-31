@@ -32,6 +32,12 @@ const SINAIS_PECUARIA: Array<{ re: RegExp; rotulo: string }> = [
   { re: /\bcl[íi]nica\s+veterin[áa]ria\b|\bmedicina\s+pet\b/i, rotulo: 'clínica veterinária' },
   { re: /\bsomente\s+produtos?\s+pecu[áa]ri/i, rotulo: 'declara só pecuária' },
   { re: /\bapenas\s+pecu[áa]ri/i, rotulo: 'declara só pecuária' },
+  // 31/jul, primeira varredura com rotação: o Places devolveu "Jocape" para
+  // "revenda agrícola em Boa Esperança" — e o site é jocapeautopecas.com.br,
+  // loja de autopeças. Mesma família do caso pecuária: o nome não denuncia, a
+  // FONTE sim. Sem \b entre "autope" e "cas" porque o sinal aparece grudado em
+  // domínio (jocapeautopecas).
+  { re: /auto\s*pe[çc]as|autope[çc]as/i, rotulo: 'autopeças' },
 ];
 
 /**
