@@ -668,8 +668,13 @@
       wrap.innerHTML = '';
 
       const order = { replied: 0, contacted: 1, partner: 2, ready: 3, discovered: 4, stale: 5, discarded: 6 };
+      // Dentro do estágio, melhor número primeiro: 📱 confirmado > celular >
+      // fixo. É a ordem da revisão — aprovar os que mais têm chance de serem
+      // lidos antes de gastar atenção nos fixos.
+      const qualidade = (x) => (x.wa_phone_source && x.wa_phone) ? 0 : isMobile(x.phone) ? 1 : 2;
       let rows = [...pCache].sort((a, b) =>
         (order[pStage(a)] ?? 9) - (order[pStage(b)] ?? 9) ||
+        qualidade(a) - qualidade(b) ||
         String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
       if (pState.status) rows = rows.filter(x => pStage(x) === pState.status);
       if (pState.kind) rows = rows.filter(x => (x.kind || '') === pState.kind);
