@@ -355,6 +355,10 @@ export interface ProspectInput {
   city: string | null;
   uf: string | null;
   source: string;
+  /** WhatsApp citado pelo proprio negocio (wa.me no site) — ver enrich.ts.
+   * Medido: leitura ~38% em enriquecidos vs ~5% em numero cru do Places. */
+  wa_phone?: string | null;
+  wa_phone_source?: string | null;
 }
 
 /**

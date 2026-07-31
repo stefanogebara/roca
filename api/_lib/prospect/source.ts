@@ -10,15 +10,20 @@
  * it the ops action explains what to configure instead of failing silently.
  */
 
-import { normalizePhoneBR } from './core';
+import { normalizePhoneBR, isMobileBR } from './core';
 import { importProspects, type ProspectInput } from './db';
 import { motivoForaDoICP } from './icp';
+import { enriquecerDoSite } from './enrich';
 import { withRetry } from '../retry';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-source');
 
 const PLACES_URL = 'https://places.googleapis.com/v1/places:searchText';
+
+// Sites consultados por rodada. 12 em paralelo cabem com folga no maxDuration
+// da function (fetch individual tem timeout de 6s — ver enrich.ts).
+const MAX_ENRICH_PER_RUN = 12;
 
 /** The ICP search grid: what × where. Kept small per run (quota-friendly). */
 export const ICP_QUERIES: Array<{ kind: string; term: string }> = [
@@ -44,6 +49,8 @@ export interface PlaceHit {
   phone: string | null;
   city: string | null;
   source: string;
+  /** Site do negócio (Places websiteUri) — insumo do enriquecimento. */
+  website: string | null;
 }
 
 /** Compose the Places text queries for one run (bounded). */
@@ -83,7 +90,7 @@ async function searchOnce(apiKey: string, q: string): Promise<PlaceHit[]> {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
         'X-Goog-FieldMask':
-          'places.displayName,places.nationalPhoneNumber,places.formattedAddress,places.googleMapsUri',
+          'places.displayName,places.nationalPhoneNumber,places.formattedAddress,places.googleMapsUri,places.websiteUri',
       },
       body: JSON.stringify({ textQuery: q, languageCode: 'pt-BR', regionCode: 'BR', pageSize: 10 }),
     })
@@ -95,6 +102,7 @@ async function searchOnce(apiKey: string, q: string): Promise<PlaceHit[]> {
       nationalPhoneNumber?: string;
       formattedAddress?: string;
       googleMapsUri?: string;
+      websiteUri?: string;
     }>;
   };
   return (data.places ?? [])
@@ -104,6 +112,7 @@ async function searchOnce(apiKey: string, q: string): Promise<PlaceHit[]> {
       phone: p.nationalPhoneNumber ?? null,
       city: p.formattedAddress?.match(/,\s*([^,]+)\s*-\s*MG/)?.[1]?.trim() ?? null,
       source: p.googleMapsUri ?? 'google-places',
+      website: p.websiteUri ?? null,
     }));
 }
 
@@ -113,6 +122,8 @@ export interface SourceReport {
   found: number;
   imported: number;
   withPhone: number;
+  /** WhatsApp citado achado no site (wa.me) — ver enrich.ts. */
+  enriquecidos: number;
   /** Quantos o filtro de ICP barrou (pet/ração/veterinária). */
   descartadosICP: number;
   /** Quem foi barrado e por qual sinal — descarte silencioso vira base
@@ -127,13 +138,15 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
   if (!apiKey) {
     return {
       configured: false, queries: 0, found: 0, imported: 0, withPhone: 0,
-      descartadosICP: 0, descartadosExemplos: [],
+      enriquecidos: 0, descartadosICP: 0, descartadosExemplos: [],
       error: 'GOOGLE_PLACES_API_KEY não configurada (Vercel env) — busca automática desligada.',
     };
   }
 
   const queries = buildQueries(ICP_CITIES, maxCities);
-  const rows: ProspectInput[] = [];
+  // O site acompanha o input ate a fase de enriquecimento (toProspectInput nao
+  // o carrega — website nao e coluna do prospect, e insumo).
+  const rows: Array<{ input: ProspectInput; website: string | null }> = [];
   // Reportado, nunca silencioso: um filtro que descarta sem dizer o quê vira
   // uma base que encolhe sem explicação.
   const descartados: string[] = [];
@@ -148,7 +161,7 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
           descartados.push(`${hit.name} (${motivo})`);
           continue;
         }
-        rows.push(toProspectInput(hit, kind, city));
+        rows.push({ input: toProspectInput(hit, kind, city), website: hit.website });
       }
     } catch (e) {
       failures++;
@@ -160,19 +173,40 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
   // against existing rows by phone).
   const seen = new Set<string>();
   const unique = rows.filter((r) => {
-    const key = r.phone ?? `name:${r.name.toLowerCase()}`;
+    const key = r.input.phone ?? `name:${r.input.name.toLowerCase()}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 
-  const imported = await importProspects(unique);
+  // Enriquecimento: buscar o wa.me no site de quem ainda nao tem CELULAR.
+  // Medido (30/jul, 42 envios): leitura ~38% em numero enriquecido vs ~5% no
+  // cru do Places — e o maior salto do funil. Orcamento por rodada + fetches em
+  // paralelo para caber no maxDuration da function; fail-soft: site fora do ar
+  // nao trava o sourcing.
+  const paraEnriquecer = unique
+    .filter((r) => r.website && (!r.input.phone || !isMobileBR(r.input.phone)))
+    .slice(0, MAX_ENRICH_PER_RUN);
+  let enriquecidos = 0;
+  await Promise.all(
+    paraEnriquecer.map(async (r) => {
+      const hit = await enriquecerDoSite(r.website as string);
+      if (hit) {
+        r.input.wa_phone = hit.waPhone;
+        r.input.wa_phone_source = hit.fonte;
+        enriquecidos++;
+      }
+    })
+  );
+
+  const imported = await importProspects(unique.map((r) => r.input));
   const report: SourceReport = {
     configured: true,
     queries: queries.length,
     found: rows.length,
     imported,
-    withPhone: unique.filter((r) => r.phone).length,
+    withPhone: unique.filter((r) => r.input.phone).length,
+    enriquecidos,
     descartadosICP: descartados.length,
     descartadosExemplos: descartados.slice(0, 10),
     ...(failures ? { error: `${failures} consulta(s) falharam` } : {}),

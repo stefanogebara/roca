@@ -509,7 +509,9 @@
           try {
             const rep = await api('prospects', { method:'POST', body: JSON.stringify({ action:'source' }) });
             note.textContent = rep.configured
-              ? `Busca: ${rep.found} encontrados · ${rep.imported} novos importados (${rep.withPhone} com telefone).` + (rep.error ? ` Aviso: ${rep.error}` : '')
+              ? `Busca: ${rep.found} encontrados · ${rep.imported} novos importados (${rep.withPhone} com telefone` +
+                (rep.enriquecidos ? `, ${rep.enriquecidos} com zap confirmado no site 📱` : '') + `).` +
+                (rep.error ? ` Aviso: ${rep.error}` : '')
               : rep.error;
             await refreshProspects();
           } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro na busca: '+e.message; }

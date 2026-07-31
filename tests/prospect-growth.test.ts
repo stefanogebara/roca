@@ -33,11 +33,11 @@ describe('sourcing query grid', () => {
 
 describe('toProspectInput', () => {
   it('validates phones through the P1 core, never fabricates', () => {
-    const ok = toProspectInput({ name: 'Agro X', phone: '(35) 99999-1234', city: null, source: 'maps://x' }, 'revenda', 'Lavras');
+    const ok = toProspectInput({ name: 'Agro X', phone: '(35) 99999-1234', city: null, source: 'maps://x', website: null }, 'revenda', 'Lavras');
     expect(ok.phone).toBe('+5535999991234');
     expect(ok.wa_status).toBe('pending');
     expect(ok.city).toBe('Lavras');
-    const bad = toProspectInput({ name: 'Agro Y', phone: '1234', city: 'Alfenas', source: 'maps://y' }, 'revenda', 'Lavras');
+    const bad = toProspectInput({ name: 'Agro Y', phone: '1234', city: 'Alfenas', source: 'maps://y', website: null }, 'revenda', 'Lavras');
     expect(bad.phone).toBeNull();
     expect(bad.wa_status).toBe('invalid');
     expect(bad.city).toBe('Alfenas'); // listing city wins over query city
