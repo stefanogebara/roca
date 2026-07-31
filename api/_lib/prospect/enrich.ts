@@ -101,19 +101,26 @@ export interface BackfillRow {
   phone: string | null;
   wa_phone_source: string | null;
   send_status: string | null;
+  /** Ultima tentativa de backfill — com ou sem sucesso. Sem esta marca, cada
+   * rodada re-consultava os mesmos fracassos (visto ao vivo em 31/jul). */
+  enrich_tried_at?: string | null;
 }
+
+/** Depois de 30 dias vale tentar de novo: site novo aparece. */
+const RETENTATIVA_MS = 30 * 86_400_000;
 
 /**
  * Quem vale a consulta: ready/discovered, nunca enviado, telefone fixo cru e
  * sem enriquecimento prévio. Ready primeiro — é quem está a caminho do disparo.
  */
-export function candidatosBackfill<T extends BackfillRow>(rows: T[], limite: number): T[] {
+export function candidatosBackfill<T extends BackfillRow>(rows: T[], limite: number, now: Date = new Date()): T[] {
   const elegivel = (r: T): boolean =>
     (r.status === 'ready' || r.status === 'discovered') &&
     !r.send_status &&
     !r.wa_phone_source &&
     !!r.phone &&
-    !isMobileBR(r.phone);
+    !isMobileBR(r.phone) &&
+    (!r.enrich_tried_at || now.getTime() - Date.parse(r.enrich_tried_at) > RETENTATIVA_MS);
   return rows
     .filter(elegivel)
     .sort((a, b) => (a.status === b.status ? 0 : a.status === 'ready' ? -1 : 1))
@@ -177,7 +184,7 @@ export async function runBackfill(limite = BACKFILL_POR_RODADA): Promise<Backfil
   const db = getDb();
   const { data, error } = await db
     .from('prospects')
-    .select('id, name, city, status, phone, wa_phone_source, send_status')
+    .select('id, name, city, status, phone, wa_phone_source, send_status, enrich_tried_at')
     .in('status', ['ready', 'discovered']);
   if (error) {
     return {
@@ -235,6 +242,16 @@ export async function runBackfill(limite = BACKFILL_POR_RODADA): Promise<Backfil
       }
     })
   );
+
+  // Marca de tentativa em TODOS os consultados, com ou sem achado — e o que
+  // faz "clique de novo" avancar pela fila em vez de andar em circulo.
+  if (alvos.length) {
+    const marca = await db
+      .from('prospects')
+      .update({ enrich_tried_at: new Date().toISOString() })
+      .in('id', alvos.map((p) => p.id));
+    if (marca.error) log.error('backfill: marca de tentativa falhou:', marca.error.message);
+  }
 
   const report: BackfillReport = {
     configurado: true,

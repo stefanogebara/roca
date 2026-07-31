@@ -112,3 +112,28 @@ describe('backfill — gate de identidade por telefone', () => {
     expect(mesmoNegocio(null, '(35) 3821-1234')).toBe(false);
   });
 });
+
+describe('backfill — memória de tentativa (o bug da leva 2)', () => {
+  // Visto ao vivo em 31/jul: a leva 1 consultou 15 e enriqueceu 1; a leva 2
+  // re-consultou os MESMOS 14 fracassos e devolveu 0. Sem marca de tentativa,
+  // "clique de novo pra continuar" era promessa falsa e quota em círculo.
+  const agora = new Date('2026-07-31T12:00:00Z');
+  const row = (over = {}) => ({
+    id: 'x', name: 'Agro Teste', city: 'Lavras', status: 'ready',
+    phone: '+553538211234', wa_phone_source: null, send_status: null,
+    enrich_tried_at: null, ...over,
+  });
+
+  it('pula quem já foi tentado há pouco', () => {
+    const rows = [
+      row({ id: 'nunca-tentado' }),
+      row({ id: 'tentado-ontem', enrich_tried_at: '2026-07-30T12:00:00Z' }),
+    ];
+    expect(candidatosBackfill(rows, 10, agora).map((r) => r.id)).toEqual(['nunca-tentado']);
+  });
+
+  it('re-tenta depois de 30 dias — site novo aparece', () => {
+    const rows = [row({ id: 'tentado-ha-2-meses', enrich_tried_at: '2026-05-20T12:00:00Z' })];
+    expect(candidatosBackfill(rows, 10, agora).map((r) => r.id)).toEqual(['tentado-ha-2-meses']);
+  });
+});
