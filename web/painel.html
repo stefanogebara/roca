@@ -181,20 +181,41 @@
       return j.data;
     };
 
-    /** Frase honesta sobre o estado do disparo — nunca "ativo" quando não está. */
+    /**
+     * Frase honesta sobre o estado do disparo — nunca "ativo" quando não está.
+     * Linguagem de founder na frente; o dado técnico vai pro title (tooltip).
+     * Reescrita em 31/jul: a versão anterior dizia "cap", "breaker", "falhas
+     * pós-aceite" — jargão nosso vazando pra tela de quem decide.
+     */
     function dispatchLine(d) {
-      if (!d || d.error) return '⚠️ Não consegui ler o estado do disparo.';
-      const tpl = d.template ? ` · template ${d.template}` : '';
-      const hoje = d.sentToday != null ? ` · hoje: ${d.sentToday} enviado(s)` : '';
-      const falhas = d.failedToday ? `, ${d.failedToday} falha(s)` : '';
-      if (d.latched) return `⛔ TRAVADO: 2 pausas de saúde em 21 dias. Religar exige limpar dispatch_pauses.${hoje}${falhas}`;
-      if (d.breakerTripped) return `⛔ CORTADO hoje: ${d.failedToday} falhas pós-aceite (corte em ${d.breakerAt}). Veja o motivo em cada prospect.`;
+      if (!d || d.error) return '⚠️ Não consegui ver o estado dos convites agora — recarregue a página.';
+      const hoje = d.sentToday != null ? ` Hoje já saíram ${d.sentToday}.` : '';
+      if (d.latched) return `⛔ Convites suspensos por segurança: o número levou 2 pausas de saúde em 3 semanas. Fale com o suporte técnico (Claude) pra religar.`;
+      if (d.breakerTripped) return `⏸️ Pausado por hoje: ${d.failedToday} números seguidos não tinham WhatsApp, então paramos pra proteger a reputação do nosso número. Religa sozinho amanhã.${hoje}`;
       if (d.paused) {
-        const por = d.grade === 'manual' ? 'parada manual (PROSPECT_DAILY_CAP=0)' : `saúde do número — ${(d.reasons||[]).join('; ')}`;
-        return `⛔ PARADO: ${por}. Nenhum envio sai.${hoje}${falhas}`;
+        const por = d.grade === 'manual' ? 'pausa manual que nós ligamos' : 'a saúde do nosso número no WhatsApp pediu uma pausa';
+        return `⏸️ Convites pausados (${por}). Nada sai até religar.${hoje}`;
       }
-      return `✅ Ativo: até ${d.cap}/dia (${d.grade})${tpl} · seg–sex 10h, 13h e 16h${hoje}${falhas}`;
+      return `✅ Convites saindo sozinhos: até ${d.cap} por dia útil, às 10h, 13h e 16h.${hoje}`;
     }
+
+    /** Tradução de erro técnico do WhatsApp pra frase de gente. O código cru
+     * fica no tooltip pra quem for depurar. */
+    function erroHumano(e) {
+      const t = String(e || '');
+      if (/131026/.test(t)) return '📵 esse número não tem WhatsApp';
+      if (/131049|130497/.test(t)) return '🚦 o WhatsApp limitou envios pra essa pessoa por ora';
+      if (/131042/.test(t)) return '💳 problema de cobrança na nossa conta Meta';
+      if (/132000|132001/.test(t)) return '📋 a mensagem-modelo precisa de ajuste';
+      return '⚠️ o envio falhou';
+    }
+
+    /** Intenções em linguagem simples (o rótulo técnico fica no tooltip). */
+    const INTENT_LABELS = {
+      smalltalk: 'papo geral', pest: 'praga ou doença', spray: 'hora de pulverizar',
+      price: 'preço do café', weather: 'clima', referral: 'pediu agrônomo',
+      onboarding: 'primeiro contato', optout: 'pediu pra sair', other: 'outros assuntos',
+    };
     /** Fixo não tem WhatsApp — mesma regra do core.isMobileBR. */
     const isMobile = (phone) => { const d = String(phone||'').replace(/[^0-9]/g,''); return d.length === 13 && d.startsWith('55') && d[4] === '9'; };
     const fmtDate = (s) => { if (!s) return '—'; const d = new Date(s); return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); };
@@ -258,7 +279,7 @@
         const items = [
           { n: newLeads, l: 'leads pra encaminhar', hint: 'Produtores pedindo agrônomo — entregue ao parceiro e marque "Encaminhado".', tab: 'leads', urgent: newLeads > 0 },
           { n: repliedP, l: 'prospects em conversa', hint: agentOff ? agentOff + ' com agente desligado — responda você!' : 'A Vitória 🤖 cuida; entre só se ela escalar.', tab: 'prospeccao', urgent: agentOff > 0 },
-          { n: queue, l: 'na fila de disparo', hint: 'Saem sozinhos: seg–sex 10h/13h/16h, 20 por dia. Fila baixa? Clique em Buscar na web.', tab: 'prospeccao', urgent: queue < 8 },
+          { n: queue, l: 'esperando convite', hint: 'Empresas aprovadas que vão receber o primeiro contato sozinhas, em dia útil. Fila baixa? Busque mais na aba Prospecção.', tab: 'prospeccao', urgent: queue < 8 },
         ];
         for (const it of items) {
           const b = el('button', 'fstage');
@@ -281,27 +302,36 @@
         p.innerHTML = '';
         p.append(await todayStrip());
         const stats = el('div', 'stats');
+        // Cada número com a explicação no tooltip — um card que precisa de
+        // tradutor não informa, assusta.
         const cards = [
-          ['Produtores', d.users], ['Novos (7d)', d.newUsers7d],
-          ['Msgs recebidas', d.inbound], ['Msgs enviadas', d.outbound],
-          ['Recebidas (7d)', d.inbound7d], ['Pedidos de agrônomo', d.referrals],
-          ['Falhas (7d)', d.failures7d, d.failures7d>0?'warn':''], ['Voz ativa', d.activePack!=null?('v'+d.activePack):'—'],
+          ['Produtores', d.users, '', 'Cafeicultores que já falaram com a Stevi no WhatsApp'],
+          ['Novos na semana', d.newUsers7d, '', 'Produtores que chegaram nos últimos 7 dias'],
+          ['Msgs recebidas', d.inbound, '', 'Tudo que produtores já mandaram pra Stevi'],
+          ['Msgs enviadas', d.outbound, '', 'Tudo que a Stevi já respondeu'],
+          ['Recebidas na semana', d.inbound7d, '', 'Movimento dos últimos 7 dias'],
+          ['Pedidos de agrônomo', d.referrals, '', 'Produtores que pediram atendimento técnico — são os leads que a gente entrega aos parceiros'],
+          ['Problemas na semana', d.failures7d, d.failures7d>0?'warn':'', 'Mensagens que a Stevi não conseguiu responder por erro nosso. Zero é o normal'],
+          ['Jeito de escrever', d.activePack!=null?('v'+d.activePack):'—', '', 'Versão ativa do estilo de escrita da Stevi (aba Voz)'],
         ];
-        for (const [l, n, cls] of cards) {
+        for (const [l, n, cls, tip] of cards) {
           const c = el('div', 'stat');
+          c.title = tip || '';
           c.append(el('div', 'n ' + (cls||''), String(n)), el('div', 'l', l));
           stats.append(c);
         }
         p.append(stats);
         const intents = Object.entries(d.byIntent||{}).sort((a,b)=>b[1]-a[1]);
-        const card = el('div', 'card'); card.append(el('h3', null, 'Intenções (últimos 7 dias)'));
-        if (!intents.length) card.append(el('div', 'empty', 'Sem tráfego nos últimos 7 dias.'));
+        const card = el('div', 'card'); card.append(el('h3', null, 'Sobre o que os produtores falaram (7 dias)'));
+        if (!intents.length) card.append(el('div', 'empty', 'Sem conversas nos últimos 7 dias.'));
         else {
           const max = intents[0][1]; const bars = el('div', 'bars');
           for (const [k, v] of intents) {
             const row = el('div', 'bar'); const track = el('div', 'track'); const fill = el('div', 'fill');
             fill.style.width = Math.round(v/max*100) + '%'; track.append(fill);
-            row.append(el('span', 'mono', k), track, el('span', 'v', String(v))); bars.append(row);
+            const nome = el('span', 'mono', INTENT_LABELS[k] || k);
+            nome.title = 'código interno: ' + k;
+            row.append(nome, track, el('span', 'v', String(v))); bars.append(row);
           }
           card.append(bars);
         }
@@ -513,12 +543,16 @@
                 (rep.enriquecidos ? `, ${rep.enriquecidos} com zap confirmado no site 📱` : '') + `).` +
                 (rep.error ? ` Aviso: ${rep.error}` : '')
               : rep.error;
+            const msg = note.textContent;
             await refreshProspects();
+            // refreshProspects escreve a linha do motor por cima — devolve o
+            // resultado da busca, que e o que a pessoa clicou pra ver.
+            note.textContent = msg;
           } catch (e) { if (e.message!=='unauthorized') note.textContent = 'Erro na busca: '+e.message; }
           finally { srcBtn.disabled = false; srcBtn.textContent = '🌐 Buscar na web'; }
         });
-        const simBtn = el('button', 'btn small ghost', '👁 Simular lote');
-        const goBtn = el('button', 'btn small', '📤 Disparar agora');
+        const simBtn = el('button', 'btn small ghost', '👁 Ver quem sai no próximo lote');
+        const goBtn = el('button', 'btn small', '📤 Enviar convites agora');
         const runDispatch = async (dryRun) => {
           if (!dryRun && !confirm('Enviar o template de parceria pro próximo lote de aprovados agora? (respeita opt-out, 20/dia e horário comercial)')) return;
           note.textContent = 'Processando…';
@@ -589,10 +623,14 @@
       // estágio AGORA; as taxas respondem "a máquina converte?".
       const f = lastMeta.funnel;
       if (f && f.contatados > 0) {
-        const bits = [`resposta ${f.taxaResposta ?? '—'}% (${f.responderam}/${f.contatados})`];
-        if (f.responderam > 0) bits.push(`parceria ${f.taxaParceria ?? '—'}% (${f.parceiros}/${f.responderam})`);
-        for (const k of (f.porTipo || []).slice(0, 3)) bits.push(`${k.kind}: ${k.taxaResposta ?? '—'}%`);
-        funnel.append(el('div', 'countnote', '📈 Conversão · ' + bits.join(' · ')));
+        // Frase inteira, não sopa de percentuais: quem lê decide, não calcula.
+        let frase = `📈 De ${f.contatados} empresas contatadas, ${f.responderam} responderam`;
+        if (f.taxaResposta != null) frase += ` (${f.taxaResposta}%)`;
+        if (f.responderam > 0) frase += ` · ${f.parceiros} viraram parceiras`;
+        const tipos = (f.porTipo || []).slice(0, 3).map(k => `${k.kind} ${k.taxaResposta ?? 0}%`).join(', ');
+        const note = el('div', 'countnote', frase + '.');
+        if (tipos) note.title = 'Resposta por tipo de empresa: ' + tipos;
+        funnel.append(note);
       }
       const stages = Object.keys(P_STATUS);
       stages.forEach((s, i) => {
@@ -661,28 +699,27 @@
       } else if (!isMobile(pr.phone)) {
         // Fixo sem confirmação ainda entrega (9 das nossas 14 entregas foram
         // pra fixo), mas é onde vale procurar um número melhor.
-        const pill = Object.assign(el('span','pill'), { textContent: '☎️ fixo — vale enriquecer' });
-        pill.title = 'Fixo entrega, mas menos. Procure no site/Instagram um celular ou um link wa.me.';
+        const pill = Object.assign(el('span','pill'), { textContent: '☎️ só temos o fixo' });
+        pill.title = 'Fixo recebe menos: quase ninguém le. Se acharem no site/Instagram um celular ou link de WhatsApp, vale editar — mensagens pra numero citado sao ~7x mais lidas.';
         meta.append(pill);
       }
       // 131026 é o único erro que condena o número: a Meta disse que não
       // alcança. Mas condena AQUELE número — se o enriquecimento achou outro,
       // o prospect voltou à fila e dizer "não alcançável" seria mentira.
       if (/\b131026\b/.test(String(pr.wa_error || '')) && enviavel === pr.phone) {
-        const pill = Object.assign(el('span','pill'), { textContent: '🚫 número não alcançável' });
-        pill.title = 'Meta retornou 131026. Só volta à fila se acharmos outro número.';
+        const pill = Object.assign(el('span','pill'), { textContent: '📵 sem WhatsApp' });
+        pill.title = 'O WhatsApp confirmou que este número não recebe mensagens (erro 131026). Só volta à fila se acharmos outro número da empresa.';
         meta.append(pill);
       }
       if (pr.send_status === 'failed') {
-        // O motivo vem do callback da Meta (prospects.wa_error). Sem ele, o
-        // post-mortem de 21/jul virou arqueologia: 16 falhas e nenhuma causa.
-        const why = pr.wa_error ? String(pr.wa_error).slice(0, 90) : 'motivo não registrado';
-        const pill = Object.assign(el('span','pill'), { textContent: '⚠️ falhou: ' + why });
+        // Frase de gente na pill; o erro CRU da Meta fica no tooltip — sem ele
+        // o post-mortem de 21/jul virou arqueologia (16 falhas, nenhuma causa).
+        const pill = Object.assign(el('span','pill'), { textContent: erroHumano(pr.wa_error) });
         pill.style.background = 'var(--amber)';
-        pill.title = pr.wa_error || '';
+        pill.title = 'Erro técnico da Meta: ' + (pr.wa_error || 'não registrado');
         meta.append(pill);
       }
-      if (pr.send_status === 'sending') meta.append(Object.assign(el('span','pill'),{textContent:'⏳ envio travado'}));
+      if (pr.send_status === 'sending') meta.append(Object.assign(el('span','pill'),{textContent:'⏳ envio travou no meio — use Liberar reenvio'}));
       if (pr.send_status === 'delivered') meta.append(Object.assign(el('span','pill'),{textContent:'📬 entregue'}));
       if (pr.send_status === 'read') meta.append(Object.assign(el('span','pill'),{textContent:'👁 lido'}));
       left.append(meta);
@@ -858,30 +895,34 @@
       const intro = el('div', 'card');
       intro.append(el('h3', null, '🤖 Treino da Vitória (prospecção)'));
       intro.append(el('div', 'countnote',
-        'Personagens simulados (gerente ocupado, cético de preço, detector de bot…) conversam com o cérebro REAL da Vitória. ' +
-        'Um juiz dá notas de 1 a 5 em: naturalidade (parece gente), missão (avança a qualificação) e segurança (nunca fala preço, escala pro Stefano). ' +
-        'Rodar: npm run gym:vitoria'));
+        'Antes de falar com gente de verdade, a Vitória treina contra clientes simulados — o gerente ocupado, o cético do preço, o que detesta robô. ' +
+        'Cada conversa ganha nota de 1 a 5 em três coisas: parece gente? avança a parceria? respeita as regras (nunca fala preço, chama o Stefano na hora certa)?'));
       const pw = el('div');
       (vit.personas || []).forEach(pe => pw.append(Object.assign(el('span','pill'), {textContent: pe.label})));
       intro.append(pw);
       p.append(intro);
 
-      // Comparações A/B (pareadas): é AQUI que se decide se um prompt novo é
-      // melhor — não comparando notas absolutas entre rodadas. O vencedor já
-      // vem com o piso de ruído aplicado (margem <3 = inconclusivo; medido com
-      // 4 controles de código idêntico, que deram margens 0–1).
+      // A comparação A/B decide se uma versão nova da Vitória é melhor — nunca
+      // as notas absolutas entre rodadas. Aqui isso vira uma frase: quem venceu,
+      // por quanto, e se dá pra confiar. O detalhe (placar, ruído) vai pro
+      // tooltip — jargão de instrumento não decide nada pra quem lê.
       if ((vit.paired || []).length) {
         const pc = el('div', 'card');
-        pc.append(el('h3', null, '⚖️ Comparações A/B (o que decide promoção de prompt)'));
+        pc.append(el('h3', null, '⚖️ Duelo de versões da Vitória'));
+        pc.append(el('div', 'countnote',
+          'Quando mudamos o jeito da Vitória conversar, as duas versões enfrentam os mesmos 14 clientes simulados e um juiz compara conversa por conversa. Só promovemos a nova se ela vencer com folga.'));
         for (const pr of vit.paired) {
           const pl = pr.placar || {};
           const margem = Math.abs((pl.a||0) - (pl.b||0));
           const line = el('div', 'meta');
-          const pill = el('span', 'pill',
-            pl.vencedor === 'B' ? '✅ nova melhor' : pl.vencedor === 'A' ? '❌ antiga melhor' : margem > 0 ? '⚪ inconclusivo (ruído)' : '⚪ empate');
-          pill.style.cssText = 'color:#fff;background:' + (pl.vencedor === 'B' ? '#2e9e63' : pl.vencedor === 'A' ? '#b3452e' : '#8a7a5c');
-          line.append(pill, document.createTextNode(
-            ` ${fmtDate(pr.ran_at)} · B ${pl.b||0} × ${pl.a||0} A · ${pl.empates||0} empates em ${pl.total||0} cenários`));
+          const [txt, cor, frase] =
+            pl.vencedor === 'B' ? ['✅ versão nova venceu', '#2e9e63', `venceu em ${pl.b} dos ${pl.total} cenários — mudança confirmada`]
+            : pl.vencedor === 'A' ? ['❌ versão antiga era melhor', '#b3452e', `a antiga venceu em ${pl.a} de ${pl.total} — melhor voltar atrás`]
+            : ['⚪ empate técnico', '#8a7a5c', `diferença pequena demais pra confiar (${pl.b} × ${pl.a}) — nem promove, nem reverte`];
+          const pill = el('span', 'pill', txt);
+          pill.style.cssText = 'color:#fff;background:' + cor;
+          line.append(pill, document.createTextNode(` ${fmtDate(pr.ran_at)} · ${frase}`));
+          line.title = `Placar técnico: B ${pl.b||0} × ${pl.a||0} A · ${pl.empates||0} empates · margem ${margem} (mínimo pra declarar vencedor: 3, medido contra o ruído do juiz)`;
           pc.append(line);
         }
         p.append(pc);
@@ -891,17 +932,22 @@
         p.append(el('div', 'empty', 'Nenhum treino da Vitória ainda.'));
         return;
       }
-      // O aviso sai COLADO nos números, igual ao terminal: 4 rodadas idênticas
-      // deram 4–8/11 — rodada isolada não sustenta comparação.
-      if (vit.aviso) p.append(el('div', 'countnote', '⚠️ ' + vit.aviso));
+      // O aviso sai COLADO nos números — e traduzido: o texto técnico do
+      // terminal ("4-8/11, use o pareado") vai pro tooltip.
+      if (vit.aviso) {
+        const av = el('div', 'countnote',
+          '⚠️ As notas abaixo variam naturalmente entre treinos — não compare um treino com outro. Pra saber se uma mudança ajudou, vale o Duelo de versões acima.');
+        av.title = 'Medição: ' + vit.aviso;
+        p.append(av);
+      }
       for (const r of vit.runs) {
         const card = el('div', 'card');
         card.append(el('div', 'when', fmtDate(r.ran_at)));
         const hd = el('div', 'toolbar');
         hd.append(scoreChip('naturalidade', r.medias?.naturalidade), scoreChip('missão', r.medias?.missao), scoreChip('segurança', r.medias?.seguranca));
         if (r.avanco && r.avanco.total > 0) {
-          const av = el('span', 'spill', `avanço limpo ${r.avanco.advanced}/${r.avanco.total}`);
-          av.title = 'Avançou estágio com zero violação de regra dura, contando só cenários onde avançar é possível. ' + (vit.aviso || '');
+          const av = el('span', 'spill', `avançou a conversa em ${r.avanco.advanced} de ${r.avanco.total}`);
+          av.title = 'Em quantos cenários a Vitória conseguiu propor o próximo passo (call ou piloto) sem quebrar nenhuma regra. Só contam cenários onde avançar era possível — com quem recusou ou era robô, parar é o certo.';
           av.style.background = '#3b6fb2';
           hd.append(av);
         }
@@ -929,11 +975,9 @@
 
     function renderGolden(p, runs) {
       const card = el('div', 'card');
-      card.append(el('h3', null, '🎯 Golden set (precisão)'));
+      card.append(el('h3', null, '🎯 Prova de precisão da Stevi'));
       card.append(Object.assign(el('p','meta'), {textContent:
-        'Perguntas reais de produtor com critérios auditáveis (nunca dose, grounding presente, roteamento certo). ' +
-        'O cérebro real responde, um juiz confere critério a critério. Rodar: '}));
-      card.append(Object.assign(el('code','mono'), {textContent: 'npm run golden  ·  npm run golden -- --pack <versão>'}));
+        'Perguntas reais de produtor com resposta certa conhecida — a Stevi responde e a gente confere ponto a ponto (nunca receitar dose, sempre citar a fonte, encaminhar pro lugar certo). A porcentagem é quantas passaram.'}));
       if (!runs.length) {
         card.append(el('div', 'empty', 'Nenhuma rodada ainda.'));
       } else {
@@ -962,9 +1006,8 @@
         if (d.golden) renderGolden(p, d.golden);
         if (d.vitoria) renderVitoriaGym(p, d.vitoria);
         const intro = el('div', 'card');
-        intro.append(el('h3', null, 'Treino da voz (Gym)'));
-        intro.append(Object.assign(el('p','meta'), {textContent: 'Produtores simulados conversam com o cérebro real da Stevi; um juiz de 3 lentes (naturalidade · clareza · segurança, com veto de segurança) compara a voz campeã contra uma desafiante. Rodar uma rodada: '}));
-        intro.append(Object.assign(el('code','mono'), {textContent: 'npm run gym -- <campeã> <desafiante>'}));
+        intro.append(el('h3', null, 'Duelo de jeitos de escrever (Stevi)'));
+        intro.append(Object.assign(el('p','meta'), {textContent: 'Mesma ideia do duelo da Vitória, mas pro jeito de escrever da Stevi com produtores: duas versões conversam com os mesmos produtores simulados e a melhor vence. A ativa aparece na aba Voz.'}));
         p.append(intro);
 
         const pc = el('div', 'card');
@@ -973,7 +1016,7 @@
         d.personas.forEach(pe => { const s = el('span','pill'); s.textContent = pe.label + (pe.crop?(' · '+pe.crop):''); wrap.append(s); });
         pc.append(wrap); p.append(pc);
 
-        if (!d.runs.length) { p.append(el('div','empty','Nenhuma rodada ainda. Rode `npm run gym -- 1 2` para começar.')); return; }
+        if (!d.runs.length) { p.append(el('div','empty','Nenhum duelo ainda.')); return; }
         for (const r of d.runs) {
           const card = el('div', 'card');
           card.append(el('div','when', fmtDate(r.ran_at)));
