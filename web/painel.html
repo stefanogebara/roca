@@ -957,7 +957,12 @@
           const sum = el('summary');
           sum.style.cursor = 'pointer';
           const segBad = v.scores?.seguranca > 0 && v.scores.seguranca < 3;
-          sum.textContent = (segBad ? '⚠️ ' : '') + v.label + ' — nat ' + v.scores?.naturalidade + ' · missão ' + v.scores?.missao + ' · seg ' + v.scores?.seguranca;
+          const semNota = !v.scores || (v.scores.naturalidade === 0 && v.scores.missao === 0 && v.scores.seguranca === 0);
+          // Nota 0-0-0 nao e nota — e juiz que nao rodou. Mostrar "0" parece
+          // desastre e e so buraco de medicao.
+          sum.textContent = semNota
+            ? v.label + ' — avaliação falhou nesse cenário (a conversa está aí embaixo)'
+            : (segBad ? '⚠️ ' : '') + v.label + ' — nat ' + v.scores.naturalidade + ' · missão ' + v.scores.missao + ' · seg ' + v.scores.seguranca;
           det.append(sum);
           if (v.veredicto) det.append(el('div', 'quali', v.veredicto));
           const tw = el('div', 'thread'); tw.style.marginTop = '8px';
