@@ -604,3 +604,37 @@ vencedor com margem 1.
 - **Placar que decide coisa não pode morrer no terminal.** O pareado decidia
   promoção de prompt e não persistia; painel só mostrava o absoluto. Se um
   número muda decisão, ele vai pro banco e pra tela dos founders.
+
+## 2026-07-31 — O dia do funil: descoberta rende onde ninguém varreu, número citado é ouro
+
+Contexto: 42 envios históricos, 0 respostas qualificadas (a única resposta era
+uma loja de pecuária fora do ICP). Diagnóstico por estágio mostrou o vazamento
+real: 74% do que entrega nunca é LIDO — e 8 dos 9 lidos eram números
+enriquecidos (wa.me citado pelo próprio negócio). Leitura ~38% vs ~5%.
+
+**Regras:**
+- **Meça o funil por estágio antes de mexer em qualquer peça.** "Melhora o
+  template" era o pedido; o dado mostrou que o template configurado (v3) nunca
+  tinha sido enviado e o vazamento era entrega→leitura. Mexer no texto seria
+  operar no órgão errado.
+- **Grade de busca sem rotação varre o mesmo quadrante pra sempre.** 4 de 12
+  cidades foram varridas repetidas desde 25/jul; as outras 8 NUNCA. O dedup
+  descartava tudo e a busca "parecia esgotada". Primeira varredura rotacionada:
+  87 prospects novos. Se uma fonte "secou", pergunte antes se ela foi percorrida.
+- **Botão que promete progresso precisa de MEMÓRIA.** O backfill dizia "clique
+  de novo pra continuar" mas re-consultava os mesmos fracassos (leva 2 = leva 1
+  de novo, visto ao vivo). Toda iteração paginada sobre tentativas falhas exige
+  marca de tentativa (enrich_tried_at) — senão é quota andando em círculo com
+  cara de trabalho.
+- **Identidade de negócio se casa por TELEFONE, nunca por nome.** Re-buscar
+  "Agro Center" no Places pode devolver outra Agro Center — e gravar o WhatsApp
+  do negócio errado vira mensagem pra quem nunca ouviu falar da gente. Telefone
+  igual = mesma empresa; sem telefone no hit, sem match.
+- **Filtro novo pede varredura retroativa.** O sinal de autopeças (caso Jocape,
+  achado pelo enriquecimento: nome limpo, domínio jocapeautopecas) só barrava
+  ENTRADAS novas; 4 pet shops de levas antigas seguiam na fila de revisão dos
+  founders. Quando a regra nasce, rode-a sobre o estoque.
+- **Tela de founder: frase inteira na tela, jargão no tooltip.** "CORTADO: 4
+  falhas pós-aceite (corte em 3)" virou "Pausado por hoje: 4 números seguidos
+  não tinham WhatsApp; religa sozinho amanhã". Nenhuma informação sumiu — ela
+  mudou de camada. Se o dono precisa de tradutor, o painel é que está errado.
