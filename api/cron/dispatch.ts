@@ -51,6 +51,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     } catch (e) {
       log.error('bump dispatch failed:', (e as Error).message);
     }
+    // A "automação diária" (02/ago): o resumo do lote vai pros founders por
+    // WhatsApp no fim de cada lote REAL — o disparo é o evento, sem cron novo.
+    // Fail-soft: um ping que falha jamais derruba um lote que já saiu.
+    try {
+      const { resumoDoLote, pingFoundersTexto } = await import('../_lib/notify');
+      const texto = resumoDoLote(report, bumps);
+      if (texto) {
+        const { CloudApiAdapter } = await import('../_lib/transport/cloud');
+        const adapter = new CloudApiAdapter();
+        await pingFoundersTexto((to, text) => adapter.send({ to, text }), texto);
+      }
+    } catch (e) {
+      log.error('resumo do lote pros founders falhou:', (e as Error).message);
+    }
     res.status(200).json({ success: true, data: { ...report, bumps } });
   } catch (e) {
     log.error('dispatch cron failed:', (e as Error).message);

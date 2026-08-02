@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { formatReferralEmail, formatProspectReplyEmail, pingFoundersWhatsApp } from '../api/_lib/notify';
+import { formatReferralEmail, formatProspectReplyEmail, pingFoundersWhatsApp, resumoDoLote } from '../api/_lib/notify';
 
 describe('formatProspectReplyEmail', () => {
   it('carries name, kind, region, masked phone, reply excerpt and the painel link', () => {
@@ -99,5 +99,55 @@ describe('pingFoundersWhatsApp', () => {
       sent.push(to);
     }, notice);
     expect(sent).toEqual(['+5511888001111']);
+  });
+});
+
+/**
+ * Resumo do lote pros founders — a "automação diária" pedida em 02/ago.
+ *
+ * Desenho deliberado: NÃO é cron novo nem rotina em nuvem. O próprio disparo é
+ * o evento (regra da casa: evento > cron), e o resumo sai no fim de cada lote
+ * real pelo mesmo canal de WhatsApp que já avisa pedido de agrônomo. A rotina
+ * em nuvem foi descartada por não ter como ler o banco sem espalhar segredo.
+ */
+describe('resumoDoLote — o push das 10h em linguagem de founder', () => {
+  const base = {
+    dryRun: false, skippedOutsideHours: false, aborted: false,
+    eligible: 139, planned: 8, sent: 8, failed: 0,
+    recipients: [], cap: 20, capGrade: 'graded',
+  };
+
+  it('lote normal vira frase com enviados e fila', () => {
+    const r = resumoDoLote({ ...base }, null);
+    expect(r).toMatch(/8 convites enviados/);
+    expect(r).toMatch(/131 na fila/); // eligible - sent
+    expect(r).toMatch(/painel/i);
+  });
+
+  it('falhas aparecem com o motivo típico traduzido', () => {
+    const r = resumoDoLote({ ...base, sent: 5, failed: 3 }, null);
+    expect(r).toMatch(/5 convites enviados/);
+    expect(r).toMatch(/3 não tinham WhatsApp/);
+  });
+
+  it('aborto de segurança é o aviso mais importante do dia', () => {
+    const r = resumoDoLote({ ...base, aborted: true, error: 'optouts indisponíveis', sent: 0 }, null);
+    expect(r).toMatch(/⛔/);
+    expect(r).toMatch(/nenhum convite saiu/i);
+  });
+
+  it('bumps entram na conta quando existem', () => {
+    const r = resumoDoLote({ ...base }, { sent: 2, failed: 0 });
+    expect(r).toMatch(/2 lembretes/);
+  });
+
+  it('nada aconteceu → null: silêncio, não spam', () => {
+    // 13h e 16h com cap do dia já esgotado não podem virar três pings iguais.
+    expect(resumoDoLote({ ...base, sent: 0, failed: 0 }, null)).toBeNull();
+    expect(resumoDoLote({ ...base, sent: 0, failed: 0, skippedOutsideHours: true }, null)).toBeNull();
+  });
+
+  it('dry run NUNCA vira mensagem', () => {
+    expect(resumoDoLote({ ...base, dryRun: true }, null)).toBeNull();
   });
 });

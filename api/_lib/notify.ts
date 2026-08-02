@@ -178,3 +178,74 @@ export async function sendProspectReplyNotification(n: ProspectReplyNotice): Pro
     await alertFounders(`⚠️ Stevi: email de lead quente falhou — ${(e as Error).message.slice(0, 200)}`);
   }
 }
+
+// ── Resumo do lote de disparo (a "automação diária" de 02/ago) ──────────────
+
+/** O que resumoDoLote precisa saber do DispatchReport (evita import circular
+ * com dispatch.ts, que já importa daqui no futuro — e o tipo estrutural basta). */
+export interface LoteParaResumo {
+  dryRun: boolean;
+  skippedOutsideHours: boolean;
+  aborted: boolean;
+  error?: string;
+  eligible: number;
+  sent: number;
+  failed: number;
+}
+
+/**
+ * Resumo do lote em linguagem de founder, ou null quando não há o que dizer.
+ *
+ * Desenho deliberado (pedido do Stefano em 02/ago, "automação diária"): NÃO é
+ * cron novo nem rotina em nuvem — o próprio disparo é o evento (regra da casa:
+ * evento > cron; e a rotina em nuvem não tem como ler o banco sem espalhar
+ * segredo). O texto segue a regra do painel: frase de gente, zero jargão.
+ *
+ * Null nos casos silenciosos de propósito: 13h/16h com cap esgotado não podem
+ * virar três pings iguais por dia — push que se repete vira push ignorado.
+ */
+export function resumoDoLote(
+  lote: LoteParaResumo,
+  bumps: { sent: number; failed: number } | null
+): string | null {
+  if (lote.dryRun) return null;
+  if (lote.aborted) {
+    return (
+      `⛔ Lote da Vitória: nenhum convite saiu — o motor parou por segurança` +
+      (lote.error ? ` (${lote.error})` : '') +
+      `. Dá uma olhada no painel: ${PAINEL_URL}`
+    );
+  }
+  const bumpSent = bumps?.sent ?? 0;
+  if (lote.sent === 0 && lote.failed === 0 && bumpSent === 0) return null;
+
+  const partes: string[] = [];
+  if (lote.sent > 0) partes.push(`${lote.sent} convites enviados`);
+  if (bumpSent > 0) partes.push(`${bumpSent} lembretes pra quem não respondeu`);
+  if (lote.failed > 0) partes.push(`${lote.failed} não tinham WhatsApp (ficam fora das próximas filas)`);
+  const fila = Math.max(0, lote.eligible - lote.sent);
+  return (
+    `🌱 Lote da Vitória: ${partes.join(' · ')}.` +
+    ` Ainda ${fila} na fila pros próximos lotes.` +
+    ` Respostas aparecem no painel: ${PAINEL_URL}`
+  );
+}
+
+/** Ping de texto livre pros founders — mesmo canal do aviso de pedido de
+ * agrônomo. Fail-soft por número: um founder inalcançável não cala o outro. */
+export async function pingFoundersTexto(
+  send: (to: string, text: string) => Promise<void>,
+  texto: string
+): Promise<void> {
+  const numbers = (process.env.FOUNDER_WA_NUMBERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const to of numbers) {
+    try {
+      await withRetry(() => send(to, texto), { attempts: 2 });
+    } catch (e) {
+      log.error(`founder ping to ${to.slice(0, 6)}… failed:`, (e as Error).message);
+    }
+  }
+}
