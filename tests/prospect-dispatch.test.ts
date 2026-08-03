@@ -67,7 +67,23 @@ import { sendProspectTemplate } from '../api/_lib/prospect/send';
 import { getTemplateStatus, templateShapeError, COOP_NAME } from '../api/_lib/prospect/template';
 import { alertFounders } from '../api/_lib/alert';
 
-const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => ({
+// Desde 03/ago um prospect só é enviável com número CITADO (sendablePhone), e
+// a fixture representa o caso normal: enviável. A citação é derivada do `phone`
+// para que sobrescrever o telefone continue mudando o destino do envio. Quem
+// quiser testar o caso NÃO enviável passa `wa_phone_source: null` de propósito.
+const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => {
+  const p = prospectBase(over);
+  return {
+    ...p,
+    wa_phone: 'wa_phone' in over ? (over.wa_phone as string | null) : p.phone,
+    wa_phone_source:
+      'wa_phone_source' in over
+        ? (over.wa_phone_source as string | null)
+        : 'fixture — botão Zap citado no site',
+  };
+};
+
+const prospectBase = (over: Partial<ProspectRow> = {}): ProspectRow => ({
   id: 'p1',
   name: 'Agro Forte',
   kind: 'agronomo',

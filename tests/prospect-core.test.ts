@@ -47,7 +47,17 @@ describe('isBusinessHours (BRT Mon–Fri 09–18)', () => {
   });
 });
 
-const base: ProspectLike = { phone: '+5511999002121', wa_status: 'valid', status: 'ready', send_status: null };
+// A citação virou requisito em 03/ago (ver sendablePhone): sem `wa_phone_source`
+// nada é elegível, então a fixture base precisa dela para seguir testando o que
+// ela sempre testou — os estados de segurança, não a procedência.
+const base: ProspectLike = {
+  phone: '+5511999002121',
+  wa_phone: '+5511999002121',
+  wa_phone_source: 'https://exemplo.coop.br/contato — botão Zap',
+  wa_status: 'valid',
+  status: 'ready',
+  send_status: null,
+};
 
 describe('eligibleToSend', () => {
   const noOptouts = new Set<string>();
@@ -148,34 +158,55 @@ describe('isMobileBR — classifica celular vs fixo', () => {
 // P(fixo|131026) com P(131026|fixo) — a base é 71% fixo, então quase tudo
 // "vem de fixo". Taxa real de entrega: fixo 39%, celular 50%. O que separa
 // não é a classe, é a EVIDÊNCIA sobre aquele número específico.
-describe('eligibleToSend julga o número, não a classe do número', () => {
+describe('eligibleToSend julga a PROCEDÊNCIA, não a classe do número', () => {
+  // O princípio antigo era "fixo e celular valem igual" — e continua valendo.
+  // O que mudou em 03/ago é o que habilita: citação, não o telefone do cadastro.
   const base = { status: 'ready', wa_status: 'valid', send_status: null } as never;
-  it('fixo é elegível — WhatsApp Business aceita linha fixa', () => {
-    expect(eligibleToSend({ ...(base as object), phone: '+553532142166' } as never, new Set())).toBe(true);
+  const fonte = 'https://exemplo.coop.br/contato — botão Zap';
+
+  it('fixo COM wa.me citado é elegível — WhatsApp Business aceita linha fixa', () => {
+    expect(eligibleToSend(
+      { ...(base as object), phone: '+553532142166', wa_phone: '+553532142166', wa_phone_source: fonte } as never,
+      new Set()
+    )).toBe(true);
   });
-  it('celular é elegível', () => {
-    expect(eligibleToSend({ ...(base as object), phone: '+5535999429176' } as never, new Set())).toBe(true);
+  it('celular COM fonte citada é elegível', () => {
+    expect(eligibleToSend(
+      { ...(base as object), phone: '+5535999429176', wa_phone: '+5535999429176', wa_phone_source: fonte } as never,
+      new Set()
+    )).toBe(true);
   });
+
+  // O CORTE. Sem citação não vai, seja fixo ou celular: o telefone do cadastro
+  // é palpite, e 3 de 3 palpites voltaram 131026 em 03/ago.
+  it('sem fonte citada NÃO é elegível, nem fixo nem celular', () => {
+    expect(eligibleToSend({ ...(base as object), phone: '+553532142166' } as never, new Set())).toBe(false);
+    expect(eligibleToSend({ ...(base as object), phone: '+5535999429176' } as never, new Set())).toBe(false);
+  });
+
   it('número que a Meta já declarou inalcançável NÃO é reenviado', () => {
     expect(eligibleToSend(
       { ...(base as object), phone: '+553532924233', wa_error: '131026 Message undeliverable' } as never,
       new Set()
     )).toBe(false);
   });
-  it('inalcançável, mas achamos OUTRO número → volta a ser elegível', () => {
+  it('inalcançável, mas achamos OUTRO número citado → volta a ser elegível', () => {
     expect(eligibleToSend({
       ...(base as object),
       phone: '+553532924233',
       wa_error: '131026 Message undeliverable',
       wa_phone: '+5535999887766',
-      wa_phone_source: 'https://exemplo.com.br/contato',
+      wa_phone_source: fonte,
     } as never, new Set())).toBe(true);
   });
   it('falha de COBRANÇA não condena o número — foi problema nosso', () => {
-    expect(eligibleToSend(
-      { ...(base as object), phone: '+553532142166', wa_error: '131042 Business eligibility payment issue' } as never,
-      new Set()
-    )).toBe(true);
+    expect(eligibleToSend({
+      ...(base as object),
+      phone: '+553532142166',
+      wa_phone: '+553532142166',
+      wa_phone_source: fonte,
+      wa_error: '131042 Business eligibility payment issue',
+    } as never, new Set())).toBe(true);
   });
 });
 
@@ -198,11 +229,22 @@ describe('sendablePhone — o número confirmado vence o telefone do Places', ()
     expect(sendablePhone({ phone: '+553532142166', wa_phone: '+5535999887766', wa_phone_source: fonte } as never))
       .toBe('+5535999887766');
   });
-  it('sem wa_phone, usa o phone da fonte', () => {
-    expect(sendablePhone({ phone: '+5535999429176', wa_phone: null } as never))
-      .toBe('+5535999429176');
-    expect(sendablePhone({ phone: '+553532142166', wa_phone: null } as never))
-      .toBe('+553532142166'); // fixo também — a classe não decide
+  // MUDANÇA DELIBERADA DE CONTRATO (03/ago): antes, sem wa_phone citado a
+  // função caía no telefone do Places. Hoje devolve null.
+  //
+  // O que desempatou: dos envios de 03/ago, os 6 com fonte citada entregaram e
+  // os 3 SEM fonte falharam com 131026 undeliverable — 3 de 3 — estourando o
+  // breaker. Discar o cadastro é palpite, e cada 131026 é sinal negativo de
+  // qualidade no MESMO número que atende produtor.
+  it('sem wa_phone citado → NÃO enviável, mesmo tendo telefone no cadastro', () => {
+    expect(sendablePhone({ phone: '+5535999429176', wa_phone: null } as never)).toBeNull();
+    expect(sendablePhone({ phone: '+553532142166', wa_phone: null } as never)).toBeNull();
+  });
+
+  it('null aqui significa "enriquecer", não "descartar"', () => {
+    // O prospect segue na base: eligibleToSend só o tira da FILA.
+    const semFonte = { phone: '+553532142166', wa_phone: null, wa_phone_source: null } as never;
+    expect(sendablePhone(semFonte)).toBeNull();
   });
   it('sem número nenhum → nada a enviar', () => {
     expect(sendablePhone({ phone: null, wa_phone: null } as never)).toBeNull();
@@ -218,13 +260,18 @@ describe('sendablePhone — o número confirmado vence o telefone do Places', ()
       wa_phone_source: 'https://coccamig.com.br — botão wa.me/553532142166',
     } as never)).toBe('+553532142166');
   });
-  it('wa_phone sem fonte citada é ignorado — cai no phone da fonte', () => {
+  it('wa_phone sem fonte citada NÃO vale — e agora não cai no cadastro tampouco', () => {
+    // Número sem citação é palpite de alguém. Antes o palpite era descartado e
+    // o cadastro assumia; agora os dois são recusados, que é o ponto.
     expect(sendablePhone({ phone: '+553532142166', wa_phone: '+5535999887766', wa_phone_source: null } as never))
-      .toBe('+553532142166');
+      .toBeNull();
   });
-  it('wa_phone que nem é número BR válido NÃO é aceito', () => {
+  it('wa_phone que nem é número BR válido NÃO é aceito — e não há para onde cair', () => {
+    // A intenção do teste é a mesma; o desfecho mudou com o corte de 03/ago.
+    // Antes, um wa_phone inválido cedia lugar ao telefone do cadastro. Agora o
+    // cadastro também não vale, então o prospect volta pra fila de enriquecimento.
     expect(sendablePhone({ phone: '+5535999429176', wa_phone: '+55351234', wa_phone_source: fonte } as never))
-      .toBe('+5535999429176');
+      .toBeNull();
   });
   it('fixo com wa.me é o MESMO número — o disparo não muda de destino', () => {
     const p = { phone: '+553532668200', wa_phone: '+553532668200', wa_phone_source: fonte } as never;

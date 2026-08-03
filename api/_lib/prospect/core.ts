@@ -115,20 +115,31 @@ export function numberIsUndeliverable(waError: string | null | undefined): boole
  * believe receives WhatsApp. Null means "not reachable yet": the prospect stays
  * in the base for enrichment instead of being deleted.
  *
- * Two sources of belief, in order:
- *  1. `wa_phone` — a number someone found and CITED (site, Instagram, wa.me
- *     link). Any valid BR number qualifies, mobile or not. The citation is
- *     mandatory: an uncited number is someone's guess, and guesses are what
- *     burn the number's reputation.
- *  2. `phone` — the Places-sourced number, mobile or landline alike.
+ * UMA fonte de crença: `wa_phone` com `wa_phone_source` — um número que alguém
+ * encontrou e CITOU (site, Instagram, link wa.me). Qualquer número BR válido
+ * serve, celular ou fixo: fixo com wa.me publicado recebe WhatsApp Business.
+ *
+ * O que NÃO serve mais: cair no `phone` do Places quando não há citação. Este
+ * comentário sempre disse que "an uncited number is someone's guess, and guesses
+ * are what burn the number's reputation" — e o código fazia exatamente o
+ * contrário logo abaixo. Em 03/ago o dado desempatou: dos envios do dia, os 6
+ * com fonte citada entregaram e os 3 SEM fonte falharam com `131026
+ * undeliverable`, 3 de 3. Foi o que estourou o breaker de falhas pós-aceite.
+ *
+ * O custo de discar o fixo do cadastro não é o envio perdido: cada 131026 é
+ * sinal negativo de qualidade para a Meta, no MESMO número que atende produtor.
+ * Queimar reputação de canal por um palpite é o pior negócio da casa.
+ *
+ * Null significa "ainda não alcançável" — o prospect fica na base para
+ * enriquecimento, não é descartado. Hoje isso deixa 126 dos 133 `ready` fora da
+ * fila, e isso é a verdade do estoque, não uma regressão.
  */
 export function sendablePhone(p: {
   phone?: string | null;
   wa_phone?: string | null;
   wa_phone_source?: string | null;
 }): string | null {
-  const cited = p.wa_phone_source ? normalizePhoneBR(p.wa_phone) : null;
-  return cited ?? normalizePhoneBR(p.phone);
+  return p.wa_phone_source ? normalizePhoneBR(p.wa_phone) : null;
 }
 
 /** UTC ISO for the start of the current BRT calendar day (for the daily cap). */
