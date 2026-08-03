@@ -56,16 +56,46 @@ export async function enriquecerDoSite(url: string): Promise<{ waPhone: string; 
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
 
+  // A home não é onde o "Zap" costuma morar. Das 7 citações que a base tem
+  // hoje, pelo menos duas vieram de /contato (grupograodeouro, coopama) — e
+  // essas foram achadas por pesquisa manual, porque esta função só lia a home.
+  // Era 6,7% de acerto em 105 tentativas: teto do método, não da base.
+  for (const caminho of CAMINHOS_CANDIDATOS) {
+    const alvo = new URL(caminho || parsed.pathname, parsed);
+    const r = await buscarPagina(alvo);
+    if (r.html) {
+      const waPhone = extrairWhatsAppDeHtml(r.html);
+      // A fonte cita a PÁGINA onde o link estava, não a home — a citação é a
+      // prova, e prova que aponta pro lugar errado não é prova.
+      if (waPhone) return { waPhone, fonte: alvo.href.slice(0, 300) };
+    }
+    // Host morto/inalcançável: insistir nos subcaminhos é queimar timeout por
+    // nada. Página ausente (404) não diz nada sobre as outras — segue.
+    if (r.hostMorto) return null;
+  }
+  return null;
+}
+
+/** Caminhos tentados, em ordem, até o primeiro link encontrado. */
+const CAMINHOS_CANDIDATOS = ['', '/contato', '/fale-conosco', '/atendimento'];
+
+/**
+ * Uma página. `hostMorto` separa "site fora do ar" de "essa página não existe":
+ * o primeiro condena as tentativas seguintes, o segundo não diz nada sobre elas.
+ */
+async function buscarPagina(alvo: URL): Promise<{ html: string | null; hostMorto: boolean }> {
   try {
-    const res = await fetch(parsed.href, {
+    const res = await fetch(alvo.href, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SteviBot/1.0; +https://roca-black.vercel.app)' },
     });
-    if (!res.ok) return null;
+    // 4xx/5xx é sobre ESTA página; o host respondeu, então não condena as
+    // outras. Só o catch (DNS, conexão, timeout) fala do host.
+    if (!res.ok) return { html: null, hostMorto: false };
     // Cap de tamanho lendo o stream: text() numa página gigante estoura memória
     // de function por causa de um site ruim.
     const reader = res.body?.getReader();
-    if (!reader) return null;
+    if (!reader) return { html: null, hostMorto: false };
     const chunks: Uint8Array[] = [];
     let total = 0;
     while (total < MAX_HTML_BYTES) {
@@ -78,11 +108,10 @@ export async function enriquecerDoSite(url: string): Promise<{ waPhone: string; 
     const html = new TextDecoder('utf-8', { fatal: false }).decode(
       chunks.length === 1 ? chunks[0] : concat(chunks, total)
     );
-    const waPhone = extrairWhatsAppDeHtml(html);
-    return waPhone ? { waPhone, fonte: parsed.href.slice(0, 300) } : null;
+    return { html, hostMorto: false };
   } catch (e) {
-    log.info(`enrich fetch falhou (${parsed.hostname}): ${(e as Error).message}`);
-    return null;
+    log.info(`enrich fetch falhou (${alvo.hostname}${alvo.pathname}): ${(e as Error).message}`);
+    return { html: null, hostMorto: true };
   }
 }
 
@@ -110,8 +139,16 @@ export interface BackfillRow {
 const RETENTATIVA_MS = 30 * 86_400_000;
 
 /**
- * Quem vale a consulta: ready/discovered, nunca enviado, telefone fixo cru e
- * sem enriquecimento prévio. Ready primeiro — é quem está a caminho do disparo.
+ * Quem vale a consulta: ready/discovered, nunca enviado, com telefone (âncora
+ * do gate mesmoNegocio) e SEM citação. Ready primeiro — é quem está a caminho
+ * do disparo.
+ *
+ * Não filtra mais por classe de número. O `!isMobileBR` daqui presumia que
+ * celular cru já era enviável; desde o corte de 03/ago (sendablePhone) o que
+ * habilita é a CITAÇÃO, então celular sem citação precisa de enriquecimento
+ * igual ao fixo — são 62 na base, que estavam invisíveis pra este backfill.
+ * É a mesma lição de 27/jul, terceira vez: o eixo é a evidência sobre aquele
+ * número, nunca a classe dele.
  */
 export function candidatosBackfill<T extends BackfillRow>(rows: T[], limite: number, now: Date = new Date()): T[] {
   const elegivel = (r: T): boolean =>
@@ -119,7 +156,6 @@ export function candidatosBackfill<T extends BackfillRow>(rows: T[], limite: num
     !r.send_status &&
     !r.wa_phone_source &&
     !!r.phone &&
-    !isMobileBR(r.phone) &&
     (!r.enrich_tried_at || now.getTime() - Date.parse(r.enrich_tried_at) > RETENTATIVA_MS);
   return rows
     .filter(elegivel)

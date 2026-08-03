@@ -13,8 +13,8 @@
  * WhatsApp), então o extrator deliberadamente os ignora: falso "zap confirmado"
  * é pior que nenhum, porque vira envio queimando reputação.
  */
-import { describe, it, expect } from 'vitest';
-import { extrairWhatsAppDeHtml, candidatosBackfill, mesmoNegocio } from '../api/_lib/prospect/enrich';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { extrairWhatsAppDeHtml, candidatosBackfill, mesmoNegocio, enriquecerDoSite } from '../api/_lib/prospect/enrich';
 
 describe('extrairWhatsAppDeHtml — só evidência positiva', () => {
   it('acha o wa.me clássico', () => {
@@ -75,7 +75,7 @@ describe('backfill — seleção de candidatos', () => {
     phone: '+553538211234', wa_phone_source: null, send_status: null, ...over,
   });
 
-  it('seleciona ready/discovered com fixo cru, nunca já-enriquecido', () => {
+  it('seleciona ready/discovered SEM citação, nunca já-enriquecido', () => {
     const rows = [
       row({ id: 'fixo-ready' }),
       row({ id: 'ja-enriquecido', wa_phone_source: 'https://site.com' }),
@@ -83,8 +83,18 @@ describe('backfill — seleção de candidatos', () => {
       row({ id: 'ja-enviado', send_status: 'sent' }),
       row({ id: 'descoberto', status: 'discovered' }),
       row({ id: 'descartado', status: 'discarded' }),
+      row({ id: 'sem-telefone', phone: null }),
     ];
-    expect(candidatosBackfill(rows, 10).map((r) => r.id)).toEqual(['fixo-ready', 'descoberto']);
+    // MUDANÇA DELIBERADA (03/ago): 'celular' agora ENTRA. O filtro por classe
+    // presumia que celular cru já era enviável; desde o corte do sendablePhone
+    // o que habilita é a citação, e celular sem citação precisa de
+    // enriquecimento igual ao fixo (62 na base estavam invisíveis aqui).
+    expect(candidatosBackfill(rows, 10).map((r) => r.id))
+      .toEqual(['fixo-ready', 'celular', 'descoberto']);
+  });
+
+  it('sem telefone não entra — é a âncora do gate mesmoNegocio', () => {
+    expect(candidatosBackfill([row({ id: 'nulo', phone: null })], 10)).toEqual([]);
   });
 
   it('ready vem antes de discovered — a fila de disparo é quem manda', () => {
@@ -135,5 +145,83 @@ describe('backfill — memória de tentativa (o bug da leva 2)', () => {
   it('re-tenta depois de 30 dias — site novo aparece', () => {
     const rows = [row({ id: 'tentado-ha-2-meses', enrich_tried_at: '2026-05-20T12:00:00Z' })];
     expect(candidatosBackfill(rows, 10, agora).map((r) => r.id)).toEqual(['tentado-ha-2-meses']);
+  });
+});
+
+/**
+ * Os caminhos candidatos. Este é o conserto do balde: até 03/ago a função lia
+ * SÓ a home, e das 7 citações que a base tem, pelo menos duas moram em /contato
+ * (grupograodeouro, coopama) — achadas por pesquisa manual, não por ela. O
+ * acerto era 6,7% em 105 tentativas: teto do método, não da base.
+ */
+describe('enriquecerDoSite — procura além da home', () => {
+  const paginas = (mapa: Record<string, string>) =>
+    vi.stubGlobal('fetch', async (url: string) => {
+      const path = new URL(url).pathname;
+      const html = mapa[path];
+      if (html === undefined) return { ok: false, status: 404, body: null };
+      return { ok: true, status: 200, body: corpo(html) };
+    });
+
+  /** ReadableStream mínimo, como o código lê via getReader(). */
+  const corpo = (html: string) => {
+    const bytes = new TextEncoder().encode(html);
+    let entregue = false;
+    return {
+      getReader: () => ({
+        read: async () =>
+          entregue ? { done: true, value: undefined } : ((entregue = true), { done: false, value: bytes }),
+        cancel: async () => undefined,
+      }),
+    };
+  };
+
+  const ZAP = '<a href="https://wa.me/5535999887766">Zap</a>';
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('acha na home e nem tenta os outros caminhos', async () => {
+    paginas({ '/': ZAP });
+    const r = await enriquecerDoSite('https://exemplo.com.br/');
+    expect(r?.waPhone).toBe('+5535999887766');
+    expect(r?.fonte).toContain('exemplo.com.br');
+  });
+
+  it('home sem link → acha em /contato (o caso grupograodeouro)', async () => {
+    paginas({ '/': '<p>bem-vindo</p>', '/contato': ZAP });
+    const r = await enriquecerDoSite('https://exemplo.com.br/');
+    expect(r?.waPhone).toBe('+5535999887766');
+  });
+
+  it('a fonte cita a PÁGINA onde o link estava, não a home', async () => {
+    // Prova que aponta pro lugar errado não é prova: quem for conferir a
+    // citação precisa achar o link lá.
+    paginas({ '/': '<p>nada</p>', '/contato': ZAP });
+    const r = await enriquecerDoSite('https://exemplo.com.br/');
+    expect(r?.fonte).toContain('/contato');
+  });
+
+  it('tenta /fale-conosco quando /contato não existe', async () => {
+    paginas({ '/': '<p>nada</p>', '/fale-conosco': ZAP });
+    expect((await enriquecerDoSite('https://exemplo.com.br/'))?.waPhone).toBe('+5535999887766');
+  });
+
+  it('nenhum caminho tem link → null, sem explodir', async () => {
+    paginas({ '/': '<p>nada</p>', '/contato': '<p>nada</p>' });
+    expect(await enriquecerDoSite('https://exemplo.com.br/')).toBeNull();
+  });
+
+  it('host morto aborta os caminhos seguintes — não queima 4 timeouts', async () => {
+    let tentativas = 0;
+    vi.stubGlobal('fetch', async () => {
+      tentativas++;
+      throw new Error('ENOTFOUND');
+    });
+    expect(await enriquecerDoSite('https://morto.com.br/')).toBeNull();
+    expect(tentativas).toBe(1);
+  });
+
+  it('404 na home NÃO aborta — a página seguinte ainda pode ter', async () => {
+    paginas({ '/contato': ZAP }); // home devolve 404
+    expect((await enriquecerDoSite('https://exemplo.com.br/'))?.waPhone).toBe('+5535999887766');
   });
 });
