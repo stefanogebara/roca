@@ -12,11 +12,12 @@
  * still record the standing state. Probes retry once to damp provider flap.
  */
 
+import { createHmac } from 'node:crypto';
 import { getDb } from './db';
 import { withRetry } from './retry';
 import { chat } from './llm';
 import { MODELS } from './env';
-import { FALLBACK_REPLY } from './pipeline';
+import { FALLBACK_REPLY } from './fallbackReply';
 import { agrofitAgeDays, AGROFIT_MAX_AGE_DAYS, AGROFIT_GENERATED_AT } from './tools/agrofit';
 import { alertFounders } from './alert';
 import { createLogger } from './logger';
@@ -135,6 +136,73 @@ function externalProbes(): Array<Promise<CanaryCheck>> {
     // signature legitimately 403s).
     probe('webhook', `${PUBLIC_BASE}/api/webhook`, { okWhen: anyResponse }),
   ];
+}
+
+/**
+ * Sonda ASSINADA do webhook — o que o GET acima não alcança.
+ *
+ * O `probe('webhook', ...)` é GET, e o handler responde GET no topo: ele prova
+ * que o módulo carregou e para aí. Nunca toca `selectAdapter`, adapter nenhum,
+ * nem verificação de assinatura. Ou seja, um `WHATSAPP_APP_SECRET` errado ou
+ * ausente faria TODO inbound virar 403 — silêncio total pro produtor — com o
+ * canário verde. E env sumir em produção não é hipótese: em 30/jul o
+ * PUBLIC_WA_NUMBER estava faltando lá e ninguém sabia.
+ *
+ * O truque pra sondar sem efeito colateral: envelope legítimo da Meta SEM
+ * mensagens e SEM statuses. O handler verifica a assinatura (é isso que
+ * queremos exercitar), `parseCloudStatuses` devolve [], `parseInbound` devolve
+ * null, e ele responde 200 `{received:true}`. Nenhuma escrita no banco, nenhuma
+ * chamada de LLM, nenhuma mensagem enviada a ninguém.
+ *
+ * 403 aqui significa: a Meta está falando com um webhook que rejeita ela.
+ */
+export function canaryProbeBody(): string {
+  return JSON.stringify({
+    object: 'whatsapp_business_account',
+    entry: [{ id: '0', changes: [{ field: 'messages', value: { messaging_product: 'whatsapp' } }] }],
+  });
+}
+
+async function webhookSignedCheck(): Promise<CanaryCheck[]> {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appSecret) return []; // env-gated como os checks de template
+  const nome = 'webhook assinado (Cloud)';
+  const body = canaryProbeBody();
+  const assinatura = `sha256=${createHmac('sha256', appSecret).update(body).digest('hex')}`;
+  try {
+    const status = await withRetry(
+      async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+        try {
+          const res = await fetch(`${PUBLIC_BASE}/api/webhook`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': assinatura },
+            body,
+            signal: controller.signal,
+          });
+          return res.status;
+        } finally {
+          clearTimeout(timer);
+        }
+      },
+      { attempts: 2, baseDelayMs: 300, shouldRetry: () => true }
+    );
+    return [
+      {
+        check: nome,
+        ok: status === 200,
+        detail:
+          status === 200
+            ? null
+            : status === 403
+              ? 'HTTP 403 — assinatura recusada (WHATSAPP_APP_SECRET não bate com o app da Meta)'
+              : `HTTP ${status}`,
+      },
+    ];
+  } catch (e) {
+    return [{ check: nome, ok: false, detail: (e as Error).message.slice(0, 60) }];
+  }
 }
 
 /**
@@ -309,6 +377,7 @@ export async function runCanary(): Promise<CanaryRun> {
       templateChecks(),
       numberQualityCheck(),
       Promise.all(modelChecks()),
+      webhookSignedCheck(),
       fallbackRateCheck().then((c) => [c]),
       Promise.resolve([agrofitFreshnessCheck()]),
     ])

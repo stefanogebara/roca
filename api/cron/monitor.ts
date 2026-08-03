@@ -126,7 +126,20 @@ export default async function handler(
       );
     }
   } catch (e) {
-    log.error('canary run failed:', (e as Error).message);
+    // Fail-soft continua (o monitor não pode cair por causa do canário), mas
+    // agora SAI. Em 29/jul foi o `import` acima que falhou — o canário nem
+    // carregava, porque importava o pipeline e o pipeline não subia — e este
+    // catch engolia tudo num log que ninguém lê: 24h de webhook fora com o
+    // monitor devolvendo 200. Ausência de leitura não é leitura boa.
+    //
+    // A mensagem é montada AQUI, sem importar nada: quem avisa que o canário
+    // caiu não pode depender do módulo que caiu.
+    const motivo = (e instanceof Error ? e.message : String(e)).slice(0, 120);
+    log.error('canary run failed:', motivo);
+    findings.push(
+      `🐤 Canário NÃO RODOU (${motivo}) — sem leitura de produção hoje. ` +
+        'Quando ele cai junto, costuma ser porque algo grande quebrou.'
+    );
   }
 
   // Prospect hygiene: never-repliers past the give-up window become 'stale' —

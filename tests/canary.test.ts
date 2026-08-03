@@ -5,11 +5,14 @@
  * that's been red for a week must not page the founders every morning.
  */
 import { describe, it, expect } from 'vitest';
+import { createHmac } from 'node:crypto';
+import { CloudApiAdapter, parseCloudStatuses } from '../api/_lib/transport/cloud';
 import {
   diffCanary,
   formatCanaryAlert,
   fallbackVerdict,
   agrofitFreshnessCheck,
+  canaryProbeBody,
   type CanaryCheck,
 } from '../api/_lib/canary';
 import { AGROFIT_GENERATED_AT, AGROFIT_MAX_AGE_DAYS } from '../api/_lib/tools/agrofit';
@@ -100,5 +103,47 @@ describe('agrofitFreshnessCheck (snapshot staleness is detectable now)', () => {
     const c = agrofitFreshnessCheck(plusDays(AGROFIT_MAX_AGE_DAYS + 30));
     expect(c.ok).toBe(false);
     expect(c.detail).toMatch(/agrofit-extract/);
+  });
+});
+
+/**
+ * A sonda assinada do webhook, checada contra o adapter DE VERDADE.
+ *
+ * O `probe('webhook')` é GET, e o handler responde GET no topo — prova só que o
+ * módulo carregou. Esta sonda exercita o que importa (seleção de adapter +
+ * verificação de assinatura), e a propriedade que ela PRECISA ter é não causar
+ * trabalho nenhum: um canário que grava no banco ou gasta LLM todo dia deixa de
+ * ser barato e vira ruído no próprio dado que ele deveria medir.
+ */
+describe('sonda assinada do webhook não causa trabalho', () => {
+  const SEGREDO = 'segredo-de-app-de-teste';
+  const req = () => {
+    const body = canaryProbeBody();
+    const assinatura = `sha256=${createHmac('sha256', SEGREDO).update(body).digest('hex')}`;
+    return {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': assinatura, host: 'roca-black.vercel.app' },
+      url: '/api/webhook',
+      rawBody: Buffer.from(body),
+    };
+  };
+
+  it('o adapter real aceita a assinatura', async () => {
+    const antes = process.env.WHATSAPP_APP_SECRET;
+    process.env.WHATSAPP_APP_SECRET = SEGREDO;
+    try {
+      expect(await new CloudApiAdapter().verifySignature(req())).toBe(true);
+    } finally {
+      if (antes === undefined) delete process.env.WHATSAPP_APP_SECRET;
+      else process.env.WHATSAPP_APP_SECRET = antes;
+    }
+  });
+
+  it('não carrega mensagem — parseInbound devolve null, o pipeline nunca roda', async () => {
+    expect(await new CloudApiAdapter().parseInbound(req())).toBeNull();
+  });
+
+  it('não carrega status — nada é gravado no termômetro do número', () => {
+    expect(parseCloudStatuses(Buffer.from(canaryProbeBody()))).toEqual([]);
   });
 });

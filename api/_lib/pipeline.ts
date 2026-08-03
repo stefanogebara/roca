@@ -81,6 +81,7 @@ import { alertFounders } from './alert';
 import { sendReferralNotification, pingFoundersWhatsApp } from './notify';
 import { maskWa } from './opsData';
 import { createLogger } from './logger';
+import { FALLBACK_REPLY } from './fallbackReply';
 import { publicWaNumber } from './waNumber';
 
 const log = createLogger('pipeline');
@@ -104,10 +105,11 @@ export function isDeletionRequest(text: string): boolean {
 const CONSENT_NOTE =
   '\n\n_Pra te dar conselhos melhores eu guardo sua localização e o histórico da conversa. É só o necessário, e você pode pedir "apaga meus dados" quando quiser. Mais tarde posso te conectar com um agrônomo de verdade se precisar._';
 
-// Exported for the canary: an elevated rate of this exact reply is the
-// signature of a dead model slug / provider outage.
-export const FALLBACK_REPLY =
-  'Tive um problema pra processar isso agora. Tenta de novo daqui a pouco, ou manda de outro jeito.';
+// Definida em _lib/fallbackReply.ts, um módulo-folha: o canário compara
+// respostas contra esta frase e não pode importar o pipeline pra isso (ver o
+// comentário de lá — foi o que cegou o canário no outage de 29/jul).
+// Re-exportada aqui para não mudar a superfície pública deste módulo.
+export { FALLBACK_REPLY };
 
 // Explicit request to be connected to an agrônomo (the referral opt-in). Kept
 // conservative so we only capture on a clear ask — storing is within the
