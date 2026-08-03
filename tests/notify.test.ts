@@ -168,15 +168,17 @@ describe('resumoDoLote — o push das 10h em linguagem de founder', () => {
  * degrau do alerta, entre o webhook e o Twilio legado.
  */
 describe('escolhaDeCanal — ordem de tentativa do alerta', () => {
-  it('webhook primeiro quando configurado: independente da WhatsApp estar de pé', () => {
-    expect(escolhaDeCanal({ webhook: true, email: true })).toEqual(['webhook', 'email', 'whatsapp']);
+  it('WhatsApp PRIMEIRO — alerta que chega em caixa de entrada não acorda ninguém', () => {
+    expect(escolhaDeCanal({ webhook: true, email: true, whatsapp: true })).toEqual([
+      'whatsapp', 'webhook', 'email',
+    ]);
   });
 
-  it('sem webhook, EMAIL antes do WhatsApp — o Twilio é sandbox que caduca', () => {
-    expect(escolhaDeCanal({ webhook: false, email: true })).toEqual(['email', 'whatsapp']);
+  it('sem número de founder, cai pros canais de texto', () => {
+    expect(escolhaDeCanal({ webhook: true, email: true, whatsapp: false })).toEqual(['webhook', 'email']);
   });
 
-  it('sem webhook nem email, ainda tenta WhatsApp — melhor que nada', () => {
-    expect(escolhaDeCanal({ webhook: false, email: false })).toEqual(['whatsapp']);
+  it('só e-mail configurado: ainda entrega', () => {
+    expect(escolhaDeCanal({ webhook: false, email: true, whatsapp: false })).toEqual(['email']);
   });
 });

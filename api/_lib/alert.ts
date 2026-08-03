@@ -14,22 +14,34 @@ import { createLogger } from './logger';
 
 const log = createLogger('alert');
 
+/**
+ * WhatsApp no celular do founder, pelo Cloud API com TEMPLATE.
+ *
+ * Template, nao texto livre: mensagem iniciada pelo negocio fora da janela de
+ * 24h da Meta so passa como template aprovado (131047). E as 10h05 nenhum
+ * founder tem janela aberta — que e exatamente quando o aviso precisa chegar.
+ *
+ * Cloud API, nao Twilio: o sandbox do Twilio recusou TODA mensagem pros
+ * founders com 63015 ("so entrega a quem entrou no sandbox") e a sessao dele
+ * expira em 3 dias. Cloud e o transporte ativo da casa.
+ */
 async function whatsappFallback(text: string): Promise<boolean> {
   const numbers = (process.env.FOUNDER_WA_NUMBERS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
   if (numbers.length === 0) return false;
-  // Lazy import avoids widening alert.ts's dependency surface for every caller.
-  const { TwilioAdapter } = await import('./transport/twilio');
-  const adapter = new TwilioAdapter();
+  // Lazy import: alert.ts entra no caminho de resposta ao produtor.
+  const { CloudApiAdapter } = await import('./transport/cloud');
+  const { OPS_ALERT_NAME } = await import('./prospect/template');
+  const adapter = new CloudApiAdapter();
   let delivered = false;
   for (const to of numbers) {
     try {
-      await adapter.send({ to, text });
+      await adapter.sendTemplate(to, OPS_ALERT_NAME, text);
       delivered = true;
     } catch (e) {
-      log.error(`alert WhatsApp fallback to ${to.slice(0, 6)}… failed:`, (e as Error).message);
+      log.error(`alert WhatsApp to ${to.slice(0, 6)}… failed:`, (e as Error).message);
     }
   }
   return delivered;
@@ -51,11 +63,19 @@ export type CanalDeAlerta = 'webhook' | 'email' | 'whatsapp';
  * (o aviso de lead quente usa e chega), nao depende de janela da Meta nem de
  * sandbox que caduca. Twilio fica por ultimo — legado, mas melhor que nada.
  */
-export function escolhaDeCanal(temos: { webhook: boolean; email: boolean }): CanalDeAlerta[] {
+export function escolhaDeCanal(temos: {
+  webhook: boolean;
+  email: boolean;
+  whatsapp?: boolean;
+}): CanalDeAlerta[] {
   const ordem: CanalDeAlerta[] = [];
+  // WhatsApp PRIMEIRO quando ha numero configurado: o pedido do dono e "no
+  // celular", e alerta que chega em caixa de entrada nao acorda ninguem. Os
+  // outros ficam como rede de seguranca — a ordem so muda quando o degrau de
+  // cima nao ENTREGA, e cada degrau devolve entrega, nao aceite.
+  if (temos.whatsapp !== false) ordem.push('whatsapp');
   if (temos.webhook) ordem.push('webhook');
   if (temos.email) ordem.push('email');
-  ordem.push('whatsapp');
   return ordem;
 }
 
@@ -103,6 +123,7 @@ export async function alertFounders(text: string): Promise<void> {
   const canais = escolhaDeCanal({
     webhook: !!process.env.ALERT_WEBHOOK_URL,
     email: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD),
+    whatsapp: !!process.env.FOUNDER_WA_NUMBERS,
   });
   for (const canal of canais) {
     const ok =

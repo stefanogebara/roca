@@ -31,6 +31,16 @@ export const COOP_V2_NAME = 'stevi_parceria_coop_v2';
 export const ALERT_NAME = 'stevi_alerta_v1';
 
 /**
+ * Alerta OPERACIONAL pros founders (nao pro produtor) — resumo do lote, breaker
+ * cortado, incidente. Existe porque em 03/ago o canal de alerta se revelou
+ * morto: Twilio sandbox devolvia 63015 em tudo, e texto livre pelo Cloud API
+ * morre fora da janela de 24h (131047). Template UTILITY atravessa a janela e
+ * chega no celular a qualquer hora — que e o que "me avisa quando sair"
+ * realmente exige.
+ */
+export const OPS_ALERT_NAME = 'stevi_ops_v1';
+
+/**
  * CONTINUAÇÃO — a lacuna que 28/jul expôs. Todo template aprovado era de
  * ABERTURA: quando a conversa com o Felipe (Agro.com) esfriar e a janela de 24h
  * fechar, não existe nada para retomar de onde parou. Mandar um template de
@@ -129,6 +139,13 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
     category: 'UTILITY',
     body: 'Stevi 🌱 aviso da sua lavoura: {{1}}. Me chama aqui se quiser entender o que dá pra fazer.',
     example: ['Alerta de geada: mínima de -1°C prevista pro dia 26/07 na sua região'],
+  },
+  // Alerta interno: destinatario e founder, nao produtor. Sem emoji de lavoura
+  // e sem convite pra responder — isto e painel de controle, nao conversa.
+  [OPS_ALERT_NAME]: {
+    category: 'UTILITY',
+    body: 'Stevi · aviso interno: {{1}}. Detalhes no painel.',
+    example: ['Lote da Vitoria: 8 convites enviados, 3 sem WhatsApp. Ainda 131 na fila.'],
   },
   // D+3 bump for never-repliers — {{1}}=name, {{2}}=city.
   [BUMP_NAME]: {
