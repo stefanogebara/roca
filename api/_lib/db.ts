@@ -829,40 +829,114 @@ export async function hasRecentReferral(userId: string, sinceIso: string): Promi
   return (count ?? 0) > 0;
 }
 
+export interface PurgeTarget {
+  table: string;
+  days: number;
+  /**
+   * Date column the cutoff is compared against. Defaults to 'created_at' —
+   * `farmer_alerts` is the exception (it stamps `sent_at`).
+   */
+  coluna?: string;
+}
+
+/**
+ * Retention policy per table. Exported so a test can check each target's date
+ * column against the migrations: the whole bug below was a column name nobody
+ * verified, and only the schema can settle that.
+ */
+export const PURGE_TARGETS: readonly PurgeTarget[] = [
+  { table: 'messages', days: 365 },
+  { table: 'farmer_alerts', days: 90, coluna: 'sent_at' },
+  { table: 'ops_login_attempts', days: 30 },
+  { table: 'monitor_runs', days: 180 },
+  // Third-party data (scraped prospects) grew forever — the schema's own
+  // comment calls it "the most sensitive third-party data". Opt-outs are
+  // NEVER purged (prospect_optouts is the legal proof they asked out).
+  { table: 'prospect_messages', days: 365 },
+  { table: 'gym_runs', days: 90 },
+  { table: 'prospect_gym_runs', days: 90 },
+];
+
+export interface PurgeFailure {
+  table: string;
+  error: string;
+}
+
+export interface PurgeResult {
+  /**
+   * Rows deleted per table — EVERY table that ran is present, zeros included.
+   * Presence means "the promise was applied and found nothing"; absence means
+   * it failed, and the table is in `failed`.
+   */
+  purged: Record<string, number>;
+  /** Targets whose delete errored — retention was NOT applied to these. */
+  failed: PurgeFailure[];
+}
+
 /**
  * Data retention (LGPD minimization): purge rows past their useful life.
  * messages 365d (the caderno reads 180d), farmer_alerts 90d (dedup horizon is
  * days), ops_login_attempts 30d (throttle window is minutes), monitor_runs
  * 180d. Called by the daily monitor cron; each delete is independent.
+ *
+ * The date column is per-target. Hard-coding `created_at` for all seven meant
+ * every single run logged "column farmer_alerts.created_at does not exist",
+ * skipped that table, and returned a map where a failure and an empty table
+ * looked identical (both simply absent). The 90-day promise was never once
+ * applied, and nothing outside the log could tell. Failures now come back as
+ * data so the monitor can say so out loud.
  */
-export async function purgeExpiredRows(): Promise<Record<string, number>> {
+export async function purgeExpiredRows(): Promise<PurgeResult> {
   const db = getDb();
-  const targets: Array<{ table: string; days: number }> = [
-    { table: 'messages', days: 365 },
-    { table: 'farmer_alerts', days: 90 },
-    { table: 'ops_login_attempts', days: 30 },
-    { table: 'monitor_runs', days: 180 },
-    // Third-party data (scraped prospects) grew forever — the schema's own
-    // comment calls it "the most sensitive third-party data". Opt-outs are
-    // NEVER purged (prospect_optouts is the legal proof they asked out).
-    { table: 'prospect_messages', days: 365 },
-    { table: 'gym_runs', days: 90 },
-    { table: 'prospect_gym_runs', days: 90 },
-  ];
   const purged: Record<string, number> = {};
-  for (const t of targets) {
+  const failed: PurgeFailure[] = [];
+  for (const t of PURGE_TARGETS) {
     const cutoff = new Date(Date.now() - t.days * 86_400_000).toISOString();
     const { count, error } = await db
       .from(t.table)
       .delete({ count: 'exact' })
-      .lt('created_at', cutoff);
+      .lt(t.coluna ?? 'created_at', cutoff);
     if (error) {
       log.error(`purge ${t.table} failed:`, error.message);
+      failed.push({ table: t.table, error: error.message });
       continue;
     }
-    if (count) purged[t.table] = count;
+    purged[t.table] = count ?? 0;
   }
-  return purged;
+  return { purged, failed };
+}
+
+/**
+ * Turn a purge run into what the monitor reports: findings for the audit trail
+ * plus one check shaped like a CanaryCheck, so a broken purge rides the
+ * canary's transition machinery (paged the day it breaks, quiet while it stays
+ * broken, cleared on recovery) instead of dying in a log line.
+ *
+ * Pure — the reporting is testable without a cron or a database.
+ */
+export function purgeReport(result: PurgeResult): {
+  findings: string[];
+  check: { check: string; ok: boolean; detail: string | null };
+} {
+  const total = Object.values(result.purged).reduce((a, b) => a + b, 0);
+  const findings: string[] = [];
+  if (total > 0) findings.push(`Retenção: ${total} registro(s) antigos removidos.`);
+  if (result.failed.length === 0) {
+    return {
+      findings,
+      check: {
+        check: 'retenção LGPD',
+        ok: true,
+        detail: `${Object.keys(result.purged).length} tabela(s), ${total} linha(s)`,
+      },
+    };
+  }
+  const detalhe = result.failed.map((f) => `${f.table} (${f.error})`).join('; ');
+  findings.push(
+    `🗄️ Retenção LGPD NÃO aplicada em ${result.failed.length} tabela(s): ${detalhe}. ` +
+      'O prazo prometido segue correndo sem ninguém podar.'
+  );
+  return { findings, check: { check: 'retenção LGPD', ok: false, detail: detalhe.slice(0, 160) } };
 }
 
 /** Record an ops-console login attempt (brute-force throttling evidence). */

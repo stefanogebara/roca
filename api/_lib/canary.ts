@@ -370,7 +370,13 @@ export function agrofitFreshnessCheck(now: Date = new Date()): CanaryCheck {
   };
 }
 
-export async function runCanary(): Promise<CanaryRun> {
+/**
+ * @param extra checks the CALLER already computed (the monitor's LGPD purge)
+ * that want this same machinery: persisted with the run, paged once on the
+ * transition, silent while they stay red. Passed in rather than probed here so
+ * the canary keeps its leaf-module topology (see tests/canary-isolamento).
+ */
+export async function runCanary(extra: CanaryCheck[] = []): Promise<CanaryRun> {
   const results = (
     await Promise.all([
       Promise.all(externalProbes()),
@@ -380,6 +386,7 @@ export async function runCanary(): Promise<CanaryRun> {
       webhookSignedCheck(),
       fallbackRateCheck().then((c) => [c]),
       Promise.resolve([agrofitFreshnessCheck()]),
+      Promise.resolve(extra),
     ])
   ).flat();
 

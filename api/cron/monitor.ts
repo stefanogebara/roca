@@ -23,7 +23,7 @@ import {
 } from '../_lib/alerts';
 import { TwilioAdapter } from '../_lib/transport/twilio';
 import { CloudApiAdapter } from '../_lib/transport/cloud';
-import { getDb, purgeExpiredRows } from '../_lib/db';
+import { getDb, purgeExpiredRows, purgeReport, type PurgeResult } from '../_lib/db';
 import { createLogger } from '../_lib/logger';
 
 const log = createLogger('monitor');
@@ -111,13 +111,30 @@ export default async function handler(
     log.error('fire alerts run failed:', (e as Error).message);
   }
 
+  // LGPD retention: purge rows past their useful life (see purgeExpiredRows).
+  // Runs BEFORE the canary so its verdict can ride the canary's transition
+  // machinery. Until 03/ago this stage was a lie: farmer_alerts was purged by
+  // a column it doesn't have, the error was logged and skipped, and the return
+  // couldn't tell "nothing to purge" from "never purged". 90-day promise, zero
+  // days applied, no surface saying so.
+  let purge: PurgeResult = { purged: {}, failed: [] };
+  try {
+    purge = await purgeExpiredRows();
+  } catch (e) {
+    const motivo = (e as Error).message.slice(0, 120);
+    log.error('retention purge failed:', motivo);
+    purge = { purged: {}, failed: [{ table: '(todas)', error: motivo }] };
+  }
+  const retencao = purgeReport(purge);
+  findings.push(...retencao.findings);
+
   // Daily canary: probes the things that break silently (paused templates,
   // dead model slugs, tool APIs, public surfaces, elevated fallback rate).
   // Alerts founders only on transitions; standing state lands in findings.
   let canary: { failing: number; broke: number; recovered: number } | null = null;
   try {
     const { runCanary } = await import('../_lib/canary');
-    const run = await runCanary();
+    const run = await runCanary([retencao.check]);
     canary = { failing: run.failing, broke: run.broke.length, recovered: run.recovered.length };
     if (run.failing > 0) {
       findings.push(
@@ -181,16 +198,6 @@ export default async function handler(
     }
   }
 
-  // LGPD retention: purge rows past their useful life (see purgeExpiredRows).
-  let purged: Record<string, number> = {};
-  try {
-    purged = await purgeExpiredRows();
-    const total = Object.values(purged).reduce((a, b) => a + b, 0);
-    if (total > 0) findings.push(`Retenção: ${total} registro(s) antigos removidos.`);
-  } catch (e) {
-    log.error('retention purge failed:', (e as Error).message);
-  }
-
   // Record the run (best-effort; a DB hiccup shouldn't fail the cron).
   try {
     const db = getDb();
@@ -207,6 +214,17 @@ export default async function handler(
 
   res.status(200).json({
     success: true,
-    data: { ran_at: now.toISOString(), stale, transitions, findings, alerts, frost, fire, canary, purged },
+    data: {
+      ran_at: now.toISOString(),
+      stale,
+      transitions,
+      findings,
+      alerts,
+      frost,
+      fire,
+      canary,
+      purged: purge.purged,
+      purgeFailed: purge.failed,
+    },
   });
 }
