@@ -151,6 +151,21 @@ async function sendFounderEmail(subject: string, body: string): Promise<boolean>
 }
 
 /**
+ * Alerta operacional por e-mail — o degrau confiavel do alertFounders desde o
+ * incidente de 03/ago (Twilio sandbox morto com 63015). Reusa o mesmo SMTP que
+ * ja entrega o aviso de lead quente. Devolve se ENTREGOU, nao se tentou.
+ */
+export async function sendFounderAlertEmail(text: string): Promise<boolean> {
+  const primeiraLinha = text.replace(/\s+/g, ' ').slice(0, 80);
+  try {
+    return await sendFounderEmail(`Stevi | ${primeiraLinha}`, text);
+  } catch (e) {
+    log.error('founder alert email failed:', (e as Error).message);
+    return false;
+  }
+}
+
+/**
  * Send the referral notice to the founders. Fail-soft: a mail failure never
  * blocks the farmer's reply, but it is logged and alerted — never silent.
  */

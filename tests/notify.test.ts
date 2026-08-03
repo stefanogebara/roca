@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { formatReferralEmail, formatProspectReplyEmail, pingFoundersWhatsApp, resumoDoLote } from '../api/_lib/notify';
+import { escolhaDeCanal } from '../api/_lib/alert';
 
 describe('formatProspectReplyEmail', () => {
   it('carries name, kind, region, masked phone, reply excerpt and the painel link', () => {
@@ -149,5 +150,33 @@ describe('resumoDoLote — o push das 10h em linguagem de founder', () => {
 
   it('dry run NUNCA vira mensagem', () => {
     expect(resumoDoLote({ ...base, dryRun: true }, null)).toBeNull();
+  });
+});
+
+/**
+ * O canal de alerta da empresa — incidente descoberto em 03/ago.
+ *
+ * alertFounders tinha só dois degraus: ALERT_WEBHOOK_URL (nunca configurado) e
+ * WhatsApp via Twilio. Consulta à API do Twilio: TODA mensagem pros founders
+ * falhou com 63015 ("o sandbox só entrega a quem entrou nele") — e a sessão do
+ * sandbox expira em 3 DIAS, então mesmo quem entrou cai fora sozinho. Ou seja:
+ * alerta de incidente do webhook, canário, LLM caindo e lead quente apontavam
+ * pra um cano morto, e ninguém percebeu porque falha de alerta falha calada
+ * (o HTTP 201 "queued" do Twilio esconde o fracasso assíncrono).
+ *
+ * E-mail já era o canal comprovado (lead quente usa e chega). Agora ele é um
+ * degrau do alerta, entre o webhook e o Twilio legado.
+ */
+describe('escolhaDeCanal — ordem de tentativa do alerta', () => {
+  it('webhook primeiro quando configurado: independente da WhatsApp estar de pé', () => {
+    expect(escolhaDeCanal({ webhook: true, email: true })).toEqual(['webhook', 'email', 'whatsapp']);
+  });
+
+  it('sem webhook, EMAIL antes do WhatsApp — o Twilio é sandbox que caduca', () => {
+    expect(escolhaDeCanal({ webhook: false, email: true })).toEqual(['email', 'whatsapp']);
+  });
+
+  it('sem webhook nem email, ainda tenta WhatsApp — melhor que nada', () => {
+    expect(escolhaDeCanal({ webhook: false, email: false })).toEqual(['whatsapp']);
   });
 });
