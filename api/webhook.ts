@@ -107,6 +107,21 @@ export default async function handler(
       if (statuses.length) {
         const { applyProspectStatuses } = await import('./_lib/prospect/health');
         await applyProspectStatuses(statuses);
+        // O MESMO callback confirma (ou desmente) a entrega dos alertas pros
+        // founders. Sem isto, "aceito pela Meta" era tudo que sabiamos — e foi
+        // assim que o canal ficou mudo por semanas em 03/ago.
+        //
+        // try/catch PROPRIO: isto e contabilidade de alerta, um satelite. O
+        // teste do webhook pegou o erro na hora — sem o catch, uma falha aqui
+        // impedia handleInbound de rodar e o produtor ficava sem resposta por
+        // causa do nosso livro-caixa. Mesma familia do apagao do geotiff:
+        // periferico nunca derruba o essencial.
+        try {
+          const { aplicarStatusEmAlertas } = await import('./_lib/alertDelivery');
+          await aplicarStatusEmAlertas(statuses);
+        } catch (e) {
+          log.error('registro de entrega de alerta falhou:', (e as Error).message);
+        }
       }
     }
 

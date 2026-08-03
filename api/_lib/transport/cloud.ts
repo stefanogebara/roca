@@ -333,7 +333,13 @@ export class CloudApiAdapter implements TransportAdapter {
    * parameter — the only path Meta delivers outside the 24h service window.
    * Template params reject newlines/tabs, so the text is flattened. Throws on
    * failure (the alert runner releases its claim and retries tomorrow). */
-  async sendTemplate(to: string, templateName: string, paramText: string): Promise<void> {
+  /**
+   * Envia um template. Devolve o wamid (id da mensagem na Meta) — e o que
+   * permite casar depois com o callback de status e saber se ENTREGOU. Sem
+   * ele, "aceito" seria tudo que a gente teria, que foi exatamente o buraco
+   * do incidente de 03/ago.
+   */
+  async sendTemplate(to: string, templateName: string, paramText: string): Promise<string | null> {
     const token = process.env.WHATSAPP_CLOUD_TOKEN;
     const phoneId = this.inboundPhoneId ?? process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
     if (!token || !phoneId) {
@@ -358,6 +364,14 @@ export class CloudApiAdapter implements TransportAdapter {
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Cloud template send failed ${res.status}: ${body.slice(0, 200)}`);
+    }
+    // O wamid vive em messages[0].id. Falha de parse nao e erro de envio — a
+    // mensagem saiu; so perdemos o rastreio dela.
+    try {
+      const j = (await res.json()) as { messages?: Array<{ id?: string }> };
+      return j.messages?.[0]?.id ?? null;
+    } catch {
+      return null;
     }
   }
 

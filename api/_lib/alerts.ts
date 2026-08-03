@@ -89,7 +89,9 @@ export function alertSendPlan(opts: {
  * target's channel; `template` (optional) is the Cloud UTILITY-template path. */
 export interface ProactiveSender {
   freeform: (target: { waId: string; channel: string | null }, text: string, mediaUrl?: string) => Promise<void>;
-  template?: (target: { waId: string; channel: string | null }, text: string) => Promise<void>;
+  /** Devolve o wamid quando o transporte souber (Cloud API) — quem chama aqui
+   * ignora, mas mentir na assinatura quebraria o rastreio de entrega. */
+  template?: (target: { waId: string; channel: string | null }, text: string) => Promise<string | null | void>;
 }
 
 /** Resolve the plan and dispatch one alert accordingly. Throws on send failure

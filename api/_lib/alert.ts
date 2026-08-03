@@ -35,10 +35,15 @@ async function whatsappFallback(text: string): Promise<boolean> {
   const { CloudApiAdapter } = await import('./transport/cloud');
   const { OPS_ALERT_NAME } = await import('./prospect/template');
   const adapter = new CloudApiAdapter();
+  const { registrarAlerta } = await import('./alertDelivery');
   let delivered = false;
   for (const to of numbers) {
     try {
-      await adapter.sendTemplate(to, OPS_ALERT_NAME, text);
+      const wamid = await adapter.sendTemplate(to, OPS_ALERT_NAME, text);
+      // "Aceito" nao e "entregue": o registro fica PENDENTE ate o callback de
+      // status da Meta confirmar. Quem nao confirmar na janela e escalado por
+      // e-mail na varredura do cron. Ver alertDelivery.ts.
+      await registrarAlerta('whatsapp', text, wamid);
       delivered = true;
     } catch (e) {
       log.error(`alert WhatsApp to ${to.slice(0, 6)}… failed:`, (e as Error).message);
@@ -134,6 +139,12 @@ export async function alertFounders(text: string): Promise<void> {
           : await whatsappFallback(text).catch(() => false);
     if (ok) {
       log.info(`alerta entregue por ${canal}`);
+      // WhatsApp ja se registrou dentro do proprio degrau (com wamid, pendente
+      // de confirmacao). Webhook e e-mail confirmam na propria chamada.
+      if (canal !== 'whatsapp') {
+        const { registrarAlerta } = await import('./alertDelivery');
+        await registrarAlerta(canal, text, null);
+      }
       return;
     }
   }

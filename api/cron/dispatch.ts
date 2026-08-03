@@ -26,6 +26,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
   try {
+    // Varredura ANTES do lote: alerta que nao confirmou entrega no WhatsApp vai
+    // por e-mail. Roda primeiro de proposito — o alerta que este mesmo cron
+    // gerar daqui a pouco ainda esta dentro da janela e nao seria escalado.
+    try {
+      const { varrerAlertasNaoEntregues } = await import('../_lib/alertDelivery');
+      const v = await varrerAlertasNaoEntregues();
+      if (v.pendentes) log.info(`alertas nao entregues: ${v.pendentes} (${v.escalados} escalados)`);
+    } catch (e) {
+      log.error('varredura de alertas falhou:', (e as Error).message);
+    }
+
     // ?dryRun=1 plans without sending. It did NOT exist on 27/jul: the param
     // was silently ignored and a "preview" call shipped 8 real templates. A
     // flag that looks like it works and doesn't is worse than no flag.

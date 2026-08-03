@@ -665,3 +665,32 @@ morto. Ninguém percebeu porque falha de alerta falha calada.
   meus no mesmo caminho: texto livre fora da janela de 24h da Meta (131047) e o
   sandbox morto. Os dois falhariam em silêncio numa automação que alguém estava
   esperando — o pior modo de falha que existe.
+
+## 2026-08-03 — A retenção que nunca rodou: ausência querendo dizer duas coisas
+
+`purgeExpiredRows` apagava por `created_at` nas SETE tabelas alvo.
+`farmer_alerts` carimba `sent_at`. Resultado: todo run do cron diário logava
+`column farmer_alerts.created_at does not exist`, dava `continue`, e devolvia um
+mapa `{tabela: count}` que só incluía counts > 0. A tabela que falhou e a tabela
+que não tinha nada a apagar produziam exatamente o mesmo valor — ausência. A
+retenção de 90 dias prometida nunca foi aplicada uma única vez, e nada fora do
+log sabia disso.
+
+**Regras:**
+- **Retorno que só carrega sucesso apaga o fracasso.** Se a função tem um
+  caminho de erro tratado, o erro precisa VOLTAR como dado, não só ir pro log.
+  E "rodou e achou zero" tem que ter representação própria: aqui virou
+  `purged[tabela] = 0` (presença = aplicado) contra `failed[]` (não aplicado).
+- **Config replicada em lista é config presumida.** Sete alvos, um nome de
+  coluna cravado para todos. Ninguém conferiu o sétimo. Quando um parâmetro
+  varia por item, ele pertence ao item — e o default só cobre a maioria.
+- **Nome de coluna não se testa com mock; se testa com o SCHEMA.** O mock
+  obedece qualquer string que eu escrever, então teste de comportamento passaria
+  verde com o bug intacto. A trava útil lê `supabase/migrations` e exige que a
+  coluna de cada alvo exista de fato (com sanity check pra denunciar parser
+  quebrado). É a mesma ideia do teste de topologia do canário: fixar o que o
+  comportamento não alcança.
+- **Falha recorrente precisa de máquina de transição, não de repetição.** Um
+  purge quebrado quebra todo dia; alertar todo dia recria o log-paisagem que
+  causou o problema. A retenção passou a entrar como check do canário — avisa no
+  dia em que quebra, cala enquanto está quebrada, avisa quando volta.
