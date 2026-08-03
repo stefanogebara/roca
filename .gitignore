@@ -21,3 +21,6 @@ supabase/.temp/
 web/_shots/
 
 .vercel
+
+# Vigias temporários de sessão do Claude (não são código do produto).
+.claude-watch-*.mjs
