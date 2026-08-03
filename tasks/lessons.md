@@ -638,3 +638,30 @@ enriquecidos (wa.me citado pelo próprio negócio). Leitura ~38% vs ~5%.
   falhas pós-aceite (corte em 3)" virou "Pausado por hoje: 4 números seguidos
   não tinham WhatsApp; religa sozinho amanhã". Nenhuma informação sumiu — ela
   mudou de camada. Se o dono precisa de tradutor, o painel é que está errado.
+
+## 2026-08-03 — O alarme mudo: canal de alerta nunca exercitado não é canal
+
+Testando o aviso do lote que estrearia no dia seguinte, nada chegou nos dois
+celulares. A API do Twilio contou por quê: TODA mensagem pros founders falhava
+com 63015 ("o sandbox só entrega a quem entrou nele"), há semanas, e a sessão
+do sandbox expira em 3 dias — quem entra, cai fora sozinho. Alerta de incidente
+do webhook, canário, LLM caindo e ping de lead quente apontavam pro mesmo cano
+morto. Ninguém percebeu porque falha de alerta falha calada.
+
+**Regras:**
+- **Canal de notificação sem teste ponta a ponta COM CONFIRMAÇÃO HUMANA é uma
+  suposição, não um canal.** O único jeito de descobrir isto foi mandar e
+  perguntar "chegou?". Antes de depender de qualquer caminho de alerta (novo ou
+  herdado), exercite-o e confirme do outro lado.
+- **HTTP 2xx não é entrega.** Twilio devolve 201 "queued" e falha depois,
+  assincronamente. Todo integrador de mensagem precisa: (a) consultar o status
+  final, ou (b) tratar o degrau como não-confiável. Aceite ≠ entrega — a mesma
+  confusão que fez o gate de disparo parecer saudável em julho.
+- **Fallback tem que ser degrau com entrega comprovada, não o que sobrou.** O
+  e-mail (SMTP do lead quente) já entregava havia meses; ninguém tinha ligado
+  ele ao alertFounders porque o Twilio "estava lá". Prefira o canal provado ao
+  canal presente.
+- **Auditar o que ESTREIA amanhã, antes de estrear.** Esta ida achou dois bugs
+  meus no mesmo caminho: texto livre fora da janela de 24h da Meta (131047) e o
+  sandbox morto. Os dois falhariam em silêncio numa automação que alguém estava
+  esperando — o pior modo de falha que existe.
