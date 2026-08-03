@@ -694,3 +694,47 @@ log sabia disso.
   purge quebrado quebra todo dia; alertar todo dia recria o log-paisagem que
   causou o problema. A retenção passou a entrar como check do canário — avisa no
   dia em que quebra, cala enquanto está quebrada, avisa quando volta.
+
+## 2026-08-03 — Duas sessões num working tree: o commit alheio que levou meu trabalho
+
+**O que aconteceu:** O commit `89216e8` está publicado com o título *"feat(alert):
+o alarme agora sabe se tocou — rastreio de entrega ponta a ponta"* e contém 14
+arquivos: os 7 daquele trabalho e mais 7 de uma correção de retenção que não tem
+nada a ver com alarme. Quem for procurar por que `purgeExpiredRows` mudou não
+acha nada no título nem no corpo.
+
+Duas sessões editavam o MESMO working tree (`C:\Users\stefa\roca`). Eu tinha seis
+arquivos no index, staged por caminho explícito, como manda a regra que este
+arquivo já registra depois de um mass-stage ter embarcado 14 arquivos alheios num
+release. Não adiantou: a outra sessão fez um `git add` amplo, varreu meu index
+junto, commitou e empurrou. Meu `git commit` sequer executou.
+
+O agravante é como quase passei batido. Meu comando era
+`git status --short | grep "^[AMD]" && git commit ...` — o grep não achou nada
+staged (já tinha sido levado), retornou 1, e o `&&` curto-circuitou. O `git log`
+seguinte mostrou um commit recém-criado, e eu quase reportei "commitado" olhando
+um commit que não era meu.
+
+Errei outras três coisas na mesma sequência, todas de coordenação: criei uma
+chip de task, executei o mesmo trabalho inline sem checar se ela já tinha sido
+iniciada, e cancelei a sessão que estava fazendo melhor — só olhando o que ela
+tinha produzido DEPOIS de arquivar. O trabalho dela estava commitado e sobreviveu
+por sorte do arquivamento não apagar o branch.
+
+**Regras:**
+- **Duas sessões não compartilham working tree.** Stage explícito protege contra
+  o seu próprio `add -A`, não contra o de outra sessão no mesmo diretório. Quem
+  chega depois vai pra worktree — é para isso que elas existem.
+- **`git status | grep ... && git commit` engole o caso "index vazio".** Se o
+  grep não casa, o commit não roda e a saída parece inofensiva. Verifique o SHA
+  ou a mensagem depois de commitar, não a existência de um commit.
+- **Antes de fazer inline algo que já virou task, confira o estado da task.** Eu
+  gerei a chip e disparei o mesmo trabalho, criando duas implementações
+  concorrentes do mesmo arquivo.
+- **Ao cancelar trabalho, olhe o que ele produziu ANTES de encerrar.** A versão
+  cancelada era melhor que a minha em três pontos e virou a que está em produção.
+  Cancelar é decisão sobre um artefato que você precisa ter lido.
+- Título de commit é índice de busca, não etiqueta. Trabalho que entra de carona
+  num commit de outro assunto fica invisível para sempre — e quando descobrir que
+  o commit já foi empurrado, reescrever custa force-push num histórico
+  compartilhado, que raramente vale a pena.
