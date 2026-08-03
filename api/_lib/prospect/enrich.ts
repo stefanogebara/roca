@@ -56,10 +56,21 @@ export async function enriquecerDoSite(url: string): Promise<{ waPhone: string; 
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
 
-  // A home não é onde o "Zap" costuma morar. Das 7 citações que a base tem
-  // hoje, pelo menos duas vieram de /contato (grupograodeouro, coopama) — e
-  // essas foram achadas por pesquisa manual, porque esta função só lia a home.
-  // Era 6,7% de acerto em 105 tentativas: teto do método, não da base.
+  // HIPÓTESE NÃO CONFIRMADA — mantida de propósito, mas não a trate como fato.
+  //
+  // Duas das 7 citações históricas moram em /contato (grupograodeouro, coopama),
+  // então presumi que ler além da home destravaria o enriquecimento. Medido no
+  // backfill de 03/ago: das 11 citações novas, **11 vieram da home e ZERO de
+  // subpágina**, em 142 consultas. Quem de fato rendeu foi outra mudança da
+  // mesma leva — tirar o filtro por classe de número do candidatosBackfill.
+  //
+  // Provável explicação: site que publica Zap costuma ter o botão flutuante na
+  // home também, e /contato de muitos é renderizado em JS (o HTML cru não traz
+  // o link). Os dois casos históricos vieram de pesquisa manual mais funda.
+  //
+  // Ficam como seguro barato: só disparam quando a home não tem link, são
+  // fail-soft e abortam em host morto. Se um dia custarem latência que importe,
+  // este é o primeiro lugar a cortar — não há evidência defendendo eles.
   for (const caminho of CAMINHOS_CANDIDATOS) {
     const alvo = new URL(caminho || parsed.pathname, parsed);
     const r = await buscarPagina(alvo);

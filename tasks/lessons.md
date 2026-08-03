@@ -738,3 +738,63 @@ por sorte do arquivamento não apagar o branch.
   num commit de outro assunto fica invisível para sempre — e quando descobrir que
   o commit já foi empurrado, reescrever custa force-push num histórico
   compartilhado, que raramente vale a pena.
+
+## 2026-08-03 — Discar o cadastro queimava o canal; e minha hipótese do conserto era a errada
+
+**O que aconteceu:** O breaker cortou a prospecção — 4 falhas pós-aceite contra
+um limite de 3. Investigando os envios do dia, a correlação era limpa:
+
+| procedência do número | resultado |
+|---|---|
+| `wa_phone_source` citada | 6 de 7 entregaram |
+| sem fonte | **3 de 3 falharam** (`131026 undeliverable`) |
+
+Número sem procedência não é WhatsApp: é o fixo do cadastro do Places. E as
+fontes que funcionam são literalmente "botão Zap" e "widget wa.me/…" — o número
+foi encontrado COMO WhatsApp, por construção. Daí a correlação não ser sorte.
+
+O `sendablePhone` tinha, no próprio doc-comment, a regra certa — *"an uncited
+number is someone's guess, and guesses are what burn the number's reputation"* —
+e a fonte nº 2, três linhas abaixo, caía no `phone` do cadastro. Comentário e
+código discordavam havia semanas, e o dado deu razão ao comentário.
+
+O custo não era o envio perdido. Cada `131026` é sinal negativo de qualidade na
+Meta, no MESMO número que atende produtor — o canal inteiro do produto pendurado
+num palpite sobre o telefone de uma cooperativa.
+
+**E aqui está o erro que eu cometi logo depois.** Com o corte feito, a fila
+enviável caiu de 133 para 7, e fui atrás do enriquecimento. Notei que 2 das 7
+citações históricas moram em `/contato`, enquanto o extrator lia só a home —
+concluí "o balde tem furo" e implementei caminhos candidatos (`/contato`,
+`/fale-conosco`, `/atendimento`). Escrevi isso na mensagem do commit como se
+fosse a causa.
+
+Medi no backfill: **das 11 citações novas, 11 vieram da home e ZERO de
+subpágina**, em 142 consultas. Os caminhos renderam nada. Quem rendeu foi a
+OUTRA mudança da mesma leva — tirar o `!isMobileBR` do `candidatosBackfill`,
+que trouxe 62 celulares crus que o backfill nunca tinha olhado.
+
+Terceira vez que a classe do número se mostra o eixo errado (27/jul, 03/ago no
+corte, 03/ago no backfill) e primeira vez que eu confundo a correlação de 2
+exemplos com mecanismo.
+
+**Regras:**
+- **Duas mudanças na mesma leva = atribuição impossível sem medir.** Eu embarquei
+  caminhos candidatos e remoção do filtro de classe juntos, e teria creditado o
+  resultado ao errado se não tivesse perguntado ao banco DE ONDE cada citação
+  veio. Quando duas alterações podem explicar o mesmo ganho, meça qual explicou.
+- **Dois exemplos não são um mecanismo.** As duas citações em `/contato` eram
+  reais e mesmo assim não generalizavam — vieram de pesquisa manual mais funda,
+  não do padrão que eu inferi. Amostra pequena mostra que algo É possível, nunca
+  que é o caminho principal.
+- **Comentário que contradiz o código ao lado é bug esperando data.** Aqui o
+  doc-comment estava certo e o código errado, por semanas. Quando os dois
+  divergirem, o dado desempata — e enquanto ninguém mede, o errado é o que roda.
+- **Hipótese não confirmada fica marcada como tal no código.** Mantive os
+  caminhos (fail-soft, só disparam quando a home não tem link), mas o comentário
+  agora diz que renderam zero e que são o primeiro lugar a cortar. Código que
+  afirma o que não mediu vira folclore.
+- **Teto de método vs teto de base:** achei que era método; era base. Só 53% dos
+  prospects TÊM site — não há extrator que resolva metade da lista. O gargalo
+  virou sourcing, e reconhecer isso vale mais que a próxima otimização do
+  extrator.
