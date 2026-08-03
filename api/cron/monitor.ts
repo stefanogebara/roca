@@ -184,11 +184,23 @@ export default async function handler(
   // LGPD retention: purge rows past their useful life (see purgeExpiredRows).
   let purged: Record<string, number> = {};
   try {
-    purged = await purgeExpiredRows();
+    const res = await purgeExpiredRows();
+    purged = res.purged;
     const total = Object.values(purged).reduce((a, b) => a + b, 0);
     if (total > 0) findings.push(`Retenção: ${total} registro(s) antigos removidos.`);
+    // Tabela que erra todo dia era indistinguível de tabela vazia: o purge de
+    // farmer_alerts falhava desde sempre (coluna errada) e ninguém soube,
+    // porque `purged: {}` parece "não tinha nada pra apagar". Retenção que não
+    // roda é promessa de LGPD não cumprida — isso precisa sair.
+    if (res.failed.length) {
+      findings.push(
+        `⚠️ Retenção NÃO rodou em ${res.failed.length} tabela(s): ` +
+          res.failed.map((f) => `${f.table} (${f.reason})`).join('; ')
+      );
+    }
   } catch (e) {
     log.error('retention purge failed:', (e as Error).message);
+    findings.push(`⚠️ Retenção falhou por completo: ${(e as Error).message.slice(0, 120)}`);
   }
 
   // Record the run (best-effort; a DB hiccup shouldn't fail the cron).

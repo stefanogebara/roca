@@ -830,39 +830,59 @@ export async function hasRecentReferral(userId: string, sinceIso: string): Promi
 }
 
 /**
+ * Alvos da retenção. A coluna de data é POR ALVO porque nem toda tabela usa
+ * `created_at`: `farmer_alerts` carimba `sent_at`, e assumir o padrão fez o
+ * purge dela falhar em TODA execução desde que existe — erro só no log, e um
+ * retorno que não distinguia "nada pra apagar" de "não consegui apagar". Os 90
+ * dias de retenção prometidos nunca foram aplicados ali.
+ *
+ * Exportado pra que o teste consiga afirmar a coluna sem precisar de banco.
+ */
+export const PURGE_TARGETS: ReadonlyArray<{ table: string; days: number; column?: string }> = [
+  { table: 'messages', days: 365 },
+  { table: 'farmer_alerts', days: 90, column: 'sent_at' },
+  { table: 'ops_login_attempts', days: 30 },
+  { table: 'monitor_runs', days: 180 },
+  // Third-party data (scraped prospects) grew forever — the schema's own
+  // comment calls it "the most sensitive third-party data". Opt-outs are
+  // NEVER purged (prospect_optouts is the legal proof they asked out).
+  { table: 'prospect_messages', days: 365 },
+  { table: 'gym_runs', days: 90 },
+  { table: 'prospect_gym_runs', days: 90 },
+];
+
+export interface PurgeResult {
+  /** tabela → linhas apagadas (só as que apagaram algo). */
+  purged: Record<string, number>;
+  /** tabelas que ERRARAM. Vazio ≠ ausente: sem isto, falha vira 0 silencioso. */
+  failed: Array<{ table: string; reason: string }>;
+}
+
+/**
  * Data retention (LGPD minimization): purge rows past their useful life.
  * messages 365d (the caderno reads 180d), farmer_alerts 90d (dedup horizon is
  * days), ops_login_attempts 30d (throttle window is minutes), monitor_runs
- * 180d. Called by the daily monitor cron; each delete is independent.
+ * 180d. Called by the daily monitor cron; each delete is independent — uma
+ * tabela quebrada não pode impedir a limpeza das outras.
  */
-export async function purgeExpiredRows(): Promise<Record<string, number>> {
+export async function purgeExpiredRows(): Promise<PurgeResult> {
   const db = getDb();
-  const targets: Array<{ table: string; days: number }> = [
-    { table: 'messages', days: 365 },
-    { table: 'farmer_alerts', days: 90 },
-    { table: 'ops_login_attempts', days: 30 },
-    { table: 'monitor_runs', days: 180 },
-    // Third-party data (scraped prospects) grew forever — the schema's own
-    // comment calls it "the most sensitive third-party data". Opt-outs are
-    // NEVER purged (prospect_optouts is the legal proof they asked out).
-    { table: 'prospect_messages', days: 365 },
-    { table: 'gym_runs', days: 90 },
-    { table: 'prospect_gym_runs', days: 90 },
-  ];
   const purged: Record<string, number> = {};
-  for (const t of targets) {
+  const failed: Array<{ table: string; reason: string }> = [];
+  for (const t of PURGE_TARGETS) {
     const cutoff = new Date(Date.now() - t.days * 86_400_000).toISOString();
     const { count, error } = await db
       .from(t.table)
       .delete({ count: 'exact' })
-      .lt('created_at', cutoff);
+      .lt(t.column ?? 'created_at', cutoff);
     if (error) {
       log.error(`purge ${t.table} failed:`, error.message);
+      failed.push({ table: t.table, reason: error.message.slice(0, 120) });
       continue;
     }
     if (count) purged[t.table] = count;
   }
-  return purged;
+  return { purged, failed };
 }
 
 /** Record an ops-console login attempt (brute-force throttling evidence). */
