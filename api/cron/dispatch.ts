@@ -10,6 +10,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { runDispatch, runBumpDispatch } from '../_lib/prospect/dispatch';
 import { createLogger } from '../_lib/logger';
+import { alertFounders } from '../_lib/alert';
 
 const log = createLogger('dispatch-cron');
 
@@ -55,13 +56,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // WhatsApp no fim de cada lote REAL — o disparo é o evento, sem cron novo.
     // Fail-soft: um ping que falha jamais derruba um lote que já saiu.
     try {
-      const { resumoDoLote, pingFoundersTexto } = await import('../_lib/notify');
+      const { resumoDoLote } = await import('../_lib/notify');
       const texto = resumoDoLote(report, bumps);
-      if (texto) {
-        const { CloudApiAdapter } = await import('../_lib/transport/cloud');
-        const adapter = new CloudApiAdapter();
-        await pingFoundersTexto((to, text) => adapter.send({ to, text }), texto);
-      }
+      // alertFounders, NÃO um send de texto livre pelo Cloud API: mensagem
+      // iniciada pelo negócio fora da janela de 24h da Meta só passa como
+      // TEMPLATE (o próprio registry documenta isso em ALERT_NAME). Às 10h05 de
+      // segunda nenhum founder tem janela aberta com o número da Stevi, então o
+      // texto livre morreria com 131047 — e o catch aqui engoliria em silêncio.
+      // alertFounders é o caminho da casa: webhook independente primeiro,
+      // WhatsApp como fallback. Mesmo canal do alerta de lead e de incidente.
+      if (texto) await alertFounders(texto);
     } catch (e) {
       log.error('resumo do lote pros founders falhou:', (e as Error).message);
     }

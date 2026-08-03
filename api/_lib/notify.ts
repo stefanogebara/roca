@@ -230,22 +230,3 @@ export function resumoDoLote(
     ` Respostas aparecem no painel: ${PAINEL_URL}`
   );
 }
-
-/** Ping de texto livre pros founders — mesmo canal do aviso de pedido de
- * agrônomo. Fail-soft por número: um founder inalcançável não cala o outro. */
-export async function pingFoundersTexto(
-  send: (to: string, text: string) => Promise<void>,
-  texto: string
-): Promise<void> {
-  const numbers = (process.env.FOUNDER_WA_NUMBERS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (const to of numbers) {
-    try {
-      await withRetry(() => send(to, texto), { attempts: 2 });
-    } catch (e) {
-      log.error(`founder ping to ${to.slice(0, 6)}… failed:`, (e as Error).message);
-    }
-  }
-}
