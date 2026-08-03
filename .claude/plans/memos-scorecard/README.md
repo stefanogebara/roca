@@ -82,11 +82,21 @@ conversando.
 - CNPJ — "iniciar esta semana" listado em 25/jul, sem evidência de início →
   **9 dias**.
 - Acordo escrito com Michel + assinatura dos 36 casos golden — sem evidência
-  de progresso desde 25/jul → **9 dias**.
+  de progresso desde 25/jul → **9 dias** (ver decisão tomada em 03/ago abaixo).
 - Envs `FOUNDER_NOTIFY_TO` e `WHATSAPP_TEMPLATE_ALERT` na Vercel — sem acesso
   para confirmar o valor em produção → **9 dias, não medido**.
 - Follow-up humano no único usuário externo real (Gaia Tech) — **17 dias**
   parado desde 17/jul.
+
+**Decidido em 03/ago (durante a leitura desta semana):** Stefano vai retomar
+contato pessoal com Michel (Gaia Tech) pelo WhatsApp — não pela Stevi/robô,
+seguindo a regra pré-registrada de 16/jul de que esse acordo não pode vir do
+bot. Rascunho da mensagem preparado, cobrindo as duas frentes que estavam
+paradas: (1) reengajar o único contato externo real, silencioso há 17 dias, e
+(2) reabrir o acordo escrito + validação dos 36 casos golden, sem mencionar
+preço (guard-rail: só depois do 1º fechamento, que ainda não aconteceu). Isso
+é a ação de campo, não de engenharia, que a prioridade 2 desta semana pedia —
+ainda depende do envio e da resposta dele para sair do "parado".
 
 **Resolvido desde a última leitura:** ✅ billing da Meta (#131042) — entregas
 voltaram a acontecer 28-31/jul (ver "Achado operacional" acima). Isso remove o
