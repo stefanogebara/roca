@@ -136,7 +136,13 @@ export class TwilioAdapter implements TransportAdapter {
 
     const params: Record<string, string> = {
       From: from,
-      To: `whatsapp:${msg.to}`,
+      // O Twilio exige E.164 COM `+`; a Meta entrega e aceita só dígitos. O
+      // wa_id guardado é canônico (dígitos, sem `+`) — ver canonicalWaId em
+      // db.ts — então quem põe o `+` de volta é este adapter, que é o dono
+      // deste formato de fio. Antes disto, um `to` sem `+` virava
+      // `whatsapp:5511…` e o envio falhava; as linhas antigas (channel null)
+      // roteiam por aqui, então era o alerta de geada delas que quebraria.
+      To: `whatsapp:+${String(msg.to).replace(/\D/g, '')}`,
     };
 
     // Media path: send the image with the text as body. On any failure, retry

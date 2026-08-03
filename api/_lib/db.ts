@@ -21,6 +21,27 @@ export function getDb(): SupabaseClient {
   return cached;
 }
 
+/**
+ * Forma canônica do `wa_id`: só dígitos, COM código do país, sem `+`.
+ *
+ * Por que existe: o Twilio entrega `whatsapp:+5511…` (o adapter tira o prefixo
+ * e sobra `+5511…`) e a Meta entrega `5511…`. Como `upsertUser` gravava o valor
+ * cru, o MESMO produtor virava DUAS linhas em `users` dependendo do transporte
+ * — histórico, culturas, fazenda e consentimento LGPD divididos entre elas.
+ * Medido em 03/ago: 6 linhas com `+` (era Twilio) e 13 sem (Cloud).
+ *
+ * NÃO usa normalizePhoneBR: aquela arranca o código do país e valida DDD
+ * brasileiro, então devolveria null para o número americano do próprio produto
+ * e deixaria o wa_id sem como ser respondido. Aqui o valor precisa continuar
+ * sendo o destinatário internacional completo.
+ *
+ * Formatar para o fio é responsabilidade de cada transporte: o Twilio recoloca
+ * o `+` (ver transport/twilio.ts), a Meta aceita dígitos.
+ */
+export function canonicalWaId(raw: string): string {
+  return raw.replace(/\D/g, '');
+}
+
 export interface UserRow {
   id: string;
   wa_id: string;
@@ -45,7 +66,7 @@ export async function upsertUser(
   const db = getDb();
   const { data, error } = await db
     .from('users')
-    .upsert({ wa_id: waId, name, ...(channel ? { channel } : {}) }, { onConflict: 'wa_id' })
+    .upsert({ wa_id: canonicalWaId(waId), name, ...(channel ? { channel } : {}) }, { onConflict: 'wa_id' })
     .select()
     .single();
   if (error) {
@@ -976,7 +997,7 @@ export async function deleteUserData(waId: string): Promise<boolean> {
   const { data: user } = await db
     .from('users')
     .select('id')
-    .eq('wa_id', waId)
+    .eq('wa_id', canonicalWaId(waId))
     .maybeSingle();
   if (!user) return true;
   const userId = (user as { id: string }).id;
