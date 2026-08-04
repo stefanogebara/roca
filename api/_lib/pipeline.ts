@@ -1354,26 +1354,73 @@ export async function handleInbound(
   )
     return;
 
-  // Build the route context (guard survivors + onboarding signals), then pick
-  // the first matching route by priority order; if nothing matches, the
-  // reasoning fallback. The branch's 8 outputs come back as one RouteResult.
-  const ctx = await buildRouteContext({
-    adapter,
-    msg,
-    effective,
-    user,
-    userId,
-    firstContact,
-    media,
-    transcript,
-    contactText,
-    mediaTooLarge,
+  // ── Rede de segurança da resposta ────────────────────────────────────────
+  //
+  // Até 04/ago daqui pra baixo rodava SEM try/catch. Um throw em qualquer das
+  // 15 rotas, no buildRouteContext ou no finalizeAndSend subia até o webhook,
+  // que logava, alertava os founders e dava ack() — e o produtor recebia ZERO.
+  // É o pior desfecho do produto: ele mandou foto de ferrugem e o WhatsApp
+  // ficou mudo, sem nem um "deu ruim".
+  //
+  // O envio é observado por Proxy, não por spread: `adapter` é instância de
+  // classe, e `{...adapter}` copiaria só as props próprias, deixando `send`,
+  // `markRead` e `fetchMedia` (métodos de protótipo) para trás. Foi essa
+  // família de bug que quebrou o markRead calado em 29/jul.
+  let jaRespondeu = false;
+  const observado = new Proxy(adapter, {
+    get(alvo, prop) {
+      if (prop === 'send') {
+        return async (m: Parameters<TransportAdapter['send']>[0]) => {
+          jaRespondeu = true;
+          return alvo.send(m);
+        };
+      }
+      const v = Reflect.get(alvo, prop, alvo);
+      return typeof v === 'function' ? v.bind(alvo) : v;
+    },
   });
-  const route = ROUTES.find((r) => r.match(ctx));
-  // The route declares its intent statically; stamp it onto the handler output.
-  // The fallback owns its own (dynamic) intent, so it returns a full RouteResult.
-  const result: RouteResult = route
-    ? { ...(await route.handle(ctx)), intent: route.intent }
-    : await reasonFallback(ctx);
-  await finalizeAndSend(ctx, result);
+
+  try {
+    // Build the route context (guard survivors + onboarding signals), then pick
+    // the first matching route by priority order; if nothing matches, the
+    // reasoning fallback. The branch's 8 outputs come back as one RouteResult.
+    const ctx = await buildRouteContext({
+      adapter: observado,
+      msg,
+      effective,
+      user,
+      userId,
+      firstContact,
+      media,
+      transcript,
+      contactText,
+      mediaTooLarge,
+    });
+    const route = ROUTES.find((r) => r.match(ctx));
+    // The route declares its intent statically; stamp it onto the handler output.
+    // The fallback owns its own (dynamic) intent, so it returns a full RouteResult.
+    const result: RouteResult = route
+      ? { ...(await route.handle(ctx)), intent: route.intent }
+      : await reasonFallback(ctx);
+    await finalizeAndSend(ctx, result);
+  } catch (e) {
+    const motivo = (e as Error).message;
+    log.error('pipeline crashed after the guards:', motivo);
+    // Só desculpa quem ainda não recebeu nada. Um throw DEPOIS do envio (persist
+    // falhando, card quebrando) não pode virar mensagem duplicada — a desculpa
+    // atrás de uma resposta boa confunde mais do que ajuda.
+    if (!jaRespondeu) {
+      try {
+        await adapter.send({ to: msg.from, text: FALLBACK_REPLY });
+      } catch (envioErr) {
+        log.error('fallback de emergência também falhou:', (envioErr as Error).message);
+      }
+    }
+    // O webhook não vai mais ver este erro (ele para aqui), então o alerta sai
+    // daqui — sem esperar, porque telemetria não segura o ack.
+    fireAndForget(
+      () => alertFounders(`⚠️ Stevi: pipeline estourou — ${motivo.slice(0, 180)}`),
+      'alerta de crash do pipeline'
+    );
+  }
 }

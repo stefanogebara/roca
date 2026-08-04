@@ -106,7 +106,17 @@ export default async function handler(
       const statuses = parseCloudStatuses(rawBody);
       if (statuses.length) {
         const { applyProspectStatuses } = await import('./_lib/prospect/health');
-        await applyProspectStatuses(statuses);
+        // try/catch PRÓPRIO, pelo mesmo motivo que a função irmã abaixo tem o
+        // dela: isto é contabilidade de PROSPECÇÃO, um satélite. Ela faz um
+        // UPDATE por evento e um alertFounders sequencial por status 'failed',
+        // e a Meta empacota mensagem + statuses no mesmo POST — sem o catch,
+        // um lote com falhas derrubava o handleInbound e o produtor que mandou
+        // foto de ferrugem não recebia nada.
+        try {
+          await applyProspectStatuses(statuses);
+        } catch (e) {
+          log.error('applyProspectStatuses failed (satélite, ignorado):', (e as Error).message);
+        }
         // O MESMO callback confirma (ou desmente) a entrega dos alertas pros
         // founders. Sem isto, "aceito pela Meta" era tudo que sabiamos — e foi
         // assim que o canal ficou mudo por semanas em 03/ago.

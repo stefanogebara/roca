@@ -441,6 +441,44 @@ describe('non-field pin never ships a "SUA LAVOURA" card image', () => {
  * SUPABASE_URL, e a suíte reportava 4 "Unhandled Rejection" com 806 testes
  * verdes. Verde não é o mesmo que são.
  */
+describe('o produtor nunca fica sem resposta', () => {
+  // handleInbound rodava SEM nenhum try/catch: um throw em qualquer das 15
+  // rotas, no buildRouteContext ou no finalizeAndSend subia até o webhook, que
+  // logava, alertava os founders e dava ack(). O produtor recebia ZERO — o pior
+  // desfecho possível do produto, e o único sem sinal nenhum pra ele.
+  it('rota que estoura ainda entrega o fallback ao produtor', async () => {
+    vi.mocked(checkOutbound).mockImplementation(() => {
+      throw new Error('gate explodiu');
+    });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'posso pulverizar hoje?' }));
+
+    const textos = adapter.send.mock.calls.map((c) => c[0].text as string);
+    expect(textos.some((t) => t?.includes('problema pra processar'))).toBe(true);
+  });
+
+  it('NÃO manda fallback se o produtor já tinha recebido resposta', async () => {
+    // Um throw DEPOIS do envio não pode virar mensagem duplicada: a desculpa
+    // chegando atrás de uma resposta boa confunde mais do que ajuda.
+    const adapter = makeAdapter();
+    adapter.send
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('segundo envio falhou'));
+    vi.mocked(reason).mockImplementation(async (_m, _i, deps) => {
+      deps.onPestCard?.({ pest: 'ferrugem', confidence: 'alta', crop: 'café', evidence: 'x', products: 3, groups: ['C3'] });
+      return 'triagem honesta';
+    });
+
+    await handleInbound(adapter, msgFixture({ text: 'que praga é essa no café' }));
+
+    const desculpas = adapter.send.mock.calls
+      .map((c) => c[0].text as string)
+      .filter((t) => t?.includes('problema pra processar'));
+    expect(desculpas).toHaveLength(0);
+  });
+});
+
 describe('opt-out por áudio', () => {
   // O comentário do guard dizia que o opt-out é honrado "immediately and
   // permanently, before any other handling". Não era: handleProspectInbound

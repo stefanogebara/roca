@@ -116,6 +116,25 @@ beforeEach(() => {
   m.cloudMarkRead.mockResolvedValue(undefined);
 });
 
+describe('contabilidade de prospecção não derruba a resposta do produtor', () => {
+  // applyProspectStatuses rodava sem proteção ANTES do handleInbound. Ela faz um
+  // UPDATE por evento e um alertFounders sequencial por status 'failed' — e a
+  // Meta empacota mensagem + statuses no MESMO POST. Um lote com falhas podia
+  // estourar ali e o produtor, que tinha mandado foto de ferrugem, não recebia
+  // nada. O comentário oito linhas abaixo já explicava esse risco para a função
+  // irmã; esta ficou descoberta.
+  it('status quebrando não impede o handleInbound', async () => {
+    m.parseCloudStatuses.mockReturnValue([{ id: 'wamid', status: 'failed' }]);
+    m.applyProspectStatuses.mockRejectedValue(new Error('health machine caiu'));
+    const res = makeRes();
+
+    await handler(makeReq({ headers: { 'x-hub-signature-256': 'sha256=abc' }, body: '{}' }), res);
+
+    expect(m.handleInbound).toHaveBeenCalledTimes(1);
+    expect(res.out.json).toEqual({ received: true });
+  });
+});
+
 describe('markRead — cosmético, disparado sem esperar', () => {
   const postCloud = () =>
     handler(makeReq({ headers: { 'x-hub-signature-256': 'sha256=abc' }, body: '{}' }), makeRes());
