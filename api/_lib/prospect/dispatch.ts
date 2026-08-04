@@ -15,6 +15,7 @@ import {
   BATCH_SIZE,
   BATCH_DELAY_MS,
 } from './core';
+import { foraDoICP } from './icp';
 import {
   loadReadyProspects,
   loadOptouts,
@@ -479,7 +480,14 @@ export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise
       sendablePhone(p) &&
       !optouts.has(sendablePhone(p) as string) &&
       !(p.phone && optouts.has(p.phone)) &&
-      kindAllowed(p.kind)
+      kindAllowed(p.kind) &&
+      // ICP reavaliado NA HORA do envio, não só na entrada. Um sinal de ICP
+      // nasce depois de a base já existir — quem entrou antes segue na esteira
+      // de follow-up para sempre. Em 04/ago um pet shop leu um bump nosso; o
+      // filtro tinha ganhado o sinal dele minutos antes. Segunda camada porque
+      // a varredura retroativa pode não ter rodado ainda: aqui a mensagem não
+      // sai, mesmo que a linha ainda esteja marcada como contatada.
+      !foraDoICP(p.name, p.source)
   );
   const cap = capInfo.cap;
   const batch = planBatch(eligible, { dailyCap: cap, sentToday });

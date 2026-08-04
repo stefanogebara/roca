@@ -13,7 +13,7 @@
  * arrisca denúncia de quem recebeu oferta irrelevante.
  */
 import { describe, it, expect } from 'vitest';
-import { foraDoICP, motivoForaDoICP } from '../api/_lib/prospect/icp';
+import { foraDoICP, motivoForaDoICP, alvosDaVarreduraICP } from '../api/_lib/prospect/icp';
 
 describe('foraDoICP — descartar pet/ração/veterinário antes da fila', () => {
   it('pega os que JÁ entraram na base por engano', () => {
@@ -81,5 +81,74 @@ describe('autopeças — o caso Jocape (31/jul)', () => {
 
   it('NÃO barra revenda agro legítima', () => {
     expect(motivoForaDoICP('Corpal Comércio e Representações', 'https://www.corpal.com.br/')).toBeNull();
+  });
+});
+
+/**
+ * Varredura retroativa e guarda do bump — o caso Cãopeão (04/ago).
+ *
+ * Um pet shop recebeu bump DEPOIS de o filtro de pet existir. A raiz: quando
+ * um sinal novo nasce, a limpeza retroativa varria só `discovered` — quem já
+ * estava em `contacted` seguia recebendo follow-up. Segunda vez que o mesmo
+ * negócio consumiu cap e reputação depois de identificado como fora do ICP.
+ *
+ * Duas camadas, porque uma só falha em silêncio:
+ *  1. varredura cobre todos os estágios ANTES do disparo, não só descobertos;
+ *  2. o bump reavalia o ICP na hora do envio — mesmo que a varredura falhe ou
+ *     ainda não tenha rodado, a mensagem não sai.
+ */
+describe('alvosDaVarreduraICP — quem a limpeza retroativa pode descartar', () => {
+  const p = (over = {}) => ({ id: 'x', name: 'Agro Legítima', source: 'maps://x', status: 'contacted', ...over });
+
+  it('pega fora-do-ICP em QUALQUER estágio pré-conversa, não só descobertos', () => {
+    const rows = [
+      p({ id: 'desc', name: 'Pet Shop Feliz', status: 'discovered' }),
+      p({ id: 'ready', name: 'Auto Peças Silva', status: 'ready' }),
+      p({ id: 'cont', name: 'Cãopeão Agropecuária', status: 'contacted' }), // agora o filtro pega
+      p({ id: 'stale', name: 'Mundo Pet', status: 'stale' }),
+    ];
+    expect(alvosDaVarreduraICP(rows).descartar.map((r) => r.id)).toEqual(['desc', 'ready', 'cont', 'stale']);
+  });
+
+  it('NUNCA descarta quem respondeu ou virou parceiro — tem gente na conversa', () => {
+    // Descartar por regex alguém que já falou com a gente apagaria um
+    // relacionamento real. Vai pra revisão do founder, não pro lixo.
+    const rows = [
+      p({ id: 'resp', name: 'Pet Shop que respondeu', status: 'replied' }),
+      p({ id: 'parc', name: 'Petrolina Agro', status: 'partner' }),
+    ];
+    const r = alvosDaVarreduraICP(rows);
+    expect(r.descartar).toEqual([]);
+    expect(r.revisar.map((x) => x.id)).toEqual(['resp']);
+  });
+
+  it('não mexe em quem está dentro do ICP', () => {
+    const rows = [p({ id: 'ok', name: 'Cooperativa de Cafeicultores' })];
+    const r = alvosDaVarreduraICP(rows);
+    expect(r.descartar).toEqual([]);
+    expect(r.revisar).toEqual([]);
+  });
+
+  it('usa a FONTE também — o caso Jocape, cujo nome não denuncia', () => {
+    const rows = [p({ id: 'j', name: 'Jocape', source: 'http://jocapeautopecas.com.br' })];
+    expect(alvosDaVarreduraICP(rows).descartar.map((r) => r.id)).toEqual(['j']);
+  });
+});
+
+describe('trocadilho com cão — o caso Cãopeão (04/ago)', () => {
+  // Ele recebeu bump E leu. Eu presumi falha da varredura por estágio; a
+  // medição mostrou outra coisa: o filtro nunca viu o nome. Quem pegou foi
+  // olho humano, que não escala e falha calado.
+  it('pega nomes com trocadilho canino', () => {
+    expect(motivoForaDoICP('Cãopeão Agropecuária', 'maps://x')).toMatch(/cão/i);
+    expect(motivoForaDoICP('Cãopanheiro Agro', 'maps://x')).toMatch(/cão/i);
+    expect(motivoForaDoICP('Mundo Cão', 'maps://x')).toMatch(/cão/i);
+  });
+
+  it('NÃO pega palavras que só contêm as letras', () => {
+    // "canoa", "cana", "caolho" não são pet shop — e cana é palavra de agro.
+    expect(motivoForaDoICP('Agro Canavieira', 'maps://x')).toBeNull();
+    expect(motivoForaDoICP('Canoas Insumos Agrícolas', 'maps://x')).toBeNull();
+    expect(motivoForaDoICP('Cooperativa Cana Forte', 'maps://x')).toBeNull();
   });
 });

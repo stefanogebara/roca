@@ -29,6 +29,13 @@ const SINAIS_PECUARIA: Array<{ re: RegExp; rotulo: string }> = [
   { re: /\bra[çc][õo]es\b/i, rotulo: 'rações' },
   { re: /\bc[ãa]es\b|\bgatos\b|\bcalopsita|\bpassarinho/i, rotulo: 'animais de estimação' },
   { re: /\bbanho\s+e\s+tosa\b/i, rotulo: 'banho e tosa' },
+  // Trocadilho canino no nome — "Cãopeão", "Cãopanheiro", "Mundo Cão". Achado
+  // em 04/ago: o Cãopeão Agropecuária recebeu bump E leu. Eu presumi que fosse
+  // falha da varredura por estágio; a medição mostrou outra coisa — o filtro
+  // simplesmente não via o nome. Quem pegou foi olho humano, que não escala e
+  // falha em silêncio. O `ã` obrigatório evita casar "cana", "canoa", "canavial",
+  // que são palavras de agro de verdade.
+  { re: /\bc[ãa]o\b|\bcão[a-zà-ÿ]*/i, rotulo: 'trocadilho com cão (pet)' },
   { re: /\bcl[íi]nica\s+veterin[áa]ria\b|\bmedicina\s+pet\b/i, rotulo: 'clínica veterinária' },
   { re: /\bsomente\s+produtos?\s+pecu[áa]ri/i, rotulo: 'declara só pecuária' },
   { re: /\bapenas\s+pecu[áa]ri/i, rotulo: 'declara só pecuária' },
@@ -65,4 +72,49 @@ export function motivoForaDoICP(nome: string, contexto?: string | null): string 
 /** Se este prospect deve ser descartado antes de entrar na fila. */
 export function foraDoICP(nome: string, contexto?: string | null): boolean {
   return motivoForaDoICP(nome, contexto) !== null;
+}
+
+/** O mínimo que a varredura precisa ver de uma linha. */
+export interface LinhaVarredura {
+  id: string;
+  name: string;
+  source?: string | null;
+  status: string;
+}
+
+/**
+ * Estágios em que descartar é seguro: ninguém conversou com a gente ainda.
+ * `replied` e `partner` ficam de fora de propósito — ver alvosDaVarreduraICP.
+ */
+const ESTAGIOS_SEGUROS = new Set(['discovered', 'ready', 'contacted', 'stale']);
+
+export interface AlvosVarredura<T> {
+  /** Fora do ICP e sem conversa iniciada — pode descartar automaticamente. */
+  descartar: T[];
+  /** Fora do ICP MAS já respondeu — decisão do founder, nunca do regex. */
+  revisar: T[];
+}
+
+/**
+ * Quem a limpeza retroativa deve tocar quando um sinal novo de ICP nasce.
+ *
+ * O caso que criou isto (04/ago): um pet shop recebeu bump DEPOIS de o filtro
+ * de pet existir, porque a limpeza varria só `discovered` — quem já estava em
+ * `contacted` seguia na esteira de follow-up, consumindo cap e reputação.
+ * Segunda vez com o mesmo negócio.
+ *
+ * A linha entre descartar e revisar é ter havido CONVERSA. Um regex pode dizer
+ * "isto parece pet shop"; ele não pode apagar um relacionamento que já existe.
+ * Quem respondeu vai pra revisão humana; parceiro não se toca de jeito nenhum.
+ */
+export function alvosDaVarreduraICP<T extends LinhaVarredura>(rows: T[]): AlvosVarredura<T> {
+  const descartar: T[] = [];
+  const revisar: T[] = [];
+  for (const r of rows) {
+    if (!foraDoICP(r.name, r.source ?? null)) continue;
+    if (ESTAGIOS_SEGUROS.has(r.status)) descartar.push(r);
+    else if (r.status === 'replied') revisar.push(r);
+    // 'partner' e 'discarded' não entram em nenhuma lista.
+  }
+  return { descartar, revisar };
 }
