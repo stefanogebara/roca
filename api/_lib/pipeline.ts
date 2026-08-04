@@ -1317,16 +1317,6 @@ export async function handleInbound(
     if (src) await setUserSource(userId, src);
   }
 
-  // Prospect opt-out ("sair") is honoured immediately and permanently, before
-  // any other handling. `pr` also carries the prospect for the agent branch,
-  // which runs after media normalization below.
-  const pr = await handleProspectInbound(msg.from, msg.text ?? null);
-  if (pr.handled && pr.reply) {
-    await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
-    if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
-    return;
-  }
-
   if (await guardRateLimit(adapter, msg, userId)) return;
 
   const { media, transcript, contactText, mediaTooLarge } = await fetchInboundMedia(adapter, msg);
@@ -1336,6 +1326,28 @@ export async function handleInbound(
     msg.kind === 'voice' && transcript ? { ...msg, kind: 'text', text: transcript } : msg;
   // Attach the transcript to the already-claimed inbound row (observability).
   if (transcript) await updateInboundTranscript(msg.messageId, transcript);
+
+  // Opt-out de prospect ("sair", "para de mandar mensagem"): honrado antes de
+  // qualquer resposta, e DEPOIS da transcrição.
+  //
+  // Até 04/ago esta chamada vinha nove linhas acima e recebia `msg.text ?? null`
+  // — ou seja, áudio chegava com null, `isOptOut` não tinha o que ler, e o
+  // pedido ia parar no agente conversacional, que respondia. O robô seguia
+  // falando com quem pediu pra parar. No agro brasileiro áudio é o canal de
+  // quem não digita; isso não era caso de borda.
+  //
+  // Ficar depois do rate limit é aceitável e o inverso não seria: para saber se
+  // um áudio é opt-out é preciso baixar e transcrever, e é justamente esse
+  // custo que o limitador existe pra conter. Quem pede pra sair manda uma ou
+  // duas mensagens, não quinze por minuto.
+  //
+  // `pr` também carrega o prospect para o branch do agente, logo abaixo.
+  const pr = await handleProspectInbound(msg.from, effective.text ?? null);
+  if (pr.handled && pr.reply) {
+    await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
+    if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
+    return;
+  }
 
   if (
     await respondAsProspectIfApplicable(adapter, msg, userId, pr.prospect, effective, media, transcript, contactText)

@@ -83,6 +83,7 @@ import { findPartnerByPhone } from '../api/_lib/partners';
 import { checkOutbound } from '../api/_lib/compliance';
 import { resolveStatedLocation } from '../api/_lib/location';
 import { buildFarmCard } from '../api/_lib/farmcard';
+import { transcribeVoice } from '../api/_lib/transcribe';
 
 const USER = {
   id: 'u1',
@@ -440,6 +441,37 @@ describe('non-field pin never ships a "SUA LAVOURA" card image', () => {
  * SUPABASE_URL, e a suíte reportava 4 "Unhandled Rejection" com 806 testes
  * verdes. Verde não é o mesmo que são.
  */
+describe('opt-out por áudio', () => {
+  // O comentário do guard dizia que o opt-out é honrado "immediately and
+  // permanently, before any other handling". Não era: handleProspectInbound
+  // recebia `msg.text ?? null` NOVE linhas antes da transcrição, então áudio
+  // chegava com null, isOptOut não tinha o que ler, e a mensagem seguia pro
+  // agente conversacional — o robô continuava falando com quem pediu pra parar.
+  //
+  // No agro brasileiro áudio é o canal de quem não digita. Isso não é borda.
+  it('a transcrição chega no isOptOut — o pedido de parar é reconhecido', async () => {
+    vi.mocked(transcribeVoice).mockResolvedValue('pode parar de mandar mensagem por favor');
+    const adapter = makeAdapter();
+    adapter.fetchMedia = vi.fn().mockResolvedValue({ base64: 'AAA', mime: 'audio/ogg' });
+
+    await handleInbound(
+      adapter,
+      msgFixture({ kind: 'voice', text: null, mediaUrl: 'media-id-1', mediaMime: 'audio/ogg' })
+    );
+
+    expect(handleProspectInbound).toHaveBeenCalledWith(
+      '+5511999990000',
+      'pode parar de mandar mensagem por favor'
+    );
+  });
+
+  it('texto continua chegando como antes', async () => {
+    const adapter = makeAdapter();
+    await handleInbound(adapter, msgFixture({ text: 'quero sair da lista' }));
+    expect(handleProspectInbound).toHaveBeenCalledWith('+5511999990000', 'quero sair da lista');
+  });
+});
+
 describe('telemetria não pode matar a instância', () => {
   it('escrita de triagem que falha não vira unhandled rejection', async () => {
     const soltas: unknown[] = [];
