@@ -532,3 +532,63 @@ describe('telemetria não pode matar a instância', () => {
     expect(soltas.map((e) => (e as Error)?.message)).toEqual([]);
   });
 });
+
+/**
+ * Robô-espelho no lado do produtor (achado #3 da auditoria de 04/ago).
+ *
+ * 880 das 926 mensagens `out` de 03/ago foram `smalltalk`: um atendimento
+ * automático trocou despedida com a Stevi por 25+ turnos, ~13s cada, cada turno
+ * custando uma invocação e uma chamada de LLM. Estes testes fixam as duas
+ * metades do contrato — o que o guard tem que calar, e o que ele NÃO pode.
+ */
+describe('guard de eco — robô que devolve a nossa própria frase', () => {
+  it('silêncio: nem LLM nem envio quando devolvem nossa despedida verbatim', async () => {
+    vi.mocked(db.getRecentTurns).mockResolvedValue([
+      { role: 'produtor', text: 'valeu!' },
+      { role: 'stevi', text: 'Até mais! Tamo junto. 🌱' },
+    ]);
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'Até mais! Tamo junto. 🌱' }));
+
+    // A economia é ANTES do modelo: é a chamada de LLM que custa, não o envio.
+    expect(routeIntent).not.toHaveBeenCalled();
+    expect(reason).not.toHaveBeenCalled();
+    expect(adapter.send).not.toHaveBeenCalled();
+  });
+
+  it('não lê o histórico duas vezes — o guard e a memória usam a mesma leitura', async () => {
+    // A leitura subiu para antes do roteamento; se o reasonFallback voltasse a
+    // buscar por conta própria, toda mensagem de texto pagaria dois SELECTs.
+    vi.mocked(db.getRecentTurns).mockResolvedValue([{ role: 'stevi', text: 'oi de ontem' }]);
+    await handleInbound(makeAdapter(), msgFixture({ text: 'e a ferrugem na soja?' }));
+
+    expect(db.getRecentTurns).toHaveBeenCalledTimes(1);
+    expect(reason).toHaveBeenCalledTimes(1);
+  });
+
+  it('produtor que INSISTE com a própria frase é respondido — insistir é humano', async () => {
+    vi.mocked(db.getRecentTurns).mockResolvedValue([
+      { role: 'produtor', text: 'alguém aí?' },
+      { role: 'stevi', text: 'Oi! Como posso ajudar?' },
+    ]);
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'alguém aí?' }));
+
+    expect(reason).toHaveBeenCalledTimes(1);
+    expect(adapter.send).toHaveBeenCalled();
+  });
+
+  it('foto nunca é calada pelo guard — não tem texto para espelhar', async () => {
+    vi.mocked(db.getRecentTurns).mockResolvedValue([{ role: 'stevi', text: 'Até mais! 🌱' }]);
+    const adapter = makeAdapter();
+
+    await handleInbound(
+      adapter,
+      msgFixture({ kind: 'image', text: null, mediaUrl: 'https://x/foto.jpg', mediaMime: 'image/jpeg' })
+    );
+
+    expect(adapter.send).toHaveBeenCalled();
+  });
+});

@@ -54,7 +54,24 @@ nunca roda: o produtor mandou foto de ferrugem e recebeu nada porque a
 prospecção quebrou.
 
 ### 3. Loop bot-contra-bot: 95% do volume de saída
-**VERIFICADO** (distribuição) · **RELATADO** (causa)
+**VERIFICADO** (distribuição) · **RELATADO** (causa) · **CORRIGIDO** 04/ago
+
+Guard em `api/_lib/ecoGuard.ts`, ligado antes do roteamento (é a chamada de LLM
+que custa). O sinal NÃO é o do `ecoDeMaquina` da Vitória: lá a contraparte
+repete a si mesma e há piso de 40 chars porque gente repete "ok"; aqui ela
+repete a NÓS, verbatim — "Até mais! Tamo junto. 🌱" devolvido idêntico. Sem piso
+de tamanho (o caso real tem 3 palavras), comparação estrita (só caixa e espaço),
+e só os turnos `stevi` — produtor que insiste com a própria frase é humano e
+urgente, e continua sendo respondido.
+
+Medido contra o dia real: **832 das 837** mensagens `out` de 03/ago são
+posteriores ao ponto onde o guard dispararia (99,4%). Varrendo a base inteira,
+o guard calaria **um único interlocutor** — "Corpal Tratores", 589 ecos, o
+autoatendimento de uma revenda. Nenhum produtor real.
+
+**Residual, de propósito:** um robô que PARAFRASEIA em vez de espelhar escapa.
+Afrouxar a comparação pegaria esse caso e passaria a arriscar calar produtor —
+o erro barato é deixar escapar.
 
 880 de 926 mensagens `out` são `smalltalk`. O agente identificou 25+ turnos de
 `"Até logo! 🌱"` ↔ `"Até logo! 🌱"` com o mesmo interlocutor automático, ~13s por

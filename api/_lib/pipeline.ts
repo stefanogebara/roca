@@ -77,6 +77,7 @@ import type { CommodityQuote } from './tools/prices';
 import type { PestCardData } from './cards/pest';
 import { persist, confirmarOuAvisar, validarCoordenada, validarCulturas } from './persist';
 import { withRetry } from './retry';
+import { ecoDoNossoTexto } from './ecoGuard';
 import { alertFounders } from './alert';
 import { sendReferralNotification, pingFoundersWhatsApp } from './notify';
 import { maskWa } from './opsData';
@@ -412,6 +413,11 @@ interface RouteContext {
   transcript: string | null;
   contactText: string | null;
   mediaTooLarge: boolean;
+  /** Últimos turnos, já lidos pelo guard de eco. Vem pronto no contexto porque
+   * o guard precisa deles ANTES de qualquer rota e a leitura não se paga duas
+   * vezes: quem usa depois é a memória de trabalho do `reasonFallback`. `null`
+   * quando não houve leitura (mensagem que não é texto). */
+  turns: Array<{ role: 'produtor' | 'stevi'; text: string }> | null;
   // Onboarding precomputes (may fire side effects — see buildRouteContext).
   cropAnswer: string[] | null;
   cropsOnly: boolean;
@@ -907,7 +913,7 @@ export const ROUTES: Route[] = [
  * memory. Fail-soft to FALLBACK_REPLY. Captures the pest card via the callback.
  */
 async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
-  const { effective, userId, user, msg, media } = ctx;
+  const { effective, userId, user, msg, media, turns } = ctx;
   // A pending crop/confirm question that got an unrelated reply: stop waiting,
   // answer normally (don't leave the farmer stuck in an onboarding state).
   if ((user?.awaiting === 'crop' || user?.awaiting === 'farm_confirm') && userId) {
@@ -923,11 +929,11 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
   let replyText: string;
   try {
     // Working memory: the last few turns, so follow-ups ("e o que eu faço?")
-    // resolve their referent. Fail-soft — no memory beats no reply.
-    const history =
-      userId && effective.kind === 'text'
-        ? formatTurnsBlock(await getRecentTurns(userId, msg.messageId))
-        : null;
+    // resolve their referent. Fail-soft — no memory beats no reply. Os turnos
+    // já vieram lidos no contexto (o guard de eco precisa deles antes de
+    // qualquer rota); aqui só se formata. `turns` é null quando não é texto,
+    // que é exatamente a condição que este ramo já checava.
+    const history = turns ? formatTurnsBlock(turns) : null;
     // Quem indicou. O users.source persistido cobre quem volta; parsear a
     // mensagem cobre o PRIMEIRO contato, onde setUserSource já rodou mas o
     // objeto `user` desta requisição foi lido antes e está desatualizado.
@@ -969,6 +975,32 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
     );
   }
   return { intent, replyText, pestCard };
+}
+
+/**
+ * Robô-espelho: a contraparte devolveu, verbatim, uma frase que a Stevi acabou
+ * de mandar. Devolve os turnos lidos (para o contexto reaproveitar) e se a
+ * resposta deve ser SILÊNCIO.
+ *
+ * O silêncio é a resposta certa, não uma desistência. Já mandamos aquela frase;
+ * repetir é o que sustenta o loop. Quem para primeiro encerra — e do outro lado
+ * não tem ninguém esperando.
+ *
+ * Roda depois do opt-out e do LGPD (pedido de sair nunca pode ser engolido por
+ * guard nenhum) e ANTES do roteamento, que é onde mora a chamada de LLM. Em
+ * 03/ago o loop custou 25+ invocações e 25+ chamadas de LLM por conversa.
+ */
+async function lerTurnosEDetectarEco(
+  userId: string,
+  msg: InboundMessage,
+  effective: InboundMessage
+): Promise<{ turns: Array<{ role: 'produtor' | 'stevi'; text: string }> | null; eco: boolean }> {
+  if (effective.kind !== 'text' || !effective.text) return { turns: null, eco: false };
+  // Fail-soft: histórico é memória de trabalho, e sem ele o produtor ainda
+  // merece resposta. `getRecentTurns` já engole o próprio erro e devolve [] —
+  // com [] o eco nunca dispara, que é o lado seguro de errar.
+  const turns = await getRecentTurns(userId, msg.messageId);
+  return { turns, eco: ecoDoNossoTexto(turns, effective.text) };
 }
 
 /** The media survivors of the fetch step, normalized for downstream routing. */
@@ -1354,6 +1386,15 @@ export async function handleInbound(
   )
     return;
 
+  // Robô-espelho: silêncio deliberado, antes de gastar LLM. Ver
+  // `lerTurnosEDetectarEco`. Os turnos seguem para o contexto — a leitura serve
+  // ao guard e depois à memória de trabalho, sem ler duas vezes.
+  const { turns, eco } = await lerTurnosEDetectarEco(userId, msg, effective);
+  if (eco) {
+    log.info(`eco de máquina: silêncio deliberado para ${msg.from}`);
+    return;
+  }
+
   // ── Rede de segurança da resposta ────────────────────────────────────────
   //
   // Até 04/ago daqui pra baixo rodava SEM try/catch. Um throw em qualquer das
@@ -1395,6 +1436,7 @@ export async function handleInbound(
       transcript,
       contactText,
       mediaTooLarge,
+      turns,
     });
     const route = ROUTES.find((r) => r.match(ctx));
     // The route declares its intent statically; stamp it onto the handler output.
