@@ -87,3 +87,18 @@ OpenAI gpt-realtime - pipecat-ai/pipecat + quickstart-phone-bot - Anatel 0303
 + Agencia Brasil (revogacao ago/2025) + MPF (recomendacao jan/2026) - Khomp
 (gravacao x LGPD) - Telnyx BR - Rhino (AI vs human SDR) - Luo et al. 2019,
 Marketing Science 38(6), DOI 10.1287/mksc.2019.1192.
+
+## Adendo (04/ago, noite) — os modelos chineses que o Stefano lembrou
+
+Dois modelos distintos que se misturam pelo nome:
+- **MiniCPM-o 4.5** (OpenBMB, open source, 9B): primeiro open source FULL-DUPLEX
+  omni-modal — escuta enquanto fala, decide quando interromper/parar, tempo
+  real. Vira o motor candidato da Opção C (self-host). Ressalvas: GPU dedicada
+  (~US$150-400/mês, MAIS caro que EL gerenciado no nosso volume), pt-BR
+  conversacional sem benchmark, turn-taking em português só se valida testando.
+- **MiniMax Speech 2.6/2.8** (API fechada): voz ultra-humana, latência <250ms
+  ponta a ponta, fração do preço do ElevenLabs — desafiante direto nas Opções
+  A/B. Cotar os dois no piloto.
+
+Os três vetos (Luo -80%, 0303, colheita) não dependem do motor de voz —
+recomendação inalterada: ligação esperada e atendimento de produtor.
