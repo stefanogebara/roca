@@ -422,6 +422,22 @@ export async function setProspectStatus(id: string, status: ProspectStatus): Pro
 }
 
 /** Find a prospect by its E.164 phone (to recognise inbound replies from prospects). */
+/**
+ * Acha o prospect por QUALQUER um dos dois números — `phone` (cadastro) ou
+ * `wa_phone` (o citado, para onde a gente de fato envia).
+ *
+ * Casar só por `phone` era um buraco medido: em 04/ago, 27 prospects tinham
+ * `wa_phone` diferente do `phone`, e a gente manda para o `wa_phone`. Ou seja,
+ * é DE LÁ que eles respondem, e a resposta não era reconhecida. Dois casos reais
+ * (AGROTEKNE e AgroRural, ambos revenda, template lido) responderam, caíram como
+ * "produtor" no pipeline e receberam oferta de diagnóstico de folha — enquanto a
+ * Vitória tentava recrutá-los como parceiros. Pior: um "para de mandar mensagem"
+ * vindo desse número não era reconhecido como opt-out.
+ *
+ * Duas consultas simples em vez de um filtro montado: o repo não tem nenhum
+ * `.or()`/`.filter()` com string interpolada, e manter essa propriedade vale
+ * mais que uma ida a menos ao banco.
+ */
 export async function findProspectByPhone(phone: string): Promise<ProspectRow | null> {
   const db = getDb();
   const { data, error } = await db.from('prospects').select('*').eq('phone', phone).maybeSingle();
@@ -429,7 +445,41 @@ export async function findProspectByPhone(phone: string): Promise<ProspectRow | 
     log.error('findProspectByPhone failed:', error.message);
     return null;
   }
-  return (data as ProspectRow) ?? null;
+  if (data) return data as ProspectRow;
+
+  const { data: porWa, error: erroWa } = await db
+    .from('prospects')
+    .select('*')
+    .eq('wa_phone', phone)
+    .maybeSingle();
+  if (erroWa) {
+    log.error('findProspectByPhone (wa_phone) failed:', erroWa.message);
+    return null;
+  }
+  return (porWa as ProspectRow) ?? null;
+}
+
+/**
+ * Apaga a linha do prospect por qualquer um dos dois números. O CASCADE de
+ * `prospect_messages.prospect_id` leva o thread junto.
+ *
+ * `prospect_optouts` NÃO é tocada de propósito: ela é keyed por telefone, sem FK
+ * para cá, e é a prova de que a pessoa pediu para sair. Apagar a supressão junto
+ * com o dado faria o sourcing redescobrir a mesma empresa amanhã.
+ */
+export async function deleteProspectByPhone(phone: string): Promise<boolean> {
+  const db = getDb();
+  // Dois deletes com .eq() em vez de um .or() com string montada: o repo não
+  // tem NENHUM filtro interpolado hoje, e essa propriedade vale mais que uma
+  // ida a menos ao banco. Idempotente — apagar zero linhas não é erro.
+  for (const coluna of ['phone', 'wa_phone'] as const) {
+    const { error } = await db.from('prospects').delete().eq(coluna, phone);
+    if (error) {
+      log.error(`deleteProspectByPhone (${coluna}) failed:`, error.message);
+      return false;
+    }
+  }
+  return true;
 }
 
 /** Mark a prospect as having replied (engagement signal for ops). */

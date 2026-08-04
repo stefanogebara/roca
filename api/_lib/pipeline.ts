@@ -10,7 +10,7 @@ import { routeIntent, type Intent } from './router';
 import { reason } from './reason';
 import { buildFarmCard, isFarmConfirmYes } from './farmcard';
 import { buildAgronomoBrief } from './brief';
-import { handleProspectInbound, respondAsProspectAgent, recordProspectOutbound } from './prospect/inbound';
+import { handleProspectInbound, respondAsProspectAgent, recordProspectOutbound, deleteProspectData } from './prospect/inbound';
 import { normalizePhoneBR } from './prospect/core';
 import { fireAndForget } from './fireAndForget';
 import {
@@ -988,12 +988,26 @@ type ProspectState = Awaited<ReturnType<typeof handleProspectInbound>>;
  */
 async function guardDeletionRequest(adapter: TransportAdapter, msg: InboundMessage): Promise<boolean> {
   if (!(msg.text && isDeletionRequest(msg.text))) return false;
-  await deleteUserData(msg.from);
+  // DOIS acervos, não um. Quem escreve daqui pode ser produtor (linha em
+  // `users`) ou prospect que a Vitória abordou (linha em `prospects`, com dado
+  // de terceiro raspado do Places). Até 04/ago só o primeiro era apagado, e o
+  // segundo recebia "Pronto, apaguei seus dados" com tudo intacto.
+  const [eraUsuario, eraProspect] = await Promise.all([
+    deleteUserData(msg.from),
+    deleteProspectData(msg.from),
+  ]);
+  // O texto descreve o que ACONTECEU. "localização e histórico" é vocabulário
+  // de produtor e seria mentira para um prospect, que nunca teve pin nem
+  // conversa — o que ele tinha era cadastro comercial e o histórico do contato.
+  const texto = eraProspect
+    ? 'Pronto, apaguei seu cadastro e o histórico das nossas mensagens, e não vou mais te procurar. 👍'
+    : 'Pronto, apaguei seus dados (localização e histórico). Se quiser voltar a usar é só mandar mensagem. 👍';
+  log.info(`LGPD delete: usuario=${eraUsuario} prospect=${eraProspect}`);
   try {
     await withRetry(() =>
       adapter.send({
         to: msg.from,
-        text: 'Pronto, apaguei seus dados (localização e histórico). Se quiser voltar a usar é só mandar mensagem. 👍',
+        text: texto,
       })
     );
   } catch (e) {

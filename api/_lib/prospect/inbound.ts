@@ -10,6 +10,7 @@ import { normalizePhoneBR, isOptOut } from './core';
 import {
   findProspectByPhone,
   addOptout,
+  deleteProspectByPhone,
   markProspectReplied,
   logProspectMessage,
   getProspectThread,
@@ -50,6 +51,35 @@ const NOT_A_PROSPECT: ProspectInboundResult = { handled: false, reply: null, pro
  * send (handled=true). If it's a prospect replying anything else, mark it
  * `replied` and return handled=false so normal handling continues.
  */
+/**
+ * Exclusão LGPD pedida por um PROSPECT (Art. 18, direito de eliminação).
+ *
+ * Antes de 04/ago o pipeline respondia *"Pronto, apaguei seus dados"* e não
+ * apagava nada: `deleteUserData` procura em `users`, devolve true quando não
+ * acha, e não existia nenhum delete em `prospects` no código. Dado de terceiro
+ * coletado sem consentimento, mais uma declaração falsa ao titular.
+ *
+ * A ordem aqui não é estética. A SUPRESSÃO VEM PRIMEIRO: `prospect_optouts` é
+ * keyed por telefone, sem FK para `prospects`, e nunca é podada. Se apagássemos
+ * a linha sem registrar o opt-out, o sourcing redescobriria a mesma empresa no
+ * Places amanhã e mandaria de novo — o oposto exato do que a pessoa pediu.
+ * Suprimido-e-não-apagado é recuperável; apagado-e-recontatado não é.
+ *
+ * Devolve se algo foi de fato apagado, para o chamador só afirmar o que fez.
+ */
+export async function deleteProspectData(waFrom: string): Promise<boolean> {
+  const phone = normalizePhoneBR(waFrom);
+  if (!phone) return false;
+
+  const prospect = await findProspectByPhone(phone);
+  if (!prospect) return false;
+
+  await addOptout(phone, 'exclusão LGPD solicitada pelo titular');
+  const apagado = await deleteProspectByPhone(phone);
+  log.info(`prospect LGPD delete: ${prospect.id} (apagado=${apagado})`);
+  return apagado;
+}
+
 export async function handleProspectInbound(
   waFrom: string,
   text: string | null
