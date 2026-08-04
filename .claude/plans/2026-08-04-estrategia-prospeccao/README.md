@@ -29,9 +29,20 @@ agente stevi-pesquisa-prospeccao, 04/ago).
 
 ## Plano por janela
 ### Agosto (colheita — relação, não volume)
-- [ ] FOUNDERS: "lead na mão" — oferecer os 5 pedidos reais de agrônomo às
-      consultorias vizinhas de cada produtor, mensagem pessoal. Primeiro
-      parceiro + primeiro caso de prova.
+- [x] ~~"lead na mão" com os 5 pedidos~~ **CAIU (04/ago): o Stefano pegou que
+      os 5 pedidos são DADO DE TESTE** — 4 do celular dele (final 2121) + 1 de
+      um 0000, todos de 08-10/jul. Não existe lead real hoje. A base de
+      produtores também está inflada: 21 usuários, vários com final de teste
+      (0000/3333/4444/6666) + os dois founders — base real ~12-14.
+      LIÇÃO: verificar procedência antes de planejar em cima de um número.
+- [ ] A JOGADA REESCRITA: o gargalo anterior à parceria é DEMANDA REAL DE
+      PRODUTOR. Sem pedido real de agrônomo, não há o que ofertar a parceiro.
+      Agosto vira mês de pôr a Stevi na mão de produtor de verdade: os ~12-14
+      reais que já existem (pedir indicação a eles), cards/QR em pontos que
+      produtor frequenta, e o caminho sindicato/SENAR — que serve às DUAS
+      pontas (produtores E lista de agrônomos).
+- [ ] FOUNDERS: limpar os dados de teste (5 referrals + usuários de teste) pra
+      tração parar de mentir no painel — decisão de deleção é dos founders.
 - [ ] FOUNDERS: lista SENAR/Educampo via sindicato rural (precedente
       FAEMG/SENAR × NovoAgro, ~300 produtores).
 - [ ] MÁQUINA: intro fria só para consultoria pequena com dono citado; pausar
