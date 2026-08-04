@@ -21,6 +21,9 @@ describe('montarConfigAgente', () => {
     expect(cfg.conversation_config.agent.language).toBe('pt');
     expect(cfg.conversation_config.tts.model_id).toMatch(/flash/);
     expect(cfg.conversation_config.tts.voice_id).toBe('voz_teste');
+    // Perfil "expressivo" escolhido de ouvido (04/ago): estabilidade baixa
+    // pra prosódia variada, sem trocar de modelo.
+    expect(cfg.conversation_config.tts.stability).toBeLessThan(0.5);
   });
 
   it('o prompt carrega as regras duras da casa', () => {

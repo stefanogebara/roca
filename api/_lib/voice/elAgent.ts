@@ -24,6 +24,8 @@ QUEM VOCÊ É AO TELEFONE
 - Apresente-se como assistente digital da Stevi logo no início, com naturalidade — a pessoa já sabe quem você é do WhatsApp.
 - Fale como gente do interior de Minas fala: frases curtas, calorosa sem bajular, zero jargão corporativo.
 - Uma pergunta por vez. Espere a resposta. Não atropele.
+- Comece as respostas com uma confirmação curta e natural ("Entendi.", "Ah, boa.", "Perfeito.") antes de continuar — é assim que gente de verdade sinaliza que ouviu.
+- Se a pessoa te interromper, PARE e ouça. Nunca retome a frase cortada do zero; responda ao que ela disse.
 
 SUA MISSÃO NA LIGAÇÃO
 - Retomar de onde a conversa do WhatsApp parou (use a ferramenta contexto_prospect ANTES de aprofundar).
@@ -95,12 +97,51 @@ export function montarConfigAgente(p: ParamsAgente) {
           ],
         },
       },
+      // Turn-taking: o que separa "URA" de "gente". turn_v3 é o detector
+      // semântico de fim de turno (análogo do semantic VAD da OpenAI);
+      // interruption_ignore_terms deixa o cliente fazer "uhum" sem derrubar a
+      // fala do agente; soft_timeout é o "deixa eu ver aqui..." enquanto o
+      // LLM pensa — preenche o silêncio que soa robótico.
+      turn: {
+        turn_timeout: 7,
+        silence_end_call_timeout: 20,
+        turn_eagerness: 'normal',
+        turn_model: 'turn_v3',
+        interruption_ignore_terms: ['uhum', 'aham', 'sim', 'tá', 'ok', 'certo', 'entendi', 'isso'],
+        soft_timeout_config: {
+          timeout_seconds: 3.0,
+          message: 'Hmm, deixa eu ver aqui rapidinho...',
+          additional_soft_timeout_messages: ['Só um segundinho...', 'Peraí, tô conferindo...'],
+          max_soft_timeouts_per_generation: 2,
+          use_llm_generated_message: false,
+        },
+      },
+      asr: {
+        quality: 'high',
+        // Telefonia (Twilio) fala μ-law 8kHz — declarar evita resample cego.
+        user_input_audio_format: 'ulaw_8000',
+        // Boost de reconhecimento pros termos do domínio que o ASR mais erra.
+        keywords: ['saca', 'arroba', 'café', 'lavoura', 'Stevi', 'Vitória'],
+      },
       tts: {
         // Flash: o modelo de menor latência — a escolha certa pra conversa
         // (estudo 2026-08-04-agente-voz). A voz vem de fora porque escolher
         // voz pt-BR é decisão de ouvido, não de código.
         model_id: 'eleven_flash_v2_5',
         voice_id: p.voiceId,
+        // Ajuste "expressivo" escolhido de ouvido pelo Stefano (04/ago) entre
+        // três amostras: estabilidade baixa dá a variação de prosódia que
+        // tira o tom de leitura, sem sair do Flash (latência).
+        stability: 0.35,
+        similarity_boost: 0.8,
+        optimize_streaming_latency: 3,
+        agent_output_audio_format: 'ulaw_8000',
+      },
+      conversation: {
+        // 'interruption' é o barge-in: o usuário fala por cima e o agente
+        // cala na hora, com o transcript corrigido pro que foi de fato ouvido.
+        client_events: ['audio', 'interruption', 'user_transcript', 'agent_response', 'agent_response_correction'],
+        max_duration_seconds: 600,
       },
     },
   };
