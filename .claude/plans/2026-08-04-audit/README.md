@@ -135,14 +135,27 @@ Corrigido por migration (CASCADE, aplicada e verificada em produção) e travado
 por teste topológico: toda FK que aponte para `prospects` tem que ser CASCADE —
 vale para a PRÓXIMA tabela que alguém pendurar lá.
 
-**Deriva de schema descoberta no caminho, NÃO corrigida:** seis migrations estão
-aplicadas no banco sem arquivo em `supabase/migrations/` — `voice_calls`,
-`founder_alerts_delivery_tracking`, `prospect_gym_paired_runs`,
-`prospects_enrich_tried_at`, `prospect_mobile_enrichment`,
-`moat_events_and_caderno_fields`. Foram aplicadas direto pelo MCP. Escrevi só a
-do `voice_calls` (reconstruída do schema real), porque o teste de retenção lê as
-migrations e um banco maior que o repo torna a trava cega. As outras cinco ficam
-como tarefa própria.
+**Deriva de schema descoberta no caminho — CORRIGIDA no fim do dia.**
+
+A contagem inicial ("seis migrations faltando") estava errada: eu comparei NOMES
+DE ARQUIVO com os nomes registrados no banco. `moat_events_and_caderno_fields`
+já estava no repo como `20260725000030_moat.sql` — dali em diante os nomes locais
+divergem dos timestamps reais, então a comparação por nome não valia nada.
+Comparando OBJETOS (tabelas e colunas), faltavam quatro:
+
+- `20260727192947_prospect_mobile_enrichment`
+- `20260730201006_prospect_gym_paired_runs`
+- `20260731195546_prospects_enrich_tried_at`
+- `20260803192238_founder_alerts_delivery_tracking`
+
+Todas reconstruídas do schema real e commitadas. E um defeito de verdade que
+apareceu no processo: `prospect_wa_phone.sql` faz RENAME de `mobile_phone`, cuja
+criação estava justamente na migration ausente — **um banco novo não subia**. Os
+dois arquivos de 27/jul foram renumerados para os timestamps reais do banco, para
+que a ordem de aplicação volte a bater.
+
+`tests/migrations-completas.test.ts` trava a regra: toda tabela usada pelo código
+tem CREATE, todo RENAME cai sobre coluna criada, e o create vem ANTES do rename.
 
 O comentário afirma resolver o crescimento perpétuo do dado de terceiro, mas o
 alvo é `prospect_messages` — a **filha**. A mãe, onde mora o PII, nunca é podada.
