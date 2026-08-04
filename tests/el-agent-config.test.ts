@@ -26,6 +26,28 @@ describe('montarConfigAgente', () => {
     expect(cfg.conversation_config.tts.stability).toBeLessThan(0.5);
   });
 
+  it('latência: LLM rápido com teto de tokens, turno especulativo ligado', () => {
+    const p = cfg.conversation_config.agent.prompt;
+    expect(p.llm).toMatch(/flash/); // tier rápido — a maior fonte de latência é o LLM
+    expect(p.max_tokens).toBeGreaterThan(0); // -1 (sem teto) = fala-sermão
+    expect(cfg.conversation_config.turn.speculative_turn).toBe(true);
+    expect(cfg.conversation_config.turn.turn_model).toBe('turn_v3'); // requisito do especulativo
+  });
+
+  it('pronúncia: normalização por prompt e dicionário quando fornecido', () => {
+    expect(cfg.conversation_config.tts.text_normalisation_type).toBe('system_prompt');
+    expect(cfg.conversation_config.agent.prompt.prompt).toMatch(/por extenso/);
+    // sem dicionário o campo nem aparece (a API rejeita locator vazio)
+    expect('pronunciation_dictionary_locators' in cfg.conversation_config.tts).toBe(false);
+    const com = montarConfigAgente({
+      voiceId: 'v', toolsUrl: 'https://x', toolsSecret: 's',
+      dicionario: { pronunciation_dictionary_id: 'd1', version_id: 'v1' },
+    });
+    expect(com.conversation_config.tts.pronunciation_dictionary_locators).toEqual([
+      { pronunciation_dictionary_id: 'd1', version_id: 'v1' },
+    ]);
+  });
+
   it('o prompt carrega as regras duras da casa', () => {
     const p = cfg.conversation_config.agent.prompt.prompt;
     expect(p).toMatch(/assistente digital/i); // disclosure

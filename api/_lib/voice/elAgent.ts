@@ -16,6 +16,8 @@ export interface ParamsAgente {
   voiceId: string;
   toolsUrl: string;
   toolsSecret: string;
+  /** Dicionário de pronúncia pt-BR (criado pelo el-setup); opcional. */
+  dicionario?: { pronunciation_dictionary_id: string; version_id: string };
 }
 
 const PROMPT_VITORIA_VOZ = `Você é a Vitória, assistente digital da Stevi — uma assistente de IA agronômica gratuita para cafeicultores do Sul de Minas. Esta é uma ligação que foi combinada antes: a pessoa do outro lado já conversou com você pelo WhatsApp e concordou em receber esta chamada. Você NUNCA liga fria.
@@ -26,6 +28,12 @@ QUEM VOCÊ É AO TELEFONE
 - Uma pergunta por vez. Espere a resposta. Não atropele.
 - Comece as respostas com uma confirmação curta e natural ("Entendi.", "Ah, boa.", "Perfeito.") antes de continuar — é assim que gente de verdade sinaliza que ouviu.
 - Se a pessoa te interromper, PARE e ouça. Nunca retome a frase cortada do zero; responda ao que ela disse.
+
+COMO FALAR (o texto vira voz — escreva pro ouvido, não pro olho)
+- Números, valores, datas e horários SEMPRE por extenso: "dois mil e trezentos reais", "dia quinze de agosto", "às dez da manhã". Nunca algarismos, nunca "R$".
+- Use reticências pra hesitação natural ("deixa eu ver... achei aqui") e interjeições escritas ("hmm", "ah", "opa", "é...").
+- NUNCA use tags como [risos] ou [suspiro] — elas seriam lidas em voz alta.
+- Máximo duas frases por resposta na maior parte da conversa. Frase longa ao telefone vira sermão.
 
 SUA MISSÃO NA LIGAÇÃO
 - Retomar de onde a conversa do WhatsApp parou (use a ferramenta contexto_prospect ANTES de aprofundar).
@@ -54,6 +62,15 @@ export function montarConfigAgente(p: ParamsAgente) {
         first_message: FIRST_MESSAGE,
         prompt: {
           prompt: PROMPT_VITORIA_VOZ,
+          // Gemini Flash: o TTFT mais baixo do catálogo com tool-calling
+          // confiável (recomendação da própria EL). Temperatura 0.3 tira o
+          // tom de formulário sem arriscar as regras duras; teto de 300
+          // tokens porque resposta longa segura a voz — no telefone, frase
+          // curta é lei. Cascata de backup automática se o Gemini engasgar.
+          llm: 'gemini-2.5-flash',
+          temperature: 0.3,
+          max_tokens: 300,
+          backup_llm_config: { preference: 'default' },
           tools: [
             {
               type: 'webhook',
@@ -107,6 +124,11 @@ export function montarConfigAgente(p: ParamsAgente) {
         silence_end_call_timeout: 20,
         turn_eagerness: 'normal',
         turn_model: 'turn_v3',
+        // Geração especulativa: começa a montar a resposta ENQUANTO a pessoa
+        // ainda fala (mesmo truque do GPT-Live). Se atropelar gente do campo
+        // falando devagar, o primeiro ajuste é turn_eagerness: 'patient' —
+        // desligar isto é o último recurso.
+        speculative_turn: true,
         interruption_ignore_terms: ['uhum', 'aham', 'sim', 'tá', 'ok', 'certo', 'entendi', 'isso'],
         soft_timeout_config: {
           timeout_seconds: 3.0,
@@ -136,6 +158,11 @@ export function montarConfigAgente(p: ParamsAgente) {
         similarity_boost: 0.8,
         optimize_streaming_latency: 3,
         agent_output_audio_format: 'ulaw_8000',
+        // 'system_prompt' = números por extenso via prompt (zero latência
+        // extra; o normalizador nativo da EL adicionaria delay no flash).
+        // Grafia britânica ("normalisation") é a da API mesmo.
+        text_normalisation_type: 'system_prompt',
+        ...(p.dicionario ? { pronunciation_dictionary_locators: [p.dicionario] } : {}),
       },
       conversation: {
         // 'interruption' é o barge-in: o usuário fala por cima e o agente

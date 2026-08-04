@@ -52,6 +52,37 @@ async function listarVozes(): Promise<void> {
   console.log('\nOuça cada uma no dashboard (Voices) antes de decidir — voz é decisão de ouvido.');
 }
 
+// Dicionário de pronúncia pt-BR — só alias rules (phonemes não funcionam no
+// flash_v2_5). Idempotente pelo nome. Regras novas: adicionar aqui e rodar.
+const DICT_NAME = 'stevi-pt-br';
+const DICT_RULES = [
+  // A voz tende a ler "Stevi" como palavra inglesa; a grafia fonética ancora.
+  { string_to_replace: 'Stevi', type: 'alias', alias: 'Stévi' },
+];
+
+async function garantirDicionario(): Promise<{ pronunciation_dictionary_id: string; version_id: string } | undefined> {
+  const lista = await el('/pronunciation-dictionaries?page_size=30');
+  if (lista.ok) {
+    const j = (await lista.json()) as {
+      pronunciation_dictionaries?: Array<{ id: string; name: string; latest_version_id: string }>;
+    };
+    const d = (j.pronunciation_dictionaries ?? []).find((x) => x.name === DICT_NAME);
+    if (d) return { pronunciation_dictionary_id: d.id, version_id: d.latest_version_id };
+  }
+  const res = await el('/pronunciation-dictionaries/add-from-rules', {
+    method: 'POST',
+    body: JSON.stringify({ name: DICT_NAME, rules: DICT_RULES }),
+  });
+  if (!res.ok) {
+    // Sem dicionário o agente segue funcionando — não é motivo pra abortar.
+    console.warn(`⚠️ dicionário de pronúncia falhou (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    return undefined;
+  }
+  const j = (await res.json()) as { id: string; version_id: string };
+  console.log(`✅ Dicionário de pronúncia: ${DICT_NAME} (${j.id})`);
+  return { pronunciation_dictionary_id: j.id, version_id: j.version_id };
+}
+
 async function acharAgente(): Promise<string | null> {
   const res = await el('/convai/agents?page_size=100');
   if (!res.ok) throw new Error(`GET /convai/agents ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -70,7 +101,8 @@ async function main(): Promise<void> {
   if (!voiceId) throw new Error('ELEVENLABS_VOICE_ID ausente — rode `npm run el:setup -- --vozes` e escolha uma.');
   if (!toolsSecret) throw new Error('EL_TOOLS_SECRET ausente — gere uma string aleatória e ponha no .env E na Vercel.');
 
-  const cfg = montarConfigAgente({ voiceId, toolsUrl: TOOLS_URL, toolsSecret });
+  const dicionario = await garantirDicionario();
+  const cfg = montarConfigAgente({ voiceId, toolsUrl: TOOLS_URL, toolsSecret, dicionario });
   const existente = await acharAgente();
 
   if (existente) {
