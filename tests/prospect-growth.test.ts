@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildQueries, toProspectInput, ICP_QUERIES } from '../api/_lib/prospect/source';
+import { buildQueries, toProspectInput, ICP_QUERIES, offsetDoDia, ICP_CITIES, cidadesMaisCarentes} from '../api/_lib/prospect/source';
 import {
   shortName,
   kindHook,
@@ -277,5 +277,121 @@ describe('buildQueries — rotação para a grade inteira ser varrida', () => {
   it('sem offset, comporta como sempre — as primeiras N', () => {
     const qs = buildQueries(cidades, 2);
     expect([...new Set(qs.map((q) => q.city))]).toEqual(['A', 'B']);
+  });
+});
+
+/**
+ * O bug da rotação, medido em 04/ago: a busca do painel voltou ZERO importados
+ * e o último prospect da base era de 31/jul.
+ *
+ * offsetDoDia fazia `(diaDoAno * 4) % 12`. Como 4 e 12 compartilham fator, a
+ * conta só produz TRÊS valores (0, 4, 8) — as janelas intermediárias nunca
+ * existem, e 31/jul e 03/ago caíram no mesmo offset 8. Hoje voltou pro offset
+ * 0, que é Varginha/Três Pontas/Guaxupé/Alfenas: as quatro cidades mais
+ * varridas da base inteira. O dedup comeu 100% do resultado.
+ *
+ * O erro conceitual: tratei "avançar uma janela por dia" como multiplicação. O
+ * certo é o dia do ano DIRETO — a janela desliza uma cidade por dia e cobre a
+ * grade toda sem repetir o conjunto em dias seguidos.
+ */
+describe('offsetDoDia — a rotação precisa mesmo rodar', () => {
+  const dia = (iso: string) => offsetDoDia(new Date(iso));
+
+  it('dias consecutivos NUNCA dão o mesmo offset', () => {
+    const offs = ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06'].map((d) => dia(`${d}T14:00:00Z`));
+    expect(new Set(offs).size).toBe(4);
+  });
+
+  it('31/jul e 03/ago (o caso real) deixam de colidir', () => {
+    expect(dia('2026-07-31T14:00:00Z')).not.toBe(dia('2026-08-03T14:00:00Z'));
+  });
+
+  it('em 12 dias visita TODOS os offsets — nenhuma cidade fica órfã', () => {
+    const offs = new Set<number>();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date('2026-08-04T14:00:00Z');
+      d.setUTCDate(d.getUTCDate() + i);
+      offs.add(offsetDoDia(d));
+    }
+    expect(offs.size).toBe(12);
+  });
+
+  it('o offset é sempre um índice válido da grade', () => {
+    for (let i = 0; i < 40; i++) {
+      const d = new Date('2026-01-01T14:00:00Z');
+      d.setUTCDate(d.getUTCDate() + i * 9);
+      const o = offsetDoDia(d);
+      expect(o).toBeGreaterThanOrEqual(0);
+      expect(o).toBeLessThan(ICP_CITIES.length);
+    }
+  });
+});
+
+describe('ICP_CITIES — a grade precisa ter para onde crescer', () => {
+  // 04/ago: as 8 primeiras cidades somam 15-42 prospects cada e o dedup passou
+  // a comer 100% das buscas. Grade esgotada não é falha de rotação — é falta de
+  // território. Sul de Minas tem dezenas de municípios cafeeiros relevantes.
+  it('cobre bem mais que o quadrante original', () => {
+    expect(ICP_CITIES.length).toBeGreaterThanOrEqual(24);
+  });
+
+  it('toda cidade declara o estado — o Places precisa disso pra não pegar homônima', () => {
+    // "Monte Santo" existe na Bahia; "Campos Gerais" no Paraná. Sem UF o Places
+    // devolve negócio de outro estado e o disparo vai pra fora da região.
+    for (const c of ICP_CITIES) expect(c).toMatch(/\s(MG|SP)$/);
+  });
+
+  it('sem duplicatas — cidade repetida gasta quota e não traz nada', () => {
+    expect(new Set(ICP_CITIES).size).toBe(ICP_CITIES.length);
+  });
+});
+
+/**
+ * Escolha de cidades por CARÊNCIA, não por calendário.
+ *
+ * A rotação por data tem um defeito que sobrevive a qualquer conserto de
+ * fórmula: ela não sabe onde já varremos. Em 04/ago, com a fórmula já
+ * corrigida, o dia caía justamente nas cidades de 15-42 prospects — e a busca
+ * voltaria zero de novo. O calendário é cego pro estado da base.
+ *
+ * Varrer onde há MENOS prospect é auto-corretivo: cidade nova (zero) entra na
+ * frente, cidade esgotada só volta quando as outras alcançarem. Sem tabela
+ * nova, sem estado — a própria base é o registro.
+ */
+describe('cidadesMaisCarentes — varrer onde falta, não onde o calendário mandar', () => {
+  it('prioriza as que têm menos prospects', () => {
+    const contagem = new Map([['Varginha MG', 42], ['Três Corações MG', 0], ['Alfenas MG', 38], ['Muzambinho MG', 0]]);
+    expect(cidadesMaisCarentes(['Varginha MG', 'Três Corações MG', 'Alfenas MG', 'Muzambinho MG'], contagem, 2))
+      .toEqual(['Três Corações MG', 'Muzambinho MG']);
+  });
+
+  it('cidade ausente da contagem conta como ZERO — nunca varrida vai na frente', () => {
+    const contagem = new Map([['Varginha MG', 42]]);
+    expect(cidadesMaisCarentes(['Varginha MG', 'Nova MG'], contagem, 1)).toEqual(['Nova MG']);
+  });
+
+  it('empate resolve pela ordem da grade — determinístico, sem sorteio', () => {
+    // Determinismo importa: cron e botão do painel no mesmo dia varrem o mesmo
+    // conjunto, e o dedup entre eles continua barato.
+    const contagem = new Map<string, number>();
+    expect(cidadesMaisCarentes(['A MG', 'B MG', 'C MG'], contagem, 2)).toEqual(['A MG', 'B MG']);
+  });
+
+  it('pede mais do que existe: devolve todas, sem quebrar', () => {
+    expect(cidadesMaisCarentes(['A MG'], new Map(), 5)).toEqual(['A MG']);
+  });
+});
+
+describe('buildQueries — rótulo da cidade sem a UF', () => {
+  it('tira MG e SP do nome gravado', () => {
+    // A grade ganhou Mogiana paulista em 04/ago. Sem tirar o SP, o banco
+    // gravaria "Franca SP" e contarPorCidade nunca casaria com a grade —
+    // a cidade pareceria eternamente carente e seria varrida todo dia.
+    const qs = buildQueries(['Franca SP', 'Varginha MG'], 2, 0);
+    expect([...new Set(qs.map((q) => q.city))]).toEqual(['Franca', 'Varginha']);
+  });
+
+  it('a QUERY mantém a UF — é ela que impede o Places pegar homônima', () => {
+    expect(buildQueries(['Franca SP'], 1, 0)[0].q).toContain('Franca SP');
   });
 });

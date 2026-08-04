@@ -38,10 +38,30 @@ export const ICP_QUERIES: Array<{ kind: string; term: string }> = [
   { kind: 'cooperativa', term: 'cooperativa de cafeicultores' },
 ];
 
+/**
+ * A grade de municípios. TODA entrada carrega a UF: "Monte Santo" existe na
+ * Bahia e "Campos Gerais" no Paraná — sem o estado o Places devolve negócio de
+ * outra região e o disparo sai do Sul de Minas.
+ *
+ * As 12 primeiras são a grade original (25/jul). Em 04/ago elas se esgotaram —
+ * 15 a 42 prospects cada, e o dedup passou a comer 100% de toda busca nova.
+ * Grade esgotada não se conserta com rotação; se conserta com território. As 14
+ * seguintes são municípios cafeeiros do Sul de Minas e da Mogiana paulista que
+ * nunca foram varridos, escolhidos por peso na cafeicultura da região.
+ */
 export const ICP_CITIES = [
+  // Grade original (25/jul) — já esgotada, mas fica: o Places renova listagens
+  // e a rotação volta aqui a cada ~26 dias.
   'Varginha MG', 'Três Pontas MG', 'Guaxupé MG', 'Alfenas MG', 'Machado MG',
   'Poços de Caldas MG', 'Lavras MG', 'Nepomuceno MG', 'Boa Esperança MG',
   'Campos Gerais MG', 'Carmo de Minas MG', 'São Gonçalo do Sapucaí MG',
+  // Expansão 04/ago — Sul de Minas cafeeiro, nunca varridos.
+  'Três Corações MG', 'São Sebastião do Paraíso MG', 'Muzambinho MG',
+  'Monte Santo de Minas MG', 'Cabo Verde MG', 'Botelhos MG', 'Andradas MG',
+  'Santo Antônio do Amparo MG', 'Perdões MG', 'Cambuquira MG',
+  'Elói Mendes MG', 'Paraguaçu MG',
+  // Mogiana paulista — mesma cultura, mesma dor, fronteira contígua à base.
+  'Franca SP', 'São João da Boa Vista SP',
 ];
 
 export interface PlaceHit {
@@ -73,19 +93,88 @@ export function buildQueries(
     : [];
   for (const city of janela) {
     for (const { kind, term } of ICP_QUERIES) {
-      out.push({ kind, q: `${term} em ${city}`, city: city.replace(/\s+MG$/, '') });
+      out.push({ kind, q: `${term} em ${city}`, city: city.replace(/\s+(MG|SP)$/, '') });
     }
   }
   return out;
 }
 
-/** Offset do dia (BRT): a rotação avança sozinha a cada dia de varredura. */
+/**
+ * Offset do dia (BRT): a rotação avança sozinha a cada dia de varredura.
+ *
+ * O dia do ano entra DIRETO, sem multiplicador. A versão anterior fazia
+ * `(diaDoAno * 4) % 12` na intenção de "pular uma janela inteira por dia" — e
+ * como 4 e 12 compartilham fator, a conta só produzia TRÊS offsets (0, 4, 8).
+ * As janelas intermediárias nunca existiam, 31/jul e 03/ago caíram no mesmo
+ * offset, e em 04/ago a busca voltou pro offset 0 — Varginha, Três Pontas,
+ * Guaxupé e Alfenas, as quatro cidades mais varridas da base. O dedup comeu
+ * 100% do resultado e o painel devolveu zero importados.
+ *
+ * Deslizando de uma cidade por dia, a janela nunca repete o mesmo conjunto em
+ * dias seguidos e a grade inteira é coberta — passo 1 e tamanho 12 são
+ * coprimos por construção, o que o teste de 12 dias garante.
+ */
 export function offsetDoDia(now: Date = new Date()): number {
   const brt = new Date(now.getTime() - 3 * 3600_000);
   const inicioAno = Date.UTC(brt.getUTCFullYear(), 0, 0);
   const diaDoAno = Math.floor((brt.getTime() - inicioAno) / 86_400_000);
-  // ×4 = a cada dia a janela pula uma janela inteira, cobrindo as 12 em 3 dias.
-  return (diaDoAno * 4) % ICP_CITIES.length;
+  return diaDoAno % ICP_CITIES.length;
+}
+
+/**
+ * As `n` cidades com MENOS prospects na base — onde a busca ainda rende.
+ *
+ * Substitui a escolha por calendario, que tem um defeito que nenhuma correcao
+ * de formula resolve: ela nao sabe onde ja varremos. Em 04/ago, com a formula
+ * ja consertada, o dia caiu justamente nas cidades de 15-42 prospects e a busca
+ * teria voltado zero de novo.
+ *
+ * Varrer onde falta e auto-corretivo: cidade nunca varrida (zero) entra na
+ * frente, cidade esgotada so volta quando as outras alcancarem. Sem tabela
+ * nova e sem estado — a propria base e o registro. Empate resolve pela ordem
+ * da grade, entao cron e botao do painel no mesmo dia varrem o mesmo conjunto
+ * e o dedup entre eles continua barato.
+ */
+export function cidadesMaisCarentes(
+  cidades: readonly string[],
+  contagem: ReadonlyMap<string, number>,
+  n: number
+): string[] {
+  return cidades
+    .map((cidade, ordem) => ({ cidade, ordem, tem: contagem.get(cidade) ?? 0 }))
+    .sort((a, b) => a.tem - b.tem || a.ordem - b.ordem)
+    .slice(0, Math.max(0, n))
+    .map((x) => x.cidade);
+}
+
+/**
+ * Conta prospects por cidade da grade. O nome na base vem sem UF (o Places
+ * devolve "Varginha"), entao a chave e normalizada pra bater com ICP_CITIES.
+ * Falha de leitura devolve mapa vazio — e ai todas contam zero e a escolha cai
+ * na ordem da grade, que e um default seguro, nunca um erro fatal.
+ */
+export async function contarPorCidade(): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  try {
+    const { getDb } = await import('../db');
+    const { data, error } = await getDb().from('prospects').select('city');
+    if (error) {
+      log.error('contarPorCidade falhou:', error.message);
+      return out;
+    }
+    const semUf = new Map<string, number>();
+    for (const r of (data ?? []) as Array<{ city: string | null }>) {
+      const c = (r.city ?? '').trim().toLowerCase();
+      if (c) semUf.set(c, (semUf.get(c) ?? 0) + 1);
+    }
+    for (const alvo of ICP_CITIES) {
+      const chave = alvo.replace(/\s+(MG|SP)$/, '').trim().toLowerCase();
+      out.set(alvo, semUf.get(chave) ?? 0);
+    }
+  } catch (e) {
+    log.error('contarPorCidade falhou:', (e as Error).message);
+  }
+  return out;
 }
 
 /** Map a Places result to a ProspectInput (validated phone or invalid). */
@@ -167,7 +256,10 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
     };
   }
 
-  const queries = buildQueries(ICP_CITIES, maxCities, offsetDoDia());
+  // Onde a busca ainda rende, medido na propria base — ver cidadesMaisCarentes.
+  const contagem = await contarPorCidade();
+  const alvos = cidadesMaisCarentes(ICP_CITIES, contagem, maxCities);
+  const queries = buildQueries(alvos, maxCities, 0);
   // O site acompanha o input ate a fase de enriquecimento (toProspectInput nao
   // o carrega — website nao e coluna do prospect, e insumo).
   const rows: Array<{ input: ProspectInput; website: string | null }> = [];
