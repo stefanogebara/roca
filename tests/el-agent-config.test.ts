@@ -64,14 +64,23 @@ describe('montarConfigAgente', () => {
     expect(f).toMatch(/WhatsApp/i);
   });
 
-  it('as duas tools apontam pro nosso endpoint com o secret no header', () => {
+  it('as tools de webhook apontam pro nosso endpoint com o secret no header', () => {
     const tools = cfg.conversation_config.agent.prompt.tools;
-    expect(tools).toHaveLength(2);
-    for (const t of tools) {
-      expect(t.api_schema.url).toBe('https://roca-black.vercel.app/api/el-tools');
-      expect(t.api_schema.request_headers['x-el-tools-secret']).toBe('s3gr3d0');
+    const webhooks = tools.filter((t) => t.type === 'webhook');
+    expect(webhooks).toHaveLength(2);
+    for (const t of webhooks) {
+      expect(t.api_schema?.url).toBe('https://roca-black.vercel.app/api/el-tools');
+      expect(t.api_schema?.request_headers['x-el-tools-secret']).toBe('s3gr3d0');
     }
-    expect(tools.map((t) => t.name).sort()).toEqual(['contexto_prospect', 'registrar_resultado']);
+    expect(webhooks.map((t) => t.name).sort()).toEqual(['contexto_prospect', 'registrar_resultado']);
+  });
+
+  it('a agente consegue desligar: end_call registrado e citado no prompt', () => {
+    const tools = cfg.conversation_config.agent.prompt.tools;
+    expect(tools.some((t) => t.type === 'system' && t.name === 'end_call')).toBe(true);
+    expect(cfg.conversation_config.agent.prompt.prompt).toMatch(/end_call/);
+    // e o anti-loop da ligação de teste 2: nunca repetir frase igual
+    expect(cfg.conversation_config.agent.prompt.prompt).toMatch(/NUNCA repita/i);
   });
 
   it('nome do agente é estável — é a chave da idempotência do setup', () => {

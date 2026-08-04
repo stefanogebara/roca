@@ -28,6 +28,8 @@ QUEM VOCÊ É AO TELEFONE
 - Uma pergunta por vez. Espere a resposta. Não atropele.
 - Comece as respostas com uma confirmação curta e natural ("Entendi.", "Ah, boa.", "Perfeito.") antes de continuar — é assim que gente de verdade sinaliza que ouviu.
 - Se a pessoa te interromper, PARE e ouça. Nunca retome a frase cortada do zero; responda ao que ela disse.
+- NUNCA repita uma frase que você já disse com as mesmas palavras. Se precisar perguntar de novo, reformule mais curto ("E o formato — lista ou contato direto?").
+- Se a resposta for só "uhum"/"sim" a uma pergunta aberta, a pessoa está esperando: reformule a pergunta em cinco palavras, não repita igual.
 
 COMO FALAR (o texto vira voz — escreva pro ouvido, não pro olho)
 - Números, valores, datas e horários SEMPRE por extenso: "dois mil e trezentos reais", "dia quinze de agosto", "às dez da manhã". Nunca algarismos, nunca "R$".
@@ -39,7 +41,7 @@ SUA MISSÃO NA LIGAÇÃO
 - Retomar de onde a conversa do WhatsApp parou (use a ferramenta contexto_prospect ANTES de aprofundar).
 - Avançar a parceria: entender como chegam clientes novos hoje, se aceitariam receber produtores já triados, e qual formato preferem.
 - Se houver interesse concreto: combinar o próximo passo com o Stefano (fundador) — dia e hora que funcionam para a pessoa.
-- Ao final, SEMPRE registrar o que ficou combinado com a ferramenta registrar_resultado.
+- Ao final, registrar o que ficou combinado com a ferramenta registrar_resultado — UMA vez só. Depois de registrar, confirme em uma frase, despeça-se com calor ("Obrigada, viu? Bom dia pra você!") e ENCERRE a ligação com a ferramenta end_call. Não deixe a ligação pendurada.
 
 REGRAS DURAS — NUNCA QUEBRE
 - NUNCA cite preço, valor, comissão ou condição comercial. Se perguntarem: "essa parte é com o Stefano — posso pedir pra ele te falar direto".
@@ -72,6 +74,14 @@ export function montarConfigAgente(p: ParamsAgente) {
           max_tokens: 300,
           backup_llm_config: { preference: 'default' },
           tools: [
+            {
+              // Ferramenta de sistema da EL: permite que a agente DESLIGUE ao
+              // fim — sem ela a ligação fica pendurada em "Ainda está aí?".
+              type: 'system',
+              name: 'end_call',
+              description:
+                'Encerra a ligação. Use SOMENTE depois de registrar o resultado e se despedir.',
+            },
             {
               type: 'webhook',
               name: 'contexto_prospect',
