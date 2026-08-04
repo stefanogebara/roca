@@ -102,3 +102,19 @@ Dois modelos distintos que se misturam pelo nome:
 
 Os três vetos (Luo -80%, 0303, colheita) não dependem do motor de voz —
 recomendação inalterada: ligação esperada e atendimento de produtor.
+
+## Adendo 2 (04/ago, noite) — tour na conta real do Stefano (ElevenAgents)
+
+- Plano CREATOR (US$22/mes, renova 28/ago), 5.356/300.000 creditos usados.
+- JA INCLUI 250 min/mes de chamadas de agente + 10 concorrentes: o piloto de
+  10 ligacoes pt-BR (~40 min) custa ~ZERO no plano atual. Excedente US$0,12/min
+  (curiosidade: Pro/Scale pagam 0,08 no excedente — Creator e o degrau caro).
+- Plataforma ElevenAgents separada da criativa (switcher no topo): Agents
+  (templates + assistente "Architect"), Phone Numbers (importa Twilio/SIP,
+  vazio hoje), analytics nativos (custo/conversa, LLM cost, success rate,
+  CSAT, response time), config por agente com Workflow, Tools, LLMs, Knowledge
+  Base, Evaluation.
+- Conclusao operacional: quando o quadrante "ligacao esperada" tiver leads, o
+  piloto nao exige nem upgrade de plano — so importar um numero Twilio BR e
+  montar o agente. Barreira de custo: eliminada; os tres vetos de negocio:
+  inalterados.
