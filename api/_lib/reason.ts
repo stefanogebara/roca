@@ -23,7 +23,7 @@ import {
 } from './tools/ndvi';
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
-import { groundingBlock, chemicalGroups, groundedHit } from './tools/agrofit';
+import { groundingBlock, chemicalGroups, groundedHit, normalizeCrop, type CropKey } from './tools/agrofit';
 import type { PestCardData } from './cards/pest';
 import { createLogger } from './logger';
 
@@ -45,7 +45,11 @@ async function extractPestTarget(
       // aqui é orçamento roubado da composição, que é quem precisa dele.
       timeoutMs: 10_000,
       system:
-        'Extraia cultura e praga/doença da mensagem do produtor. Responda SÓ um JSON: {"crop":"soja|milho|pastagem|outro","pest":"nome da praga ou doença, ou vazio"}. Sem texto extra.',
+        // Mesmo motivo do prompt da visão: enum faz o modelo apagar a cultura
+        // antes de nós. Aqui o efeito era mais silencioso — o enum nem listava
+        // café e citros, que a Stevi ANCORA, então "meu cafezal tá com broca"
+        // devolvia "outro" e perdia o grounding de uma cultura de casa.
+        'Extraia cultura e praga/doença da mensagem do produtor. Responda SÓ um JSON: {"crop":"nome da cultura em pt-BR, ou vazio se ele não disser","pest":"nome da praga ou doença, ou vazio"}. Sem texto extra.',
       user: text,
     });
     const match = raw.match(/\{[^}]*\}/);
@@ -211,9 +215,32 @@ async function handleSpray(
 
 interface VisionId {
   pest: string | null;
-  crop: string | null;
+  /**
+   * A chave canônica, quando é uma das cinco culturas que a Stevi ancora no
+   * Agrofit. `null` = ou não deu pra ver, ou está fora do domínio — para
+   * distinguir os dois casos existe `cropVisto`.
+   */
+  crop: CropKey | null;
+  /**
+   * O nome da cultura como a visão viu, em texto livre ("mamão", "soja").
+   *
+   * Existe porque o enum do prompt fazia o modelo apagar isto antes de nós:
+   * mamão virava "outro" virava `null`, o MESMO valor de "não consegui ver a
+   * cultura". Duas situações que pedem respostas opostas colapsadas num campo
+   * só. Nenhum conserto a jusante recupera um nome que nunca foi dito.
+   */
+  cropVisto: string | null;
   confidence: 'alta' | 'media' | 'baixa';
   evidence: string | null;
+}
+
+/** As cinco culturas que a Stevi de fato ancora em registro. Fora daqui ela
+ * ainda ajuda, mas tem que dizer que está no geral. */
+const CULTURAS_DE_CASA = 'soja, milho, pastagem, café e citros';
+
+/** Viu a cultura e ela não é de casa — diferente de não ter visto cultura. */
+function foraDeDominio(id: VisionId): boolean {
+  return id.cropVisto !== null && id.crop === null;
 }
 
 /** Step 1 of photo triage: identify the pest/disease as structured data. */
@@ -224,16 +251,24 @@ async function identifyFromPhoto(msg: InboundMessage, media: ChatImage): Promise
       maxTokens: 220,
       image: media,
       system:
-        'Você é um agrônomo experiente olhando a foto de uma lavoura brasileira. Identifique a praga ou doença mais provável. Responda SÓ um JSON, sem texto extra: {"pest":"nome comum em pt-BR ou vazio se não der","crop":"soja|milho|pastagem|cafe|citros|outro","confidence":"alta|media|baixa","evidence":"uma linha curta do que você observa na imagem"}.',
+        // `crop` é texto LIVRE de propósito. Com enum, mamão só podia responder
+        // "outro", e a informação de que era mamão morria aqui — quem decide se
+        // a cultura é de casa é o `normalizeCrop`, não o modelo.
+        'Você é um agrônomo experiente olhando a foto de uma lavoura brasileira. Identifique a praga ou doença mais provável. Responda SÓ um JSON, sem texto extra: {"pest":"nome comum em pt-BR ou vazio se não der","crop":"nome da cultura em pt-BR (ex: soja, milho, mamão, uva), ou vazio se não der pra dizer","confidence":"alta|media|baixa","evidence":"uma linha curta do que você observa na imagem"}.',
       user: msg.text ? `O produtor disse: "${msg.text}".` : 'Analise a foto.',
     });
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    const p = JSON.parse(match[0]) as Partial<VisionId>;
+    const p = JSON.parse(match[0]) as { pest?: string; crop?: string; confidence?: string; evidence?: string };
     const confidence = p.confidence === 'alta' || p.confidence === 'baixa' ? p.confidence : 'media';
+    // 'outro' segue sendo aceito e tratado como "não deu pra ver": modelo é
+    // probabilístico e vai devolver o enum antigo de vez em quando, mesmo com o
+    // prompt novo. O que NÃO se faz mais é forçá-lo a dizer isso.
+    const cropVisto = p.crop?.trim() && p.crop.trim() !== 'outro' ? p.crop.trim() : null;
     return {
       pest: p.pest?.trim() || null,
-      crop: p.crop && p.crop !== 'outro' ? p.crop : null,
+      cropVisto,
+      crop: normalizeCrop(cropVisto),
       confidence,
       evidence: p.evidence?.trim() || null,
     };
@@ -303,7 +338,11 @@ async function triagePhoto(
     if (id.pest && onPestCard) {
       onPestCard({
         pest: id.pest,
-        crop: id.crop ?? hit?.crop ?? null,
+        // `cropVisto` na frente: o card mostra "mamão" em vez de nada quando a
+        // cultura é de fora. O `hit` continua mandando nos produtos, e fora do
+        // domínio ele é null — nenhum produto é sugerido para cultura que não
+        // temos registro.
+        crop: id.cropVisto ?? hit?.crop ?? null,
         confidence: id.confidence,
         evidence: id.evidence,
         products: hit?.entry.products ?? null,
@@ -314,9 +353,21 @@ async function triagePhoto(
 
   const parts: string[] = [];
   parts.push(
-    `Identificação visual: ${id.pest ?? 'incerta'} (confiança ${id.confidence}${id.crop ? `, cultura ${id.crop}` : ''}).`
+    `Identificação visual: ${id.pest ?? 'incerta'} (confiança ${id.confidence}${id.cropVisto ? `, cultura ${id.cropVisto}` : ''}).`
   );
   if (id.evidence) parts.push(`O que se vê: ${id.evidence}.`);
+  // O achado #9: sem esta linha a resposta de mamão saía com a MESMA embalagem
+  // de confiança de uma de soja, e o produtor não tinha como saber que ali a
+  // Stevi está no geral. Honestidade sobre o limite é parte do produto, não
+  // ressalva jurídica — quem confia sabendo onde a ferramenta é forte volta.
+  if (foraDeDominio(id)) {
+    parts.push(
+      `\n[ATENÇÃO] A cultura (${id.cropVisto}) está FORA das culturas que você acompanha de perto (${CULTURAS_DE_CASA}). ` +
+        'Diga isso ao produtor logo no começo, com naturalidade e sem rodeio: que seu forte são aquelas e que aqui você vai pelo geral. ' +
+        'Oriente só o que vale para qualquer cultura (monitoramento, manejo, colher material pra análise), NÃO cite registro do Agrofit ' +
+        'e reforce mais que o normal a procura por um agrônomo local que conheça a cultura.'
+    );
+  }
   if (grounding) parts.push(`\n[Registro Agrofit — use como base, não invente]\n${grounding}`);
 
   return chat({

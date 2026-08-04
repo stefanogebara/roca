@@ -113,7 +113,36 @@ Numa base do agro brasileiro, áudio é o canal natural de quem não digita. O r
 continua falando com quem pediu para parar, e o pedido não fica registrado.
 
 ### 6. `prospects` não tem retenção nenhuma
-**RELATADO** · `db.ts:868-879`
+**RELATADO** · **CORRIGIDO** 04/ago · `db.ts` PURGE_TARGETS
+
+Régua: `updated_at`, 365 dias — "um ano sem NENHUM toque". Lead sendo trabalhado
+nunca é podado; contato raspado e nunca usado sai um ano depois da descoberta. A
+coluna é NOT NULL com default `now()`, o que importa porque `.lt()` não casa com
+null e coluna anulável viraria isenção silenciosa.
+
+**Achado maior encontrado ao consertar este:** `voice_calls.prospect_id` (criada
+04/ago pela integração de voz) tinha FK **NO ACTION**. Isso quebrava DUAS coisas,
+em silêncio, até existir a primeira ligação ligada a prospect:
+
+1. **LGPD.** `deleteProspectByPhone` tomaria violação de FK — o titular pediria
+   exclusão, a função devolveria false, e a TRANSCRIÇÃO da ligação dele ficaria
+   na base. O mesmo defeito que o conserto de hoje resolveu, reaberto por outra
+   porta.
+2. **Retenção.** O purge cairia inteiro no primeiro prospect com ligação: um
+   DELETE com filtro é uma operação só, uma linha presa derruba o lote.
+
+Corrigido por migration (CASCADE, aplicada e verificada em produção) e travado
+por teste topológico: toda FK que aponte para `prospects` tem que ser CASCADE —
+vale para a PRÓXIMA tabela que alguém pendurar lá.
+
+**Deriva de schema descoberta no caminho, NÃO corrigida:** seis migrations estão
+aplicadas no banco sem arquivo em `supabase/migrations/` — `voice_calls`,
+`founder_alerts_delivery_tracking`, `prospect_gym_paired_runs`,
+`prospects_enrich_tried_at`, `prospect_mobile_enrichment`,
+`moat_events_and_caderno_fields`. Foram aplicadas direto pelo MCP. Escrevi só a
+do `voice_calls` (reconstruída do schema real), porque o teste de retenção lê as
+migrations e um banco maior que o repo torna a trava cega. As outras cinco ficam
+como tarefa própria.
 
 O comentário afirma resolver o crescimento perpétuo do dado de terceiro, mas o
 alvo é `prospect_messages` — a **filha**. A mãe, onde mora o PII, nunca é podada.
@@ -157,7 +186,21 @@ Pior caso passa de 100s. O docstring do `llm.ts` pede que extractors baratos
 passem ~10s; **nenhum call site passa `timeoutMs`**.
 
 ### 9. Cultura fora de domínio some silenciosamente
-**RELATADO** · `reason.ts:235`
+**RELATADO** · **CORRIGIDO** 04/ago · `reason.ts`
+
+O conserto inverte quem decide: o modelo diz o que VÊ, em texto livre, e o
+código decide se é cultura de casa via `normalizeCrop`, que já existia. Enum no
+prompt era o modelo apagando informação antes de nós — e nenhum conserto a
+jusante recupera um nome que nunca foi dito. `VisionId` passa a ter `cropVisto`
+(o nome livre) e `crop` (a chave canônica); "fora de domínio" e "não deu pra ver"
+deixam de ser o mesmo `null`. Fora do domínio a composição recebe instrução
+explícita de dizer que ali a Stevi vai pelo geral, não citar Agrofit e reforçar o
+agrônomo local.
+
+**Segundo defeito, achado ao consertar:** o enum do caminho de TEXTO
+(`extractPestTarget`) era `soja|milho|pastagem|outro` — sem café e sem citros,
+que a Stevi ANCORA no Agrofit. "Meu cafezal tá com broca" virava `outro` e perdia
+o grounding de uma cultura de casa. Mesmo conserto.
 
 O modelo classifica `crop` como `"outro"` e o código converte para `null` —
 indistinguível de "não deu pra ver". A resposta sai genérica, com a **mesma
@@ -167,7 +210,15 @@ Foi o caso do mamão em 03/ago. O goldenset (36 casos) não tem um único caso f
 de domínio.
 
 ### 10. Página em branco se o `app.js` não chegar
-**VERIFICADO** · `web/index.html:38` + `styles.css:492` + `index.html:575`
+**VERIFICADO** · **CORRIGIDO** 04/ago · `web/index.html` + `web/app.js`
+
+Não pelo conserto proposto abaixo. Mover o `classList.add('js')` para dentro do
+`app.js` (defer) faria o conteúdo renderizar visível e SUMIR quando o script
+chegasse — um piscar em toda visita boa para consertar a visita ruim. O inline
+fica onde está e passa a se desarmar: se em 3s o `app.js` não levantou
+`window.__steviApp`, o `.js` sai e a página aparece inteira, sem animação. Os
+três estados fecham: sem JS (inline nunca roda), JS sem app.js (desarme), tudo
+certo (reveal normal).
 
 `.js` é setado síncrono no `<head>`; `.js .reveal { opacity: 0 }`; `app.js` é
 `defer`. Se a conexão derrubar só o JS, **nada nunca reaparece** — 11.492px de
