@@ -111,3 +111,49 @@ describe('checkOutbound', () => {
     expect(r.safe).toBe(true);
   });
 });
+
+/**
+ * O gate na linguagem do produtor pequeno (achado #12 da auditoria de 04/ago).
+ *
+ * O gate disparou ZERO vezes em 926 mensagens. Sem tabela de eventos não dá pra
+ * saber se isso é bom comportamento do modelo ou gate cego — mas dá pra ver o
+ * que ele NÃO sabia ler, e o que faltava era justamente o vocabulário de quem
+ * pulveriza com bomba costal, não com pulverizador de barra:
+ *
+ *   "meio litro por bomba"   — a unidade real de quem carrega nas costas
+ *   "0,5% na calda"          — concentração, não taxa por área
+ *   "uma saca por hectare"
+ *
+ * E a segunda metade, que não é vocabulário e sim leitura da lei: sob a Lei
+ * 14.785/2023 mandar aplicar uma MARCA já é prescrição, com ou sem dose.
+ * "Aplique Priori Xtra" não precisa de número para ser receita.
+ */
+describe('vocabulário do pulverizador costal', () => {
+  const barrado = (t: string) => expect(checkOutbound(t).safe).toBe(false);
+  const passa = (t: string) => expect(checkOutbound(t).safe).toBe(true);
+
+  it.each([
+    'Aplique 500 ml por bomba de 20 litros.',
+    'Use meio litro por bomba.',
+    'Pulverize 0,5% na calda.',
+    'Aplique 2 sacas por hectare.',
+    'Recomendo 30 ml por litro de água.',
+  ])('barra dose + instrução: %s', barrado);
+
+  it('verbo + MARCA sem dose nenhuma já é prescrição', () => {
+    barrado('Aplique Priori Xtra na sua lavoura.');
+  });
+
+  it('citar a marca sem mandar aplicar continua liberado', () => {
+    // A Stevi pode dizer o que EXISTE registrado; o que ela não pode é receitar.
+    passa('Existe registro de Priori Xtra para ferrugem asiática na soja.');
+  });
+
+  it('manejo sem produto nem dose continua passando', () => {
+    passa('Monitore o talhão duas vezes por semana e faça rotação de mecanismos de ação.');
+  });
+
+  it('número solto não vira dose', () => {
+    passa('A ferrugem apareceu em 3 talhões da região.');
+  });
+});

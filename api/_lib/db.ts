@@ -270,7 +270,9 @@ export async function insertTriageEvent(e: {
   userId: string | null;
   farmId?: string | null;
   crop?: string | null;
-  pest: string;
+  /** Null quando a triagem não concluiu. NULL é DADO — foi triada e não deu.
+   * Ver 20260804230000_triage_events_incerta.sql. */
+  pest: string | null;
   confidence?: string | null;
   uf?: string | null;
 }): Promise<void> {
@@ -377,6 +379,27 @@ export async function claimInbound(
   if (error.code === '23505') return false; // duplicate provider_message_id → retry
   log.error('claimInbound failed (fail-open):', error.message);
   return true;
+}
+
+/**
+ * Ligar uma linha já reivindicada ao usuário, depois que ele foi resolvido.
+ *
+ * A reivindicação acontece ANTES de saber de quem é a mensagem, porque a
+ * idempotência tem que vir antes das guardas com efeito colateral (dossiê ao
+ * parceiro, alerta aos founders, confirmação de exclusão) — e essas guardas
+ * rodam, de propósito, antes de existir usuário. Sem esta adoção a linha ficaria
+ * órfã e sumiria do caderno e da memória de trabalho, que filtram por user_id.
+ */
+export async function adoptInbound(messageId: string, userId: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db
+    .from('messages')
+    .update({ user_id: userId })
+    .eq('provider_message_id', messageId)
+    .is('user_id', null);
+  // Fail-soft: a resposta ao produtor não pode depender da contabilidade. O
+  // custo de falhar aqui é uma linha órfã no histórico, não um silêncio.
+  if (error) log.error('adoptInbound failed:', error.message);
 }
 
 /** Attach a transcript to a claimed inbound row (voice notes). */

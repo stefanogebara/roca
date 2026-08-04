@@ -230,35 +230,53 @@ linha: mover o `classList.add('js')` para dentro do `app.js` — se ele não che
 
 ---
 
-## MEDIUM
+## MEDIUM — todos CORRIGIDOS em 04/ago
 
-- **11.** `triage_events` com **0 linhas** (VERIFICADO). Só grava com praga
-  identificada e confiança não-baixa — a triagem incerta, que é o dado de treino
-  mais valioso, não deixa rastro. O moat descrito no comentário não existe.
-- **12.** Gate de compliance não pega as unidades do produtor pequeno (RELATADO):
-  `por litro`, `por bomba`, `%`, `meio litro`, `1 saca`, e **verbo + marca sem
-  dose** (`"Aplique Priori Xtra"`), que é prescrição sob a Lei 14.785/2023.
-  Disparou 0 vezes em 926 mensagens e não há tabela de eventos — não dá para
-  saber se é bom comportamento ou gate cego.
-- **13.** `agrofit.ts:44` lança na inicialização do módulo, dentro da cadeia
-  estática do webhook (VERIFICADO). Mesma forma do outage de 29/jul. O vizinho
-  `compliance.ts:80` carrega dado igual com a política oposta e correta.
-- **14.** Guardas caras antes da guarda de idempotência (RELATADO):
-  `guardDeletionRequest` e `guardPartnerReply` antes de `guardDuplicateInbound`
-  — reentrega da Meta duplica dossiê ao parceiro e alerta aos founders.
-- **15.** `alertFounders` é awaited no caminho da resposta, com WhatsApp primeiro
-  e em série (RELATADO). Em `webhook.ts` o `ack()` só acontece depois dele.
-- **16.** Opt-out sem verbatim (RELATADO): a mensagem do prospect nunca é gravada,
-  e `reason` é string fixa. Para LGPD o que sustenta é a evidência do pedido.
-- **17.** `OPTOUT_RE` larga demais (RELATADO): "não quero atrapalhar", "vou sair
-  pro campo" viram bloqueio permanente, sem alerta e sem reversão.
-- **18.** `verifyCardQuery` falha ABERTO sem segredo (RELATADO) — `cardSign.ts:49`
-  devolve `true` se `REPORT_URL_SECRET` sumir. O irmão `reportToken.ts` falha
-  fechado. Fusível de vidro.
-- **19.** UI: tap targets abaixo de 44px (header 138×38, footer 343×34) e chips
-  `.tag--data` a 10-11px — que carregam justamente o conteúdo da demo.
-- **20.** `FALLBACK_REPLY` não é acionável ("manda de outro jeito" — qual?) nem
-  tem escape de urgência. O repo já sabe escrever melhor: ver `PHOTO_RETRY_MSG`.
+- **11.** `triage_events` com 0 linhas. **CORRIGIDO**: a gravação estava presa ao
+  card visual, e o card só sai com praga identificada e confiança não-baixa —
+  regra de PRODUTO correta que virou regra de DADO sem ninguém decidir. Agora o
+  `reason` expõe dois observadores separados (`onPestCard` = o que mostrar,
+  `onTriage` = o que vimos) e `triage_events.pest` aceita null, porque "não deu
+  pra identificar" É dado. Migration aplicada.
+- **12.** Gate de compliance cego ao produtor pequeno. **CORRIGIDO**: entraram
+  `bomba`, `litro de água`, `calda`, `saca`, `%` e quantidade por extenso ("meio
+  litro"). O gate só sabia ler taxa por ÁREA — a régua de quem tem pulverizador
+  de barra, não de quem carrega bomba costal. Segunda metade: **verbo + MARCA
+  sem dose** passa a barrar, porque a Lei 14.785/2023 põe a escolha do PRODUTO
+  no receituário, não só a dose. Restrito a marca, não a ativo: citar ativo é o
+  que a Stevi faz para ancorar no Agrofit.
+- **13.** `agrofit.ts` lançava na init. **CORRIGIDO**: degrada com log alto, como
+  o vizinho `compliance.ts` já fazia. Um throw ali não é erro de requisição — é
+  o módulo falhando ao carregar, com nenhuma requisição chegando a rodar, e
+  nenhum try/catch a jusante alcança. Mesma forma do apagão de 29/jul.
+- **14.** Guardas caras antes da idempotência. **CORRIGIDO**: a reivindicação
+  passa a ser a PRIMEIRA coisa, sem dono (`messages.user_id` é nullable), e a
+  linha é adotada quando o usuário aparece. Não deu pra só trocar as linhas de
+  lugar: as duas guardas rodam antes de resolver o usuário de propósito.
+- **15.** `alertFounders` awaited antes do ack. **CORRIGIDO** no webhook e nos
+  quatro pontos do pipeline que ficam entre a mensagem e o ack. A ORDEM DOS
+  CANAIS não mudou — é decisão de produto documentada ("alerta em caixa de
+  entrada não acorda ninguém") e não era o que estava errado.
+- **16.** Opt-out sem verbatim. **CORRIGIDO**: coluna `verbatim` própria
+  (migration aplicada), truncada em 500 na camada de dados. `reason` segue sendo
+  a categoria; a evidência do pedido agora existe.
+- **17.** `OPTOUT_RE` larga demais. **CORRIGIDO**: a régua nova exige que a
+  mensagem INTEIRA seja o pedido (ancorada nas duas pontas) ou que a frase diga
+  explicitamente que é sobre receber mensagem. "quero sair" casa; "vou sair pro
+  campo agora" não.
+- **18.** `verifyCardQuery` falhava ABERTO. **CORRIGIDO**: recusa sem segredo, e
+  — a outra metade, sem a qual o conserto pioraria as coisas — quem monta a
+  resposta consulta `cardSecretConfigured()` e não anexa card que o endpoint vai
+  negar. Só endurecer a verificação trocaria "guarda desligada" por "imagem
+  quebrada no WhatsApp do produtor".
+- **19.** Alvos de toque e fontes. **CORRIGIDO**: piso de 44px no `.btn` (e não
+  na variante grande — quem errava era a pequena) e nos links do rodapé; chips
+  `.tag--data` com piso absoluto de 14px, porque eram eles que carregavam o
+  conteúdo da demo.
+- **20.** `FALLBACK_REPLY` não acionável. **CORRIGIDO**: diz o que fazer (texto
+  curto ou áudio) e abre saída de urgência (procurar o agrônomo). O prefixo de
+  30 chars que o canário casa não mudou, então as linhas antigas seguem
+  contando.
 
 ---
 

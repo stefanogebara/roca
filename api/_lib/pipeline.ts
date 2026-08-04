@@ -5,9 +5,9 @@
  */
 
 import type { TransportAdapter, InboundMessage } from './transport/types';
-import { appendCardSig, roundCoord } from './cardSign';
+import { appendCardSig, roundCoord, cardSecretConfigured } from './cardSign';
 import { routeIntent, type Intent } from './router';
-import { reason } from './reason';
+import { reason, type VisionId } from './reason';
 import { buildFarmCard, isFarmConfirmYes } from './farmcard';
 import { buildAgronomoBrief } from './brief';
 import { handleProspectInbound, respondAsProspectAgent, recordProspectOutbound, deleteProspectData } from './prospect/inbound';
@@ -33,6 +33,7 @@ import {
   markReferralPrompted,
   logMessage,
   claimInbound,
+  adoptInbound,
   updateInboundTranscript,
   deleteUserData,
   markConsentNotified,
@@ -383,7 +384,12 @@ async function sendOrRecord(
       await logMessage(userId, 'out', { kind: 'text', text: out.text, intent: 'send_failed' });
     }
     // No phone number in the alert — masked-PII discipline applies here too.
-    await alertFounders(`⚠️ Stevi: envio ao produtor falhou (${intent}) — ${reason.slice(0, 200)}`);
+    // Sem await: o envio ao produtor já falhou, e segurar o ack por telemetria
+    // só adianta a reentrega da Meta (que vai falhar igual).
+    fireAndForget(
+      () => alertFounders(`⚠️ Stevi: envio ao produtor falhou (${intent}) — ${reason.slice(0, 200)}`),
+      'alerta de envio falho'
+    );
     return false;
   }
 }
@@ -927,6 +933,7 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
       ? 'field_health'
       : await routeIntent(effective);
   let pestCard: PestCardData | undefined;
+  let visao: VisionId | undefined;
   let replyText: string;
   try {
     // Working memory: the last few turns, so follow-ups ("e o que eu faço?")
@@ -949,6 +956,9 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
       onPestCard: (c) => {
         pestCard = c;
       },
+      onTriage: (v) => {
+        visao = v;
+      },
     });
   } catch (e) {
     log.error('reasoning failed:', (e as Error).message);
@@ -957,19 +967,27 @@ async function reasonFallback(ctx: RouteContext): Promise<RouteResult> {
   // Moat capture: the triage verdict used to exist only inside a card URL and
   // prose. Structured now — crop × pest × region × date is the dataset that
   // compounds (and the "resolveu?" follow-up will stamp the outcome onto it).
-  if (pestCard?.pest) {
-    // Congelado num const: pestCard é `let`, e o que gravamos tem que ser o
-    // veredito desta decisão, não o que a variável virar depois. (Era isso que
-    // o tsc estava reclamando ao perder o narrowing dentro do closure.)
-    const triage = pestCard;
+  //
+  // Grava a OBSERVAÇÃO, não o card. Até 04/ago a condição era `pestCard?.pest`,
+  // e o card só é emitido com praga identificada E confiança não-baixa: uma
+  // regra de produto correta (não mostrar veredito fraco com cara de firme) que
+  // virava regra de dado sem ninguém decidir isso. Resultado medido:
+  // `triage_events` com ZERO linhas, e justamente a triagem incerta — o dado de
+  // treino mais valioso — era a que nunca deixava rastro.
+  if (visao) {
+    // Congelado num const: `visao` é `let` e o que gravamos tem que ser o
+    // veredito desta decisão, não o que a variável virar depois.
+    const triagem = visao;
     const profile = userId ? await getFarmProfile(userId) : { uf: null, crop: null };
     fireAndForget(
       () =>
         insertTriageEvent({
           userId,
-          crop: triage.crop ?? profile.crop?.[0] ?? null,
-          pest: triage.pest,
-          confidence: triage.confidence ?? null,
+          // `cropVisto` (nome livre) na frente: registrar "mamão" vale mais que
+          // registrar null só porque não é cultura de casa.
+          crop: triagem.cropVisto ?? profile.crop?.[0] ?? null,
+          pest: triagem.pest,
+          confidence: triagem.confidence,
           uf: profile.uf,
         }),
       'triage_events'
@@ -1045,8 +1063,12 @@ async function guardDeletionRequest(adapter: TransportAdapter, msg: InboundMessa
     );
   } catch (e) {
     log.error('LGPD confirmation send failed:', (e as Error).message);
-    await alertFounders(
-      `⚠️ Stevi: confirmação de exclusão LGPD não foi entregue — ${(e as Error).message.slice(0, 200)}`
+    fireAndForget(
+      () =>
+        alertFounders(
+          `⚠️ Stevi: confirmação de exclusão LGPD não foi entregue — ${(e as Error).message.slice(0, 200)}`
+        ),
+      'alerta de confirmação LGPD'
     );
   }
   return true;
@@ -1065,11 +1087,18 @@ async function guardPartnerReply(adapter: TransportAdapter, msg: InboundMessage)
   const dossier = await buildDossierReply(partner);
   if (dossier) {
     await sendOrRecord(adapter, msg.from, { text: dossier }, null, 'partner_dossier');
-    await alertFounders(`🤝 Dossiê de lead entregue pro parceiro ${partner.name}. Acompanhe o fechamento!`);
+    fireAndForget(
+      () => alertFounders(`🤝 Dossiê de lead entregue pro parceiro ${partner.name}. Acompanhe o fechamento!`),
+      'alerta de dossiê entregue'
+    );
   } else {
     // No pending lead — this is relationship talk; a human answers it.
-    await alertFounders(
-      `💬 Parceiro ${partner.name} mandou mensagem (responda você): "${(msg.text ?? '(mídia)').slice(0, 150)}"`
+    fireAndForget(
+      () =>
+        alertFounders(
+          `💬 Parceiro ${partner.name} mandou mensagem (responda você): "${(msg.text ?? '(mídia)').slice(0, 150)}"`
+        ),
+      'alerta de recado de parceiro'
     );
   }
   return true;
@@ -1111,7 +1140,7 @@ async function resolveUserOrFailClosed(
  * provider retry (timeout redelivery) is a duplicate → ack without reprocessing.
  * Returns true when the message was already claimed (caller returns).
  */
-async function guardDuplicateInbound(userId: string, msg: InboundMessage): Promise<boolean> {
+async function guardDuplicateInbound(userId: string | null, msg: InboundMessage): Promise<boolean> {
   const claimed = await claimInbound(userId, {
     kind: msg.kind,
     text: msg.text,
@@ -1250,8 +1279,13 @@ async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<
   // A gate-replaced reply never ships its visual — the pest card carries the
   // exact product/group data the gate just blocked. `suppressCard` blocks the
   // generic card when the text is an honest "isso não parece uma lavoura" hold.
+  //
+  // `cardSecretConfigured()` na frente: sem REPORT_URL_SECRET o card sai sem
+  // assinatura e o /api/card recusa — o produtor receberia uma imagem quebrada.
+  // Melhor não mandar card nenhum; o texto já responde sozinho. Mesma política
+  // do reportToken, que degrada para resumo em texto quando não pode assinar.
   const mediaUrl =
-    !gate.safe || suppressCard
+    !gate.safe || suppressCard || !cardSecretConfigured()
       ? undefined
       : pestCard
         ? pestCardUrl(pestCard)
@@ -1349,6 +1383,20 @@ async function handleInboundComPrazo(
   adapter: TransportAdapter,
   msg: InboundMessage
 ): Promise<void> {
+  // IDEMPOTÊNCIA PRIMEIRO. A Meta reentrega webhook — é o comportamento normal
+  // dela, não anomalia — e até 04/ago a reentrega passava por duas guardas com
+  // efeito colateral antes de ser reconhecida como repetida: mandava o dossiê
+  // ao parceiro de novo, alertava os founders de novo, reconfirmava uma exclusão
+  // já feita.
+  //
+  // A ordem antiga tinha razão: as duas guardas rodam antes de resolver o
+  // usuário DE PROPÓSITO — não se cria cadastro para quem pede pra sumir, e
+  // parceiro não é produtor. Por isso a reivindicação passa a ser sem dono
+  // (`messages.user_id` é nullable) e a linha é adotada logo abaixo, quando o
+  // usuário existe. Um UPDATE por mensagem recebida em troca da invariante
+  // inteira: nada com efeito colateral roda duas vezes.
+  if (await guardDuplicateInbound(null, msg)) return;
+
   // Pre-route guards — each may fully handle the message and short-circuit.
   if (await guardDeletionRequest(adapter, msg)) return;
   if (await guardPartnerReply(adapter, msg)) return;
@@ -1358,7 +1406,9 @@ async function handleInboundComPrazo(
   const userId = user.id;
   const firstContact = isFirstContact(user);
 
-  if (await guardDuplicateInbound(userId, msg)) return;
+  // A linha reivindicada lá em cima ganha dono. Sem isto ela some do caderno e
+  // da memória de trabalho, que filtram por user_id.
+  await adoptInbound(msg.messageId, userId);
 
   // Acquisition attribution: a vouched farmer's first message carries who sent
   // them ("Oi! Vim pelo José" / #tec-jose). First-wins at the DB layer — the

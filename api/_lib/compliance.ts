@@ -29,8 +29,24 @@ export interface ComplianceResult {
   flags: string[];
 }
 
-const UNIT = '(l|litros?|ml|kg|g|gramas?)';
-const CONNECTOR = '(por|pra|para(\\s+cada)?)';
+const UNIT = '(l|litros?|ml|kg|g|gramas?|sacas?)';
+const CONNECTOR = '(por|pra|para(\\s+cada)?|na|no|em)';
+
+/**
+ * O alvo da aplicação, na linguagem de quem pulveriza.
+ *
+ * `bomba` e `litro (de água)` entraram em 04/ago: o gate só sabia ler taxa por
+ * ÁREA (ha, alqueire), que é a régua de quem tem pulverizador de barra. Quem
+ * carrega bomba costal dosa por bomba e por litro de calda — "meio litro por
+ * bomba" é receita igual a "10 L/ha", e passava batido.
+ */
+const ALVO = '(hectare|ha|alqueire|bomba|pulverizador|costal|litros?\\s+de\\s+[áa]gua|litros?|calda|tanque)';
+
+/**
+ * Quantidade escrita por extenso. Produtor não digita "0,5 L" — digita "meio
+ * litro". Sem isto o gate só via receita quando ela vinha formatada como bula.
+ */
+const NUMERO_POR_EXTENSO = '(meio|meia|um|uma|dois|duas|tr[êe]s|quatro|cinco|dez|quinze|vinte)';
 
 // Dose/rate patterns: a number followed by an application rate.
 const DOSE_PATTERN = new RegExp(
@@ -46,8 +62,24 @@ const DOSE_PATTERN = new RegExp(
     '|' +
     // 100 ml para cada 100 litros (de água) — citros tank mix
     `${UNIT}\\s?${CONNECTOR}\\s+100\\s?(l|litros?)` +
+    '|' +
+    // 500 ml por bomba · 30 ml por litro de água · 2 sacas por hectare
+    `${UNIT}\\s?${CONNECTOR}\\s+(de\\s+)?${ALVO}` +
     // no \b here: "pé" ends in a non-ASCII word char, which JS \b mishandles
     ')(?![\\wÀ-ÿ])',
+  'i'
+);
+
+/**
+ * Formas de dose que NÃO começam com dígito, e por isso escapavam inteiras do
+ * `DOSE_PATTERN` (que exige `\d` no começo):
+ *
+ *   "meio litro por bomba"  — quantidade por extenso
+ *   "0,5% na calda"         — concentração; a régua aqui é a porcentagem, e
+ *                             porcentagem numa resposta agronômica é calda
+ */
+const DOSE_SEM_DIGITO = new RegExp(
+  `\\b${NUMERO_POR_EXTENSO}\\s+${UNIT}\\b|\\b\\d+([.,]\\d+)?\\s?%`,
   'i'
 );
 
@@ -175,7 +207,7 @@ const SAFE_REPLACEMENT = `Olha, quem define qual produto e qual dose aplicar é 
 export function checkOutbound(text: string): ComplianceResult {
   const flags: string[] = [];
 
-  const hasDose = DOSE_PATTERN.test(text);
+  const hasDose = DOSE_PATTERN.test(text) || DOSE_SEM_DIGITO.test(text);
   if (hasDose) {
     if (APPLY_VERB.test(text)) {
       flags.push('prescription_shape: dose + application instruction');
@@ -186,6 +218,20 @@ export function checkOutbound(text: string): ComplianceResult {
     } else if (hasActiveIngredient(text)) {
       flags.push('prescription_shape: dose + active ingredient');
     }
+  }
+
+  // MARCA + mandar aplicar, sem dose nenhuma, já é prescrição.
+  //
+  // A Lei 14.785/2023 põe a escolha do PRODUTO no receituário agronômico, não
+  // só a dose — "Aplique Priori Xtra" é receita completa para quem vai comprar
+  // e pulverizar, e o gate antigo exigia um número para reagir.
+  //
+  // Restrito a MARCA comercial, não a ingrediente ativo: citar ativo é o que a
+  // Stevi faz para ancorar no Agrofit ("existe registro de azoxistrobina"), e
+  // frases legítimas como "para usar azoxistrobina, procure o agrônomo" cairiam
+  // aqui à toa. Marca é o sinal inequívoco de "compre este".
+  if (!hasDose && APPLY_VERB.test(text) && hasBrandName(text)) {
+    flags.push('prescription_shape: application instruction + commercial brand name');
   }
 
   if (flags.length > 0) {

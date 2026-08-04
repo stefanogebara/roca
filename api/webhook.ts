@@ -156,13 +156,22 @@ export default async function handler(
   } catch (e) {
     log.error('webhook error:', (e as Error).message);
     // A swallowed crash here means a farmer sent a message and got NOTHING —
-    // ack-200 + a log nobody reads. Page the founders (fail-soft: alerting
-    // trouble must never break the ack that keeps provider retries at bay).
-    try {
-      await alertFounders(`⚠️ Stevi: erro no webhook — ${(e as Error).message.slice(0, 180)}`);
-    } catch (alertErr) {
-      log.error('alertFounders failed too:', (alertErr as Error).message);
-    }
+    // ack-200 + a log nobody reads. Page the founders.
+    //
+    // SEM AWAIT: o ack não pode esperar o alerta. `alertFounders` tenta
+    // WhatsApp primeiro (decisão do dono: alerta em caixa de entrada não acorda
+    // ninguém) e cada degrau devolve ENTREGA, não aceite — pode levar segundos.
+    // O ack é o que impede a Meta de reentregar; segurá-lo por telemetria troca
+    // um alerta perdido de vez em quando por uma tempestade de reentrega, com o
+    // mesmo erro acontecendo de novo a cada volta.
+    //
+    // É a política que o `handleInbound` já aplica no catch dele, com estas
+    // mesmas palavras. Aqui estava o inverso, e este catch é o de FORA do
+    // pipeline (assinatura, parse, adapter) — mais raro e mais grave.
+    fireAndForget(
+      () => alertFounders(`⚠️ Stevi: erro no webhook — ${(e as Error).message.slice(0, 180)}`),
+      'alerta de erro do webhook'
+    );
     ack();
   }
 }

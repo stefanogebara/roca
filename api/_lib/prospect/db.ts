@@ -493,9 +493,27 @@ export async function markProspectReplied(id: string): Promise<void> {
 }
 
 /** Add a phone to the hard opt-out blocklist (idempotent on the unique index). */
-export async function addOptout(phone: string, reason: string): Promise<void> {
+/** Teto do verbatim: evidência, não arquivo. Casa com o comentário da coluna. */
+const VERBATIM_MAX = 500;
+
+/**
+ * Registrar opt-out. `reason` é a CATEGORIA (de onde veio); `verbatim` é o que a
+ * pessoa escreveu — a evidência que sustenta o registro para LGPD. Até 04/ago só
+ * havia a categoria, e ela era uma string fixa nossa.
+ */
+export async function addOptout(phone: string, reason: string, verbatim?: string | null): Promise<void> {
   const db = getDb();
-  const { error } = await db.from('prospect_optouts').upsert({ phone, reason }, { onConflict: 'phone' });
+  const { error } = await db.from('prospect_optouts').upsert(
+    {
+      phone,
+      reason,
+      // Truncar, nunca descartar: uma mensagem enorme não pode fazer a prova
+      // sumir. `undefined` viraria "não mexe na coluna" no upsert, então o
+      // ausente é explicitamente null.
+      verbatim: verbatim ? verbatim.slice(0, VERBATIM_MAX) : null,
+    },
+    { onConflict: 'phone' }
+  );
   if (error) log.error('addOptout failed:', error.message);
 }
 

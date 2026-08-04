@@ -28,7 +28,7 @@ interface AgrofitFile {
 // Loaded at module init from the bundled JSON. Runtime read (not a static import)
 // keeps tsc from inferring a ~550 KB literal type — that made typecheck take
 // ~2 minutes. Vercel ships the file via `includeFiles` in vercel.json.
-function loadAgrofit(): AgrofitFile {
+function loadAgrofit(): AgrofitFile | null {
   const candidates = [
     join(process.cwd(), 'api/_lib/data/agrofit.json'),
     join(__dirname, '../data/agrofit.json'),
@@ -41,15 +41,30 @@ function loadAgrofit(): AgrofitFile {
       // try next candidate
     }
   }
-  throw new Error('agrofit.json not found in any known location');
+  // NÃO lança. Este módulo está na cadeia estática de import do webhook, e um
+  // throw aqui não é erro de uma requisição: é o módulo falhando ao CARREGAR,
+  // com nenhuma requisição chegando a rodar. Não existe try/catch a jusante que
+  // salve — os que existem estão dentro de código que nunca é atingido. É a
+  // forma exata do apagão de 29/jul, que tirou o webhook do ar por 24h.
+  //
+  // O vizinho já ensinava o certo: `compliance.ts` carrega um arquivo igual, do
+  // mesmo diretório, gerado pelo mesmo script, e degrada com log alto porque
+  // "a weaker gate must not take the whole webhook down". Aqui vale o mesmo:
+  // sem registro o groundedHit não acha nada, a resposta sai sem o bloco do
+  // Agrofit, e o produtor recebe orientação de manejo. Pior que o normal,
+  // incomparavelmente melhor que silêncio.
+  console.error(
+    'agrofit: agrofit.json não encontrado — grounding desativado, respostas saem sem registro'
+  );
+  return null;
 }
 
 const AGROFIT = loadAgrofit();
-export const AGROFIT_SOURCE = AGROFIT.meta.source;
+export const AGROFIT_SOURCE = AGROFIT?.meta.source ?? null;
 
 /** When the bundled snapshot was extracted (YYYY-MM-DD), or null on a legacy
  * unstamped file. Rebuilt by scripts/agrofit-extract.mjs, which stamps it. */
-export const AGROFIT_GENERATED_AT = AGROFIT.meta.generated_at ?? null;
+export const AGROFIT_GENERATED_AT = AGROFIT?.meta.generated_at ?? null;
 
 /**
  * How old the registry snapshot may get before the canary nudges a rebuild.
@@ -82,6 +97,7 @@ export function isAgrofitStale(
  * prescription shapes on the way out. */
 export function allActiveIngredients(): string[] {
   const set = new Set<string>();
+  if (!AGROFIT) return [];
   for (const pests of Object.values(AGROFIT.data)) {
     for (const entry of Object.values(pests)) {
       for (const a of entry.ativos) set.add(a);
@@ -179,6 +195,10 @@ export function lookupPest(
   crop: CropKey | null,
   pestQuery: string
 ): AgrofitLookup | null {
+  // Sem registro carregado não há o que citar. Devolver null é o mesmo que a
+  // função já faz quando não acha nada com confiança — o chamador segue sem o
+  // bloco do Agrofit, que é a degradação prevista.
+  if (!AGROFIT) return null;
   const qMatch = matchNorm(pestQuery);
   const qTokens = tokens(pestQuery);
   if (qTokens.length === 0 && qMatch.length < 3) return null;
@@ -203,7 +223,9 @@ export function lookupPest(
   const best = candidates[0];
   if (best.score < 50) return null; // confidence floor
 
-  return { entry: best.entry, crop: best.crop, source: AGROFIT_SOURCE };
+  // `AGROFIT.meta.source` e não a constante exportada: a guarda no topo já
+  // estreitou AGROFIT para não-nulo aqui, e a constante é `string | null`.
+  return { entry: best.entry, crop: best.crop, source: AGROFIT.meta.source };
 }
 
 /** Chemical-group hint for common actives, so the reply can teach FRAC rotation. */

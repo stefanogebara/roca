@@ -25,6 +25,12 @@ import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
 import { groundingBlock, chemicalGroups, groundedHit, normalizeCrop, type CropKey } from './tools/agrofit';
 import type { PestCardData } from './cards/pest';
+
+/** Quem observa uma triagem de foto: o que mostrar e o que registrar. */
+interface TriageObservers {
+  onPestCard?: (c: PestCardData) => void;
+  onTriage?: (v: VisionId) => void;
+}
 import { createLogger } from './logger';
 
 const log = createLogger('reason');
@@ -213,7 +219,7 @@ async function handleSpray(
   }
 }
 
-interface VisionId {
+export interface VisionId {
   pest: string | null;
   /**
    * A chave canônica, quando é uma das cinco culturas que a Stevi ancora no
@@ -293,12 +299,12 @@ const PHOTO_RETRY_MSG =
 async function handleVision(
   msg: InboundMessage,
   media: ChatImage,
-  packOverride?: string | null,
-  onPestCard?: (c: PestCardData) => void,
+  packOverride: string | null | undefined,
+  obs: TriageObservers,
   knownCrops?: string[] | null
 ): Promise<string> {
   try {
-    return await triagePhoto(msg, media, packOverride, onPestCard, knownCrops);
+    return await triagePhoto(msg, media, packOverride, obs, knownCrops);
   } catch (e) {
     log.error('handleVision failed:', (e as Error).message);
     return PHOTO_RETRY_MSG;
@@ -308,11 +314,17 @@ async function handleVision(
 async function triagePhoto(
   msg: InboundMessage,
   media: ChatImage,
-  packOverride?: string | null,
-  onPestCard?: (c: PestCardData) => void,
+  packOverride: string | null | undefined,
+  obs: TriageObservers,
   knownCrops?: string[] | null
 ): Promise<string> {
   const id = await identifyFromPhoto(msg, media);
+  // O DADO sai daqui, sempre que houve triagem — separado do card, que é
+  // PRODUTO. Até 04/ago os dois andavam juntos e a regra do card ("não mostrar
+  // veredito fraco com cara de firme", que está certa) virava regra de dado sem
+  // ninguém decidir isso: `triage_events` tinha ZERO linhas, e a triagem
+  // incerta, que é o dado de treino mais valioso, era exatamente a que sumia.
+  if (id) obs.onTriage?.(id);
 
   if (!id || (!id.pest && id.confidence === 'baixa')) {
     // Fallback: direct vision answer (still carries the handoff via the prompt).
@@ -335,8 +347,8 @@ async function triagePhoto(
     const hit = groundedHit(id.crop, id.pest, knownCrops);
     if (hit) grounding = groundingBlock(hit);
     // Emit the visual triage card alongside the text (compliance line baked in).
-    if (id.pest && onPestCard) {
-      onPestCard({
+    if (id.pest && obs.onPestCard) {
+      obs.onPestCard({
         pest: id.pest,
         // `cropVisto` na frente: o card mostra "mamão" em vez de nada quando a
         // cultura é de fora. O `hit` continua mandando nos produtos, e fora do
@@ -434,7 +446,14 @@ export interface ReasonDeps {
   referredBy?: string | null;
   /** Photo triage only: called with card data when a pest is identified with
    * enough confidence, so the caller can attach the visual triage card. */
+  /** O que MOSTRAR: o card visual, sujeito às regras de produto/compliance. */
   onPestCard?: (c: PestCardData) => void;
+  /**
+   * O que VIMOS: a observação da triagem, sempre que houve uma — inclusive
+   * confiança baixa e sem praga identificada. Separado do card de propósito;
+   * ver o comentário em `triagePhoto`.
+   */
+  onTriage?: (v: VisionId) => void;
 }
 
 /** Produce a reply for a routed message. */
@@ -466,7 +485,13 @@ export async function reason(
     needsCrop && deps.userId ? (await getFarmProfile(deps.userId)).crop : null;
 
   if (msg.kind === 'image' && deps.media) {
-    return handleVision(msg, deps.media, deps.packOverride, deps.onPestCard, knownCrops);
+    return handleVision(
+      msg,
+      deps.media,
+      deps.packOverride,
+      { onPestCard: deps.onPestCard, onTriage: deps.onTriage },
+      knownCrops
+    );
   }
 
   if (!msg.text) {

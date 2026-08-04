@@ -26,6 +26,7 @@ vi.mock('../api/_lib/db', async (importOriginal) => {
     logMessage: vi.fn(),
     claimInbound: vi.fn(),
     updateInboundTranscript: vi.fn(),
+    adoptInbound: vi.fn(),
     deleteUserData: vi.fn(),
     markConsentNotified: vi.fn(),
     setAwaiting: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock('../api/_lib/db', async (importOriginal) => {
     hasRecentReferral: vi.fn(),
     getActivityLog: vi.fn(),
     getRecentTurns: vi.fn(),
+    insertTriageEvent: vi.fn(),
   };
 });
 vi.mock('../api/_lib/reason', () => ({ reason: vi.fn() }));
@@ -120,6 +122,11 @@ function makeAdapter(): TransportAdapter & { send: ReturnType<typeof vi.fn> } {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Desde 04/ago (achado #18) o card só é anexado quando dá pra assiná-lo: sem
+  // REPORT_URL_SECRET o /api/card recusaria a URL e o produtor receberia uma
+  // imagem quebrada. Aqui o ambiente é o "configurado", que é o de produção;
+  // a degradação tem caso próprio abaixo.
+  process.env.REPORT_URL_SECRET = 'sk-teste-pipeline';
   vi.mocked(db.upsertUser).mockResolvedValue({ ...USER });
   vi.mocked(db.claimInbound).mockResolvedValue(true);
   vi.mocked(db.countRecentInbound).mockResolvedValue(0);
@@ -590,5 +597,129 @@ describe('guard de eco — robô que devolve a nossa própria frase', () => {
     );
 
     expect(adapter.send).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Idempotência ANTES das guardas com efeito colateral (achado #14).
+ *
+ * `guardDeletionRequest` e `guardPartnerReply` rodavam antes de
+ * `guardDuplicateInbound`. A Meta reentrega webhook — é o comportamento normal
+ * dela, não uma anomalia — e reentrega significava mandar o dossiê ao parceiro
+ * de novo, alertar os founders de novo, e reconfirmar uma exclusão já feita.
+ *
+ * A ordem antiga tinha razão de ser, e é por isso que o conserto não é só
+ * trocar as linhas de lugar: a guarda de LGPD roda antes de resolver o usuário
+ * DE PROPÓSITO (não se cria cadastro para quem está pedindo para sumir), e a de
+ * parceiro também (parceiro não é produtor, não pode virar linha em `users`).
+ *
+ * Então a reivindicação passa a acontecer sem dono — `messages.user_id` é
+ * nullable — e a linha é ADOTADA quando o usuário aparece. Custa um UPDATE por
+ * mensagem recebida e compra a invariante inteira: nada com efeito colateral
+ * roda duas vezes numa reentrega.
+ */
+describe('reentrega da Meta não repete efeito colateral', () => {
+  it('mensagem repetida não apaga dados de novo nem responde de novo', async () => {
+    vi.mocked(db.claimInbound).mockResolvedValue(false); // já vista
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'apaga meus dados' }));
+
+    expect(db.deleteUserData).not.toHaveBeenCalled();
+    expect(adapter.send).not.toHaveBeenCalled();
+  });
+
+  it('mensagem repetida não manda o dossiê ao parceiro de novo', async () => {
+    vi.mocked(db.claimInbound).mockResolvedValue(false);
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'quero o dossiê' }));
+
+    expect(findPartnerByPhone).not.toHaveBeenCalled();
+    expect(adapter.send).not.toHaveBeenCalled();
+  });
+
+  it('a reivindicação acontece ANTES de resolver o usuário', async () => {
+    // Se voltar a acontecer depois, a guarda de LGPD e a de parceiro rodam
+    // primeiro e o teste acima deixa de significar alguma coisa.
+    vi.mocked(db.claimInbound).mockResolvedValue(false);
+    await handleInbound(makeAdapter(), msgFixture({ text: 'oi' }));
+    expect(db.upsertUser).not.toHaveBeenCalled();
+  });
+
+  it('mensagem nova é reivindicada sem dono e depois adotada pelo usuário', async () => {
+    const adapter = makeAdapter();
+    await handleInbound(adapter, msgFixture({ text: 'e a ferrugem?' }));
+
+    expect(db.claimInbound).toHaveBeenCalledWith(null, expect.objectContaining({ messageId: 'wamid-in-1' }));
+    expect(db.adoptInbound).toHaveBeenCalledWith('wamid-in-1', 'u1');
+    expect(adapter.send).toHaveBeenCalled(); // e o produtor recebe normalmente
+  });
+});
+
+describe('sem REPORT_URL_SECRET a resposta sai só em texto', () => {
+  it('não anexa card que o /api/card iria recusar', async () => {
+    // A outra ponta do achado #18. Só endurecer a verificação transformaria
+    // "guarda desligada" em "imagem quebrada no WhatsApp do produtor".
+    delete process.env.REPORT_URL_SECRET;
+    vi.mocked(routeIntent).mockResolvedValue('pest_triage');
+    vi.mocked(reason).mockResolvedValue('parece ferrugem asiática');
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'tem ferrugem na soja' }));
+
+    expect(adapter.send).toHaveBeenCalledTimes(1); // o texto, e só ele
+    expect(adapter.send.mock.calls[0][0].mediaUrl).toBeUndefined();
+  });
+});
+
+/**
+ * O moat registra a triagem INCERTA (achado #11).
+ *
+ * `triage_events` tinha ZERO linhas. A gravação estava presa ao card visual, e
+ * o card só sai com praga identificada E confiança não-baixa — uma regra de
+ * PRODUTO correta (não mostrar veredito fraco com cara de firme) que virou
+ * regra de DADO sem ninguém decidir isso. O comentário no código descreve um
+ * conjunto que "compounds"; ele estava vazio.
+ *
+ * A triagem incerta é justamente o dado de treino mais valioso: é onde a visão
+ * erra, é o que o follow-up "resolveu?" vai carimbar depois.
+ */
+describe('triagem incerta deixa rastro', () => {
+  const fotoDe = (v: object) =>
+    vi.mocked(reason).mockImplementation(async (_m, _i, deps) => {
+      deps.onTriage?.(v as never);
+      return 'resposta';
+    });
+
+  it('confiança BAIXA é registrada — antes era exatamente o que sumia', async () => {
+    fotoDe({ pest: 'algo parecido com ferrugem', cropVisto: 'soja', crop: 'soja', confidence: 'baixa', evidence: null });
+
+    await handleInbound(makeAdapter(), msgFixture({ kind: 'image', text: null, mediaUrl: 'https://x/f.jpg' }));
+
+    expect(db.insertTriageEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ pest: 'algo parecido com ferrugem', confidence: 'baixa' })
+    );
+  });
+
+  it('SEM praga identificada também é registrada — "não deu" é dado', async () => {
+    fotoDe({ pest: null, cropVisto: 'soja', crop: 'soja', confidence: 'baixa', evidence: 'folha borrada' });
+
+    await handleInbound(makeAdapter(), msgFixture({ kind: 'image', text: null, mediaUrl: 'https://x/f.jpg' }));
+
+    expect(db.insertTriageEvent).toHaveBeenCalledWith(expect.objectContaining({ pest: null }));
+  });
+
+  it('registra a cultura VISTA, mesmo fora do domínio', async () => {
+    fotoDe({ pest: 'mancha', cropVisto: 'mamão', crop: null, confidence: 'media', evidence: null });
+
+    await handleInbound(makeAdapter(), msgFixture({ kind: 'image', text: null, mediaUrl: 'https://x/f.jpg' }));
+
+    expect(db.insertTriageEvent).toHaveBeenCalledWith(expect.objectContaining({ crop: 'mamão' }));
+  });
+
+  it('mensagem de texto não inventa triagem', async () => {
+    await handleInbound(makeAdapter(), msgFixture({ text: 'bom dia' }));
+    expect(db.insertTriageEvent).not.toHaveBeenCalled();
   });
 });

@@ -7,16 +7,52 @@
  *
  * Canonicalization: params are sorted by key before signing, so key order in
  * the URL never matters. Secret: REPORT_URL_SECRET (same one the applications
- * report already uses). Without a secret (dev), signing is a no-op and the
- * endpoint accepts unsigned URLs — configure the secret in prod.
+ * report already uses).
+ *
+ * SEM SEGREDO, RECUSA. Até 04/ago `verifyCardQuery` devolvia `true` quando a
+ * env não estava configurada, "para dev" — um fusível de vidro: a proteção
+ * contra falsificação de marca sumia exatamente no cenário em que ela some sem
+ * ninguém perceber (a variável some de produção). O irmão `reportToken.ts`
+ * sempre fez o contrário: expõe `reportSecretConfigured()` e quem chama degrada
+ * para texto em vez de mandar link não assinado.
+ *
+ * Aqui vale a mesma política, e ela precisa das DUAS pontas: a verificação
+ * recusa, e quem monta a resposta não anexa card nenhum quando não há segredo.
+ * Só a primeira metade transformaria "guarda desligada" em "imagem quebrada no
+ * WhatsApp do produtor", que é trocar um problema por outro.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createLogger } from './logger';
 
 const SIG_PARAM = 'sig';
 const SIG_LEN = 16; // hex chars — 64 bits, plenty against forgery-by-guess
+const log = createLogger('card-sign');
 
 function secret(): string {
   return process.env.REPORT_URL_SECRET ?? '';
+}
+
+let avisou = false;
+
+/**
+ * Se dá pra assinar card. Quem monta a resposta consulta ANTES de anexar a
+ * imagem — sem segredo, a resposta sai só em texto.
+ */
+export function cardSecretConfigured(): boolean {
+  if (secret().length > 0) return true;
+  if (!avisou) {
+    avisou = true;
+    log.error(
+      'REPORT_URL_SECRET não configurado — cards desativados (a resposta sai só em texto). ' +
+        'Configure a env para reativar; requisições não assinadas a /api/card são recusadas.'
+    );
+  }
+  return false;
+}
+
+/** Testes: o aviso-uma-vez é estado de módulo e vaza entre casos. */
+export function resetCardSecretWarning(): void {
+  avisou = false;
 }
 
 /** Sorted `k=v&k2=v2` canonical form of a query (sig param excluded). */
@@ -43,10 +79,10 @@ export function appendCardSig(url: string): string {
   return `${url}${url.endsWith('?') ? '' : '&'}${SIG_PARAM}=${sig}`;
 }
 
-/** Verify a card request's query. No secret → accept (dev). With a secret,
- * a missing or wrong sig fails closed. */
+/** Verify a card request's query. Sem segredo RECUSA — ver o cabeçalho: uma
+ * guarda que desaparece junto com a env é a que ninguém percebe faltando. */
 export function verifyCardQuery(query: Record<string, unknown> | URLSearchParams): boolean {
-  if (!secret()) return true;
+  if (!secret()) return false;
   const params =
     query instanceof URLSearchParams
       ? query

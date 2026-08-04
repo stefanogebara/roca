@@ -25,6 +25,7 @@ vi.mock('../api/_lib/db', async (importOriginal) => {
     markReferralPrompted: vi.fn(),
     logMessage: vi.fn(),
     claimInbound: vi.fn(),
+    adoptInbound: vi.fn(),
     updateInboundTranscript: vi.fn(),
     deleteUserData: vi.fn(),
     markConsentNotified: vi.fn(),
@@ -144,6 +145,10 @@ function firstSend(adapter: { send: SendMock }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Cards só são anexados quando dá pra assiná-los (achado #18): sem
+  // REPORT_URL_SECRET o /api/card recusaria a URL e o produtor receberia imagem
+  // quebrada. Estes casos exercitam o ambiente configurado.
+  process.env.REPORT_URL_SECRET = 'sk-teste-rotas';
   vi.mocked(db.upsertUser).mockResolvedValue({ ...USER });
   vi.mocked(db.claimInbound).mockResolvedValue(true);
   vi.mocked(db.countRecentInbound).mockResolvedValue(0);

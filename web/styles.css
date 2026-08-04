@@ -145,8 +145,13 @@ strong { font-weight: 600; }
 .section__sub { color: var(--ink-2); font-size: 1.1rem; margin-top: var(--s3); }
 
 /* ---- Buttons --------------------------------------------------------- */
+/* min-height 44px: piso de alvo de toque (WCAG 2.5.5 / HIG). O CTA do header
+   media 138×38 antes disto — e o dedo de quem está no campo, de luva ou com a
+   mão suja, não é o mouse de quem desenhou. Vai no .btn e não em cada variante
+   porque quem errava era justamente a variante pequena. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+  min-height: 44px;
   font-weight: 600; text-decoration: none; cursor: pointer;
   border-radius: var(--r-pill); border: 1px solid transparent;
   padding: .7rem 1.25rem; line-height: 1; white-space: nowrap;
@@ -309,8 +314,12 @@ strong { font-weight: 600; }
 .verdict__reasons li::before { content: "•"; position: absolute; left: .1rem; color: var(--green); font-weight: 700; }
 .verdict__window { font-size: .84rem; color: var(--ink-2); margin-top: .35rem; padding-top: .35rem; border-top: 1px dashed var(--line); }
 
+/* Estes chips carregam o CONTEÚDO da demo — o número do Delta T, a dose, a
+   praga. Eram os menores da página (.78em de um pai já pequeno dava ~10-11px):
+   o texto que mais importa era o mais difícil de ler. O piso em rem impede que
+   um pai pequeno os encolha de novo. */
 .tag--data {
-  font-family: var(--font-mono); font-size: .78em; font-weight: 600;
+  font-family: var(--font-mono); font-size: max(.78em, .875rem); font-weight: 600;
   background: var(--green-050); color: var(--green-deep);
   padding: .06em .38em; border-radius: 6px; white-space: nowrap;
 }
@@ -480,7 +489,13 @@ strong { font-weight: 600; }
 .site-footer__blurb { margin-top: var(--s3); font-size: .92rem; max-width: 42ch; color: #A9BCAE; }
 
 .site-footer__col h2 { font-family: var(--font-sans); font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: #8FA694; margin-bottom: var(--s3); font-weight: 600; }
-.site-footer__col a, .site-footer__col span { display: block; text-decoration: none; color: #D9E3C0; padding: .28rem 0; font-size: .96rem; }
+/* Mesmo piso dos botões: os links do rodapé mediam 343×34. `flex` no lugar de
+   `block` para o texto centralizar dentro da altura nova em vez de encostar no
+   topo. */
+.site-footer__col a, .site-footer__col span {
+  display: flex; align-items: center; min-height: 44px;
+  text-decoration: none; color: #D9E3C0; padding: .28rem 0; font-size: .96rem;
+}
 .site-footer__col a:hover { color: #fff; }
 .site-footer__col .muted { color: #96A085; }
 .site-footer__wa { font-weight: 600; }

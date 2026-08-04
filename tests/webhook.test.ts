@@ -310,3 +310,33 @@ describe('always-ack-on-error (retry-storm guard)', () => {
     expect(m.handleInbound).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * O ack não espera o alerta (achado #15 da auditoria de 04/ago).
+ *
+ * `alertFounders` tenta WhatsApp primeiro — decisão explícita do dono, porque
+ * alerta em caixa de entrada não acorda ninguém — e cada degrau devolve
+ * ENTREGA, não aceite. Isso pode levar segundos. Enquanto isso o `ack()` é
+ * exatamente o que impede a Meta de reentregar a mensagem.
+ *
+ * Segurar o ack por telemetria troca "um alerta perdido de vez em quando" por
+ * "tempestade de reentrega", com o mesmo erro acontecendo de novo a cada volta.
+ * O `handleInbound` já tinha decidido assim no catch dele; o webhook fazia o
+ * contrário.
+ *
+ * A ordem dos canais NÃO mudou: ela é escolha de produto, documentada, e não é
+ * o que estava errado.
+ */
+describe('o ack não fica preso na telemetria', () => {
+  it('responde 200 mesmo com o alerta pendurado para sempre', async () => {
+    m.handleInbound.mockRejectedValue(new Error('boom'));
+    // Um alerta que nunca resolve: é o WhatsApp fora do ar, não um caso teórico.
+    m.alertFounders.mockImplementation(() => new Promise(() => {}));
+    const res = makeRes();
+
+    await handler(makeReq({ headers: { 'x-twilio-signature': 'sig' } }), res);
+
+    expect(res.out.sent).toBe(TWIML);
+    expect(m.alertFounders).toHaveBeenCalledTimes(1); // disparado, não esperado
+  });
+});

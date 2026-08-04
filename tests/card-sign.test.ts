@@ -4,7 +4,13 @@
  * without a secret the whole mechanism is a no-op (dev).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { appendCardSig, verifyCardQuery, roundCoord } from '../api/_lib/cardSign';
+import {
+  appendCardSig,
+  verifyCardQuery,
+  roundCoord,
+  cardSecretConfigured,
+  resetCardSecretWarning,
+} from '../api/_lib/cardSign';
 
 describe('card URL signing', () => {
   beforeEach(() => {
@@ -35,11 +41,33 @@ describe('card URL signing', () => {
     expect(verifyCardQuery(new URLSearchParams('type=frost&t0=-1.2'))).toBe(false);
   });
 
-  it('no secret → no-op signing, permissive verify (dev)', () => {
+  // Contrato TROCADO de propósito em 04/ago (achado #18). Antes: sem segredo,
+  // `verifyCardQuery` devolvia true "para dev" — e era um fusível de vidro, a
+  // guarda contra falsificação de marca sumia junto com a env, no cenário em que
+  // ninguém percebe. Agora recusa, e quem monta a resposta consulta
+  // `cardSecretConfigured()` para não anexar um card que o endpoint vai negar.
+  it('sem segredo: não assina, RECUSA, e avisa que os cards estão desligados', () => {
     delete process.env.REPORT_URL_SECRET;
+    resetCardSecretWarning();
     const url = appendCardSig('https://x/api/card?type=frost');
     expect(url).not.toContain('sig=');
-    expect(verifyCardQuery(new URLSearchParams('type=frost'))).toBe(true);
+    expect(verifyCardQuery(new URLSearchParams('type=frost'))).toBe(false);
+    expect(cardSecretConfigured()).toBe(false);
+  });
+
+  it('sem segredo, nem uma URL bem formada de antes passa', () => {
+    // O ataque óbvio: assinar em dev (ou com um segredo vazado antigo) e mandar
+    // depois. Sem segredo configurado nada é aceito, ponto.
+    process.env.REPORT_URL_SECRET = 'segredo-antigo';
+    const assinada = appendCardSig('https://x/api/card?type=frost&t0=-1.2');
+    delete process.env.REPORT_URL_SECRET;
+    expect(verifyCardQuery(qs(assinada))).toBe(false);
+  });
+
+  it('com segredo, cards voltam a ser permitidos', () => {
+    process.env.REPORT_URL_SECRET = 'sk-teste';
+    resetCardSecretWarning();
+    expect(cardSecretConfigured()).toBe(true);
   });
 
   it('roundCoord keeps ~110 m precision', () => {

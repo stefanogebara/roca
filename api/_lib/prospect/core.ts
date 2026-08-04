@@ -250,10 +250,70 @@ export function parseProspectLines(text: string): ParsedProspect[] {
   return out;
 }
 
-// Inbound opt-out phrases from a prospect ("parar", "sair", "não quero", "remover").
-const OPTOUT_RE = /\b(parar|sair|descadastr\w*|remover?|n[ãa]o\s+quero|cancelar?|stop)\b/i;
+/**
+ * Reconhecer pedido de sair.
+ *
+ * A versão anterior procurava `parar|sair|descadastr|remover?|não quero|
+ * cancelar?|stop` em QUALQUER lugar da frase, e no vocabulário de quem trabalha
+ * na roça isso pega conversa normal: "não quero atrapalhar", "vou sair pro
+ * campo", "preciso remover as plantas daninhas", "quero parar a pulverização".
+ * Cada um desses virava bloqueio permanente — `prospect_optouts` nunca é podado,
+ * de propósito, porque é a prova legal — silencioso e sem reversão. O lead
+ * morria e ninguém ficava sabendo.
+ *
+ * A régua nova tem duas portas, e as duas exigem intenção clara:
+ *
+ * 1. A mensagem INTEIRA é o comando ("sair", "parar", "stop"). Quem quer sair
+ *    escreve curto; quem fala de lavoura escreve coisa em volta.
+ * 2. A frase diz explicitamente que é sobre RECEBER MENSAGEM ("não quero
+ *    receber", "para de mandar", "me tira da lista").
+ *
+ * Errar para menos aqui é o lado seguro: um opt-out não reconhecido volta na
+ * próxima mensagem, e continua havendo a saída manual pelo painel. Um opt-out
+ * falso é definitivo.
+ */
+/**
+ * A mensagem INTEIRA é o pedido — ancorada nas duas pontas, e é a âncora que
+ * faz o trabalho. "quero sair" casa; "vou sair pro campo agora" não, porque
+ * sobra texto depois. "não quero mais" casa; "não quero atrapalhar" e "não
+ * quero perder a safra" não, pela mesma razão.
+ *
+ * O prefixo opcional cobre a educação de quem escreve ("pode parar", "por favor
+ * me remove") sem abrir a porta para "vou", "preciso", "tem como" — que são
+ * justamente os começos das frases sobre lavoura.
+ */
+const PEDIDO_INTEIRO =
+  /^(?:eu\s+)?(?:quero\s+|queria\s+|pode\s+|podem\s+|favor\s+|pfv\s+|por\s+favor\s+)*(sair|parar|pare|para|stop|cancelar|cancela|descadastrar|remover|me\s+remov\w*|me\s+tir\w*|me\s+exclu\w*|nao\s+quero\s+mais(?:\s+nada)?|nao\s+quero)\s*(?:por\s+favor|pfv|obrigad\w*)?\s*$/;
+
+/** Frases que dizem, com todas as letras, que é sobre a MENSAGEM. */
+const SOBRE_MENSAGEM: RegExp[] = [
+  // "não quero (mais) receber (mais) ..." e variações sem acento
+  /n[ãa]o\s+quero\s+(?:mais\s+)?receber/i,
+  /n[ãa]o\s+(?:me\s+)?mand\w*\s+mais/i,
+  /n[ãa]o\s+quero\s+mais\s+(?:mensage|contato|nada)/i,
+  // "para/pare/parar de (me) mandar|enviar mensagem"
+  /\bpar[ae]r?\s+de\s+(?:me\s+)?(?:mandar|enviar)/i,
+  // "me tira/remove/exclui da lista"
+  /\bme\s+(?:tir[ae]|remov\w+|exclu\w+)\s+d\w*\s+list/i,
+  /\bsa[ií]r\s+d\w*\s+list/i,
+  // descadastro explícito, em qualquer construção
+  /descadastr\w+/i,
+  /\bcancelar?\s+(?:o\s+)?(?:envio|contato|mensage\w*)/i,
+];
 
 /** Whether an inbound message from a prospect is an opt-out request. */
 export function isOptOut(text: string | null | undefined): boolean {
-  return !!text && OPTOUT_RE.test(text);
+  if (!text) return false;
+  const bruto = text.trim();
+  if (!bruto) return false;
+  // Comando isolado: sem pontuação, sem acento, sem caixa.
+  const nu = bruto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (PEDIDO_INTEIRO.test(nu)) return true;
+  return SOBRE_MENSAGEM.some((re) => re.test(bruto));
 }

@@ -91,7 +91,10 @@ export async function handleProspectInbound(
   if (!prospect) return NOT_A_PROSPECT;
 
   if (isOptOut(text)) {
-    await addOptout(phone, 'inbound opt-out');
+    // O texto do pedido vai junto: é ele que sustenta o registro para LGPD, e
+    // este ramo retorna antes de a thread ser gravada — sem isto a mensagem não
+    // existiria em lugar nenhum.
+    await addOptout(phone, 'inbound opt-out', text);
     await markProspectReplied(prospect.id); // record the interaction, then never contact again
     log.info(`prospect opt-out honoured: ${prospect.id}`);
     return {
