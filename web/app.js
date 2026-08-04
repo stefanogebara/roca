@@ -4,6 +4,13 @@
 (function () {
   'use strict';
 
+  // Sinal de vida para o desarme do index.html: enquanto isto não roda, quem
+  // esconde o conteúdo (`.js .reveal { opacity: 0 }`) está sem ninguém para
+  // revelá-lo. Tem que ser a PRIMEIRA linha — qualquer erro abaixo (navegador
+  // velho, API faltando) deixaria a bandeira por levantar e a página seria
+  // desarmada e mostrada inteira, que é o desfecho certo.
+  window.__steviApp = true;
+
   var reduceMotion = window.matchMedia
     ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
     : false;

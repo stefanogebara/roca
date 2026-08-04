@@ -35,7 +35,25 @@
 
   <link rel="stylesheet" href="styles.css" />
 
-  <script>document.documentElement.classList.add('js');</script>
+  <!-- `.js` liga o scroll-reveal (styles.css esconde `.js .reveal`). Fica aqui,
+       síncrono, para que a página nunca pisque: se entrasse junto com o app.js
+       (defer) o conteúdo já teria renderizado visível e sumiria em seguida.
+
+       O preço disso é que quem esconde e quem revela ficam em arquivos
+       diferentes: se o app.js não chegar — CDN fora, 2G no meio da lavoura, aba
+       trocada durante o carregamento — `.js` fica setado, ninguém revela nada, e
+       11.492px de página ficam invisíveis para sempre, com o CTA clicável no
+       escuro. Modo de falha normal do nosso público, não de laboratório.
+
+       Daí o desarme: se em 3s o app.js não deu sinal de vida, tira-se o `.js` e
+       a página aparece inteira, sem animação. Sem JS nenhum este bloco nunca
+       roda e a página também renderiza — os três estados fecham. -->
+  <script>
+    document.documentElement.classList.add('js');
+    setTimeout(function () {
+      if (!window.__steviApp) document.documentElement.classList.remove('js');
+    }, 3000);
+  </script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
