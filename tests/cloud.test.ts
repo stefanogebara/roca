@@ -281,3 +281,73 @@ describe('CloudApiAdapter — responde pelo número que recebeu (multi-número n
     expect(urls[0]).toContain('/DEFAULT_ID/messages');
   });
 });
+
+/**
+ * Todo fetch do Cloud API sai com prazo.
+ *
+ * Era o único módulo de I/O da casa sem deadline — `llm.ts`, `weather.ts`,
+ * `soil.ts`, `geo.ts`, `cog.ts` e `alert.ts` todos usam AbortSignal.timeout, e
+ * o transporte de PRODUÇÃO era a exceção. Com a Graph API degradada (socket
+ * pendurado, não erro), o withRetry pendura 3 tentativas, o alertFounders tenta
+ * WhatsApp pela MESMA API pendurada, e o maxDuration de 60s estoura: função
+ * morta, sem 200, sem alerta, sem resposta — e a Meta reentrega, repetindo tudo.
+ *
+ * O teste fixa a PROPRIEDADE, não um valor: um fetch novo adicionado sem prazo
+ * cai aqui. Foi o que faltou para este buraco existir por tanto tempo.
+ */
+describe('nenhum fetch do Cloud sai sem deadline', () => {
+  const realFetch = globalThis.fetch;
+  let chamadas: Array<{ url: string; signal: unknown }> = [];
+
+  beforeEach(() => {
+    process.env.WHATSAPP_CLOUD_TOKEN = 't';
+    process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID = '123';
+    chamadas = [];
+    globalThis.fetch = (async (url: any, init: any) => {
+      chamadas.push({ url: String(url), signal: init?.signal });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => '{}',
+        json: async () => ({ messages: [{ id: 'wamid.X' }], url: 'https://x/media', mime_type: 'image/jpeg' }),
+        arrayBuffer: async () => new ArrayBuffer(8),
+      };
+    }) as any;
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  const temPrazo = () => {
+    expect(chamadas.length).toBeGreaterThan(0);
+    for (const c of chamadas) {
+      expect(c.signal, `sem signal: ${c.url}`).toBeInstanceOf(AbortSignal);
+    }
+  };
+
+  it('send (texto)', async () => {
+    await new CloudApiAdapter().send({ to: '5511999990000', text: 'oi' });
+    temPrazo();
+  });
+
+  it('send (mídia)', async () => {
+    await new CloudApiAdapter().send({ to: '5511999990000', text: 'oi', mediaUrl: 'https://x/card.png' });
+    temPrazo();
+  });
+
+  it('sendTemplate', async () => {
+    await new CloudApiAdapter().sendTemplate('5511999990000', 'stevi_x', 'pt_BR' as never);
+    temPrazo();
+  });
+
+  it('markRead', async () => {
+    await new CloudApiAdapter().markRead('wamid.A');
+    temPrazo();
+  });
+
+  it('fetchMedia — as DUAS etapas (id → url → bytes)', async () => {
+    await new CloudApiAdapter().fetchMedia('media-1');
+    expect(chamadas.length).toBe(2);
+    temPrazo();
+  });
+});

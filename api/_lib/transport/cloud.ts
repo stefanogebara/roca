@@ -21,6 +21,21 @@ import type {
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
+// Prazos. Este módulo era o ÚNICO de I/O da casa sem deadline — llm.ts,
+// weather.ts, soil.ts, geo.ts, cog.ts e alert.ts todos usam
+// AbortSignal.timeout, e o transporte de PRODUÇÃO era a exceção.
+//
+// Os valores cabem no maxDuration de 60s do webhook contando que o withRetry
+// faz 3 tentativas: envio pendurado custa ~31s no pior caso, não o minuto
+// inteiro. Antes disso, um socket pendurado na Graph API matava a função — sem
+// 200, sem alerta, sem resposta — e a Meta reentregava, repetindo o ciclo.
+const SEND_TIMEOUT_MS = 10_000;
+/** Cosmético e disparado sem esperar: prazo curto, nunca vale segurar nada. */
+const MARK_READ_TIMEOUT_MS = 5_000;
+/** Duas etapas (id → url → bytes); a segunda baixa o arquivo. */
+const MEDIA_META_TIMEOUT_MS = 8_000;
+const MEDIA_BYTES_TIMEOUT_MS = 12_000;
+
 const log = createLogger('cloud');
 
 interface CloudMessage {
@@ -267,6 +282,7 @@ export class CloudApiAdapter implements TransportAdapter {
           : { type: 'image', image: { link: msg.mediaUrl, caption } };
       const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
         method: 'POST',
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
@@ -315,6 +331,7 @@ export class CloudApiAdapter implements TransportAdapter {
 
     const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
       method: 'POST',
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -348,6 +365,7 @@ export class CloudApiAdapter implements TransportAdapter {
     const flat = paramText.replace(/\s*\n+\s*/g, ' · ').replace(/\t/g, ' ').trim().slice(0, 1024);
     const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
       method: 'POST',
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
@@ -387,6 +405,7 @@ export class CloudApiAdapter implements TransportAdapter {
     try {
       const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
         method: 'POST',
+        signal: AbortSignal.timeout(MARK_READ_TIMEOUT_MS),
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
@@ -407,12 +426,18 @@ export class CloudApiAdapter implements TransportAdapter {
     if (!token) throw new Error('WHATSAPP_CLOUD_TOKEN not configured');
     const auth = { Authorization: `Bearer ${token}` };
 
-    const metaRes = await fetch(`${GRAPH}/${mediaId}`, { headers: auth });
+    const metaRes = await fetch(`${GRAPH}/${mediaId}`, {
+      headers: auth,
+      signal: AbortSignal.timeout(MEDIA_META_TIMEOUT_MS),
+    });
     if (!metaRes.ok) throw new Error(`Cloud media meta failed: ${metaRes.status}`);
     const meta = (await metaRes.json()) as { url?: string; mime_type?: string };
     if (!meta.url) throw new Error('Cloud media meta missing url');
 
-    const binRes = await fetch(meta.url, { headers: auth });
+    const binRes = await fetch(meta.url, {
+      headers: auth,
+      signal: AbortSignal.timeout(MEDIA_BYTES_TIMEOUT_MS),
+    });
     if (!binRes.ok) throw new Error(`Cloud media download failed: ${binRes.status}`);
     const mime = meta.mime_type ?? binRes.headers.get('content-type') ?? 'image/jpeg';
     const buf = Buffer.from(await binRes.arrayBuffer());
