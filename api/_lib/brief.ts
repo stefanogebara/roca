@@ -47,6 +47,9 @@ async function extractBriefFields(convo: string): Promise<BriefFields> {
     const raw = await chat({
       model: MODELS.router(),
       maxTokens: 220,
+      // Extração barata, saída minúscula: 10s é folgado. O default de 25s
+      // aqui é orçamento roubado da composição, que é quem precisa dele.
+      timeoutMs: 10_000,
       system:
         'Você lê o que um produtor rural brasileiro contou e extrai os fatos pra um resumo ao agrônomo. ' +
         'Responda SÓ um JSON, sem texto extra, com estas chaves (use null quando o produtor não disse): ' +

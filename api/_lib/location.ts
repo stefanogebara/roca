@@ -55,6 +55,9 @@ export async function extractStatedPlace(
     const raw = await chat({
       model: MODELS.router(),
       maxTokens: 40,
+      // Extração barata, saída minúscula: 10s é folgado. O default de 25s
+      // aqui é orçamento roubado da composição, que é quem precisa dele.
+      timeoutMs: 10_000,
       system:
         'Extraia a cidade e a UF (sigla de 2 letras) que o produtor menciona como local da lavoura. ' +
         'Responda SÓ um JSON: {"city":"nome da cidade ou vazio","uf":"UF ou vazio"}. Sem texto extra.',

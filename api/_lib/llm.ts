@@ -7,6 +7,7 @@
 import { requireEnv, MODELS } from './env';
 import { withRetry, isTransient } from './retry';
 import { fireAndForget } from './fireAndForget';
+import { restanteMs, prazoDaTentativa, cabeOutraTentativa, prazoAtual } from './orcamento';
 import { createLogger } from './logger';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -42,13 +43,26 @@ export interface ChatOptions {
    */
   cacheSystem?: boolean;
   /**
-   * Hard deadline per attempt, in ms. Default 25s — the only external call
-   * without a deadline used to be this one, and a hung OpenRouter socket ate
-   * the webhook's whole 60s maxDuration (farmer got silence, not even the
-   * fallback reply). 25s leaves room for one retry inside the budget; cheap
-   * router/extraction calls should pass something tighter (~10s).
+   * Teto por tentativa, em ms. Default 25s — esta era a única chamada externa
+   * sem prazo, e um socket pendurado do OpenRouter comia os 60s inteiros do
+   * maxDuration (o produtor recebia silêncio, nem o fallback).
+   *
+   * Este número sozinho NÃO fecha o orçamento, e o comentário antigo aqui
+   * dizia que fechava ("leaves room for one retry"): 25s × 2 tentativas já são
+   * 50s. Quem fecha é o `deadlineAt` abaixo. Este campo continua sendo o teto
+   * de UMA tentativa — útil para dizer "esta extração é barata, 10s bastam".
    */
   timeoutMs?: number;
+  /**
+   * Prazo final da requisição (epoch ms), compartilhado por todas as chamadas
+   * do mesmo webhook. Com ele, cada tentativa gasta no máximo o que sobrou e a
+   * tentativa extra só acontece se couber — é o que impede duas chamadas
+   * sequenciais de somarem mais que o maxDuration.
+   *
+   * Ausente = comportamento de sempre. Gym, canary, crons e scripts chamam o
+   * mesmo `chat()` sem orçamento de webhook nenhum e não devem ser apertados.
+   */
+  deadlineAt?: number;
 }
 
 type ContentPart =
@@ -79,13 +93,24 @@ export async function describeImage(image: ChatImage): Promise<string> {
  */
 export async function chat(opts: ChatOptions): Promise<string> {
   try {
-    return await withRetry(() => chatOnce(opts), {
-      attempts: 2,
-      shouldRetry: (e) =>
-        isTransient(e) ||
-        (e instanceof Error &&
-          (e.message.includes('empty completion') || e.message.includes('timeout after'))),
-    });
+    return await withRetry(
+      // O prazo é recalculado A CADA tentativa, dentro do thunk: entre a
+      // primeira e a segunda o relógio andou, e a segunda só pode gastar o que
+      // sobrou. Fosse calculado uma vez fora, as duas pediriam 25s e a soma
+      // estouraria o maxDuration — que é exatamente o bug que isto conserta.
+      () => chatOnce({ ...opts, timeoutMs: prazoDaTentativa(opts.timeoutMs ?? 25_000, restanteMs(opts.deadlineAt ?? prazoAtual(), Date.now())) }),
+      {
+        attempts: 2,
+        shouldRetry: (e) =>
+          // Sem tempo, não se repete: gastar o resto para falhar de novo deixa
+          // o produtor sem nem o fallback. Uma resposta pior no prazo vale mais
+          // que a resposta certa depois que a função já morreu.
+          cabeOutraTentativa(restanteMs(opts.deadlineAt ?? prazoAtual(), Date.now())) &&
+          (isTransient(e) ||
+            (e instanceof Error &&
+              (e.message.includes('empty completion') || e.message.includes('timeout after')))),
+      }
+    );
   } catch (e) {
     // Saldo zero é incidente de negócio, não erro técnico: sem alerta a Vitória
     // fica muda e ninguém sabe. O alerta NUNCA altera o resultado da chamada —
@@ -142,6 +167,10 @@ async function chatOnce(opts: ChatOptions): Promise<string> {
   const messages = buildMessages(opts);
 
   const timeoutMs = opts.timeoutMs ?? 25_000;
+  // Sem orçamento não se abre conexão: um AbortSignal.timeout(0) faria a
+  // requisição sair e morrer no mesmo tique, gastando o pouco que sobrou. Erro
+  // explícito para quem chamou degradar (fallback) enquanto ainda dá tempo.
+  if (timeoutMs <= 0) throw new Error('sem orçamento de tempo para a chamada de LLM');
   let res: Response;
   try {
     res = await fetch(OPENROUTER_URL, {

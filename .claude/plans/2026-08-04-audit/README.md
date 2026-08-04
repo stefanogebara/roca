@@ -132,7 +132,25 @@ pendurado → `alertFounders` tenta WhatsApp pela mesma API → estoura o
 reentrega e o ciclo repete.
 
 ### 8. Orçamento de 60s não fecha no caminho da foto
-**RELATADO** · `vercel.json` vs `llm.ts:144` (25s) × `llm.ts:82` (2 tentativas)
+**RELATADO** · **CORRIGIDO** 04/ago · `api/_lib/orcamento.ts`
+
+Apertar timeout por chamada não fechava: são as TENTATIVAS que multiplicam
+(25s × 2 × duas chamadas = 100s só de LLM). O conserto é um prazo compartilhado
+por requisição — cada tentativa gasta o que sobrou, e a segunda só existe se
+couber. Orçamento de 55s, não 60: o estouro passa a ser nosso, com throw que o
+catch de topo vira FALLBACK_REPLY, em vez da plataforma matar a função sem
+deixar nada rodar. Para o produtor é a diferença entre "deu ruim, manda de
+novo" e silêncio absoluto.
+
+O prazo viaja por `AsyncLocalStorage`, não por variável de módulo: no Fluid a
+mesma instância atende requisições concorrentes, e estado de módulo faria o
+produtor que chegou depois herdar um prazo vencido de outra pessoa. Tem teste
+de concorrência fixando isso — com estado de módulo ele falha.
+
+Também fechada a segunda metade do achado: os seis extractors baratos agora
+passam `timeoutMs: 10_000`. Eram ZERO — o docstring pedia desde sempre e nenhum
+call site cumpria. `tests/extractor-prazo.test.ts` lê o fonte e trava a regra,
+porque o que apodreceu foi justamente a chamada nova que ninguém ligou a teste.
 
 `fetchMedia` (sem timeout) → `identifyFromPhoto` (até 50s) → compose (até 50s).
 Pior caso passa de 100s. O docstring do `llm.ts` pede que extractors baratos

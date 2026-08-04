@@ -41,6 +41,9 @@ async function extractPestTarget(
     const raw = await chat({
       model: MODELS.router(),
       maxTokens: 60,
+      // Extração barata, saída minúscula: 10s é folgado. O default de 25s
+      // aqui é orçamento roubado da composição, que é quem precisa dele.
+      timeoutMs: 10_000,
       system:
         'Extraia cultura e praga/doença da mensagem do produtor. Responda SÓ um JSON: {"crop":"soja|milho|pastagem|outro","pest":"nome da praga ou doença, ou vazio"}. Sem texto extra.',
       user: text,

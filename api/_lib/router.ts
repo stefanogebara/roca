@@ -77,6 +77,9 @@ export async function routeIntent(msg: InboundMessage): Promise<Intent> {
       system: ROUTER_INSTRUCTION,
       user: text,
       maxTokens: 12,
+      // Extração barata, saída minúscula: 10s é folgado. O default de 25s
+      // aqui é orçamento roubado da composição, que é quem precisa dele.
+      timeoutMs: 10_000,
     });
     const lowered = raw.toLowerCase();
     const match = VALID.find((v) => lowered.includes(v));

@@ -78,6 +78,7 @@ import type { PestCardData } from './cards/pest';
 import { persist, confirmarOuAvisar, validarCoordenada, validarCulturas } from './persist';
 import { withRetry } from './retry';
 import { ecoDoNossoTexto } from './ecoGuard';
+import { comPrazo } from './orcamento';
 import { alertFounders } from './alert';
 import { sendReferralNotification, pingFoundersWhatsApp } from './notify';
 import { maskWa } from './opsData';
@@ -1326,7 +1327,25 @@ async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<
   }
 }
 
+/**
+ * Orçamento da requisição. `vercel.json` dá 60s ao webhook; usamos 55s para que
+ * o estouro seja NOSSO, com throw que o catch de topo converte em FALLBACK_REPLY,
+ * e não da plataforma — que mata a função sem deixar nada rodar. A diferença
+ * para o produtor é entre "deu ruim, manda de novo" e silêncio absoluto.
+ */
+const ORCAMENTO_WEBHOOK_MS = 55_000;
+
 export async function handleInbound(
+  adapter: TransportAdapter,
+  msg: InboundMessage
+): Promise<void> {
+  // Prazo por requisição, visível a todo `chat()` abaixo sem precisar ser
+  // enfiado em quatro assinaturas do reason.ts. Ver `orcamento.ts` para por que
+  // é AsyncLocalStorage e não estado de módulo.
+  return comPrazo(Date.now() + ORCAMENTO_WEBHOOK_MS, () => handleInboundComPrazo(adapter, msg));
+}
+
+async function handleInboundComPrazo(
   adapter: TransportAdapter,
   msg: InboundMessage
 ): Promise<void> {

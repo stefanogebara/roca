@@ -44,3 +44,42 @@ describe('chat deadline', () => {
     expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 });
+
+/**
+ * Orçamento COMPARTILHADO da requisição (achado #8 da auditoria de 04/ago).
+ *
+ * O teto por chamada nunca fechou os 60s do maxDuration: duas chamadas
+ * sequenciais no caminho da foto, com duas tentativas de 25s cada, somam 100s
+ * só de LLM. Estes testes fixam as duas metades do conserto — o prazo aperta a
+ * tentativa, e a tentativa extra deixa de existir quando não cabe.
+ */
+describe('chat sob prazo compartilhado', () => {
+  const prazoUsado = (): number[] =>
+    vi.mocked(fetch).mock.calls.map((c) => {
+      // Não dá pra ler o timeout do AbortSignal; medimos pelo que a chamada
+      // pediu, exposto via o erro. Aqui basta contar as tentativas.
+      void c;
+      return 1;
+    });
+
+  it('NÃO tenta de novo quando o prazo já acabou — uma tentativa só', async () => {
+    // Prazo no passado: sobra zero. Sem isto, a segunda tentativa gastava o
+    // resto do orçamento para falhar igual e o produtor ficava sem o fallback.
+    await expect(
+      chat({ model: 'test/model', user: 'oi', timeoutMs: 40, deadlineAt: Date.now() - 1 })
+    ).rejects.toThrow(/orçamento/i);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled(); // nem abriu conexão
+  });
+
+  it('com prazo FOLGADO, o retry continua existindo — não viramos um-tiro-só', async () => {
+    await expect(
+      chat({ model: 'test/model', user: 'oi', timeoutMs: 40, deadlineAt: Date.now() + 600_000 })
+    ).rejects.toThrow(/timeout/i);
+    expect(prazoUsado().length).toBe(2);
+  });
+
+  it('sem prazo nenhum, nada muda — gym, canary e crons seguem iguais', async () => {
+    await expect(chat({ model: 'test/model', user: 'oi', timeoutMs: 40 })).rejects.toThrow(/timeout/i);
+    expect(prazoUsado().length).toBe(2);
+  });
+});

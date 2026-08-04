@@ -473,6 +473,9 @@ export async function extractQualification(thread: ThreadTurn[]): Promise<Qualif
     const raw = await chat({
       model: MODELS.router(),
       maxTokens: 250,
+      // Extração barata, saída minúscula: 10s é folgado. O default de 25s
+      // aqui é orçamento roubado da composição, que é quem precisa dele.
+      timeoutMs: 10_000,
       system:
         'Extraia do diálogo os fatos sobre o PROSPECT (parceiro potencial). Responda SÓ JSON válido com as chaves: ' +
         'acquisition (como consegue clientes hoje, string|null), accepts_leads (bool|null), response_time (string|null), ' +

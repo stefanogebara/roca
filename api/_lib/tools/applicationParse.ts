@@ -226,6 +226,9 @@ export async function parseApplication(
       system: EXTRACT_SYSTEM,
       user: text,
       maxTokens: 200,
+      // Extração barata, saída minúscula: 10s é folgado. O default de 25s
+      // aqui é orçamento roubado da composição, que é quem precisa dele.
+      timeoutMs: 10_000,
     });
     return finalizeApplication(text, extractJsonObject(raw), opts);
   } catch (e) {
