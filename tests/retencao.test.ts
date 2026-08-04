@@ -223,3 +223,46 @@ describe('PURGE_TARGETS × migrations', () => {
     expect([...colunasDe('farmer_alerts')]).toContain('sent_at');
   });
 });
+
+/**
+ * Nada pode impedir o DELETE de um prospect.
+ *
+ * Apagar um prospect não é conveniência de faxina: é obrigação legal (LGPD Art.
+ * 18) e é o que a retenção do achado #6 passou a fazer todo dia. Uma FK
+ * `NO ACTION` apontando para `prospects` bloqueia as duas coisas — e em
+ * silêncio, até existir a primeira linha filha.
+ *
+ * Foi o que aconteceu com `voice_calls`, criada em 04/ago pela integração de
+ * voz: FK NO ACTION, zero linhas. Latente, não inofensivo — o webhook já estava
+ * no ar ligando chamada a prospect pelo telefone. Bastava a primeira ligação
+ * para que "apaga meus dados" falhasse com a transcrição da pessoa na base, e
+ * para que o purge caísse inteiro (um DELETE com filtro é uma operação só: uma
+ * linha presa derruba o lote).
+ *
+ * O teste é topológico porque a regra é topológica: vale para a PRÓXIMA tabela
+ * que alguém pendurar em `prospects`, que é justamente quem ninguém vai lembrar
+ * de conferir.
+ */
+describe('toda FK para prospects apaga em cascata', () => {
+  const dirMig = join(__dirname, '..', 'supabase', 'migrations');
+  const todoSql = readdirSync(dirMig)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((f) => readFileSync(join(dirMig, f), 'utf8'))
+    .join('\n');
+
+  /** Cada `references ... prospects(id)` com o que vier depois, até o próximo
+   * separador — é ali que o `on delete` aparece, quando aparece. */
+  const referencias = [...todoSql.matchAll(/references\s+(?:public\.)?prospects\s*\(\s*id\s*\)([^,;\n]*)/gi)];
+
+  it('o varredor acha as referências que sabemos existir', () => {
+    // Sem isto, um regex quebrado passaria como "nenhuma violação encontrada".
+    expect(referencias.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('nenhuma referência fica sem ON DELETE CASCADE', () => {
+    for (const [trecho, cauda] of referencias.map((m) => [m[0], m[1]] as const)) {
+      expect(cauda.toLowerCase(), `FK sem cascade: ${trecho.trim()}`).toMatch(/on\s+delete\s+cascade/);
+    }
+  });
+});

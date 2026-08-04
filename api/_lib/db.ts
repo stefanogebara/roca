@@ -873,6 +873,24 @@ export const PURGE_TARGETS: readonly PurgeTarget[] = [
   // Third-party data (scraped prospects) grew forever — the schema's own
   // comment calls it "the most sensitive third-party data". Opt-outs are
   // NEVER purged (prospect_optouts is the legal proof they asked out).
+  //
+  // A MÃE e a filha, nesta ordem de leitura. Até 04/ago só a filha estava aqui,
+  // e o comentário acima — que fala de "scraped prospects" — servia de fiança
+  // para uma linha que poda `prospect_messages`. O PII (nome, telefone, cidade,
+  // qualificação) mora em `prospects`, e essa tabela não tinha retenção nenhuma.
+  // Mesma família do bug do `farmer_alerts`: lá era coluna errada, aqui era
+  // tabela ausente.
+  //
+  // `updated_at` e não `created_at`: a régua é "um ano sem NENHUM toque", então
+  // um lead sendo trabalhado nunca é podado, e um contato raspado e nunca usado
+  // sai um ano depois da descoberta. A coluna é NOT NULL com default now(), o
+  // que importa porque `.lt()` não casa com null — coluna anulável viraria
+  // isenção silenciosa, que é exatamente como estes bugs se escondem aqui.
+  //
+  // O CASCADE leva `prospect_messages` e `voice_calls` junto. A segunda nasceu
+  // NO ACTION e teria derrubado o lote inteiro no primeiro prospect com ligação
+  // — corrigido em 20260804210000_voice_calls_cascade.sql.
+  { table: 'prospects', days: 365, coluna: 'updated_at' },
   { table: 'prospect_messages', days: 365 },
   { table: 'gym_runs', days: 90 },
   { table: 'prospect_gym_runs', days: 90 },
