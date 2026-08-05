@@ -146,6 +146,24 @@ export async function respondAsProspectAgent(
   inboundText: string,
   inboundKind: string
 ): Promise<string | null> {
+  // A THREAD É LIDA ANTES DE GRAVAR ESTA MENSAGEM, e a ordem é a correção de um
+  // bug que custou o melhor lead da campanha (05/ago).
+  //
+  // Gravando primeiro, `getProspectThread` devolvia uma lista que já continha a
+  // mensagem atual — e `ecoDeMaquina`, que procura o texto entre os turnos `in`
+  // anteriores, achava ELA MESMA. Resultado: toda primeira resposta com 40+
+  // chars ou 5+ palavras era classificada como "a contraparte repetiu o que já
+  // tinha dito", gastava a tentativa única do porteiro e parqueava o lead.
+  //
+  // O sinal saía invertido: quanto MAIS a pessoa escrevia, mais certo era ser
+  // tratada como robô. A RT da Pró Solo se apresentou por extenso e foi
+  // parqueada por isso; só respostas curtas escapavam, por ficarem sob o piso.
+  //
+  // Que a thread não deve conter a mensagem atual já estava dito aqui embaixo,
+  // onde `extractQualification` anexa o inbound à mão — se a thread já o
+  // trouxesse, ele entraria duas vezes.
+  const thread = await getProspectThread(prospect.id);
+
   await logProspectMessage(prospect.id, 'in', inboundKind, inboundText);
 
   if (needsEscalation(inboundText)) {
@@ -153,8 +171,6 @@ export async function respondAsProspectAgent(
       `📞 Prospect ${prospect.name} pediu preço/contrato/humano — assuma a conversa: "${inboundText.slice(0, 150)}"`
     );
   }
-
-  const thread = await getProspectThread(prospect.id);
 
   // A decisão é pura e vive em agent.decidirTurno — o gym usa a MESMA, sem os
   // efeitos abaixo. Antes ela estava embutida aqui, e por isso o gym (que chama
