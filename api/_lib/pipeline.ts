@@ -28,6 +28,7 @@ import { describeImage, type ChatImage } from './llm';
 import {
   upsertUser,
   setUserSource,
+  markUserEmpresa,
   setUserState,
   setFarmLocation,
   markReferralPrompted,
@@ -1444,6 +1445,14 @@ async function handleInboundComPrazo(
   //
   // `pr` também carrega o prospect para o branch do agente, logo abaixo.
   const pr = await handleProspectInbound(msg.from, effective.text ?? null);
+
+  // Quem chegou aqui como prospect JÁ tem linha em `users` — o usuário é
+  // resolvido antes deste ramo, de propósito (idempotência e rate limit
+  // precisam da linha). A marcação retroativa foi feita duas vezes em 05/ago e
+  // vazou de novo no mesmo dia (Minas Cafeeira, Pró Solo); o carimbo na hora é
+  // o conserto permanente. Cobre os dois desfechos abaixo: opt-out e agente.
+  if (pr.prospect) await markUserEmpresa(userId);
+
   if (pr.handled && pr.reply) {
     await sendOrRecord(adapter, msg.from, { text: pr.reply }, userId, 'prospect_optout');
     if (userId) await logMessage(userId, 'out', { kind: 'text', text: pr.reply, intent: 'prospect_optout' });
