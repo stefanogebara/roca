@@ -61,12 +61,37 @@ export function normalizePhoneBR(raw: string | null | undefined): string | null 
   if (digits.length !== 10 && digits.length !== 11) return null;
   const ddd = Number(digits.slice(0, 2));
   if (!Number.isInteger(ddd) || ddd < 11 || ddd > 99) return null;
-  const sub = digits.slice(2);
+  let sub = digits.slice(2);
   if (sub.length === 9) {
     if (sub[0] !== '9') return null; // BR mobile subscriber starts with 9
   } else if (sub.length === 8) {
-    // Landline: first digit 2–5 (loosely). Reject obvious junk like all-zeros.
-    if (!/^[2-5]/.test(sub)) return null;
+    if (/^[2-5]/.test(sub)) {
+      // Fixo. Fica como está — enfiar um 9 aqui inventaria um número que não
+      // existe, e fixo com wa.me publicado RECEBE WhatsApp (caso coccamig).
+    } else if (/^[6-9]/.test(sub)) {
+      // CELULAR SEM O NONO DÍGITO. Não é entrada malformada: é o que a Cloud
+      // API da Meta entrega como remetente. Conta antiga de WhatsApp no Brasil
+      // mantém o JID de 8 dígitos, e o webhook recebe o JID, não o número que
+      // discamos. Medido em 05/ago, 10:02, logo após o disparo:
+      //
+      //   enviado +55 35 9 9750-6635  →  respondeu 55 35 9750-6635
+      //   enviado +55 38 9 8874-0493  →  respondeu 55 38 8874-0493
+      //
+      // Devolver null aqui não era "rejeitar lixo", era PERDER O PROSPECT: o
+      // `handleProspectInbound` sai na linha seguinte ao null, ANTES de checar
+      // opt-out — um "sair" desses números nunca era visto e o bump seguia. E o
+      // que sobrava caía no fluxo de produtor, com a Stevi oferecendo
+      // diagnóstico de folha para uma revenda. 12 linhas de `users` nasceram
+      // assim, incluindo a Corpal Tratores, cujo autoatendimento gerou o loop
+      // de 835 mensagens de 03/ago.
+      //
+      // 6-9 e não só 9 porque antes da adição do nono dígito o celular
+      // brasileiro começava em 6, 7, 8 ou 9; o fixo é que ficou em 2-5.
+      sub = `9${sub}`;
+      digits = digits.slice(0, 2) + sub;
+    } else {
+      return null;
+    }
   } else {
     return null;
   }
