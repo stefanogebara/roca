@@ -22,6 +22,22 @@ import { execSync } from 'node:child_process';
 import { join, extname } from 'node:path';
 
 export const VOICE_NAME_CLONE = 'Vitoria (Stevi)';
+
+/**
+ * Caminho do .env, relativo à raiz do repositório.
+ *
+ * Era `new URL('../.env', import.meta.url)`. O `tsx` engole isso, mas o
+ * `package.json` declara `"type": "commonjs"` e o `tsconfig` compila em
+ * CommonJS — onde `import.meta` não existe. O `tsc --noEmit` quebrava
+ * (TS1343), e quebrava só AQUI entre os seis scripts porque este é o único
+ * alcançado pelo typecheck: `tests/el-clone.test.ts` importa `arquivosDeAudio`
+ * daqui, e isso arrasta o arquivo inteiro para dentro do `include`.
+ *
+ * `process.cwd()` é a convenção da casa para achar arquivo (ver
+ * `goldeneval.ts`, que resolve o goldenset assim). Os scripts rodam por
+ * `npm run`, sempre a partir da raiz.
+ */
+const ENV_PATH = join(process.cwd(), '.env');
 const EXTS_ACEITAS = ['.mp3', '.wav', '.m4a', '.flac', '.ogg'];
 
 /** Filtra os arquivos de áudio aceitos pela API de clone (pura, testável). */
@@ -35,7 +51,7 @@ const FRASE_TESTE =
 
 async function main(): Promise<void> {
   // .env manual (mesmo padrão dos outros scripts do repo).
-  for (const line of readFileSync(new URL('../.env', import.meta.url), 'utf8').split('\n')) {
+  for (const line of readFileSync(ENV_PATH, 'utf8').split('\n')) {
     const i = line.indexOf('=');
     if (i > 0 && !line.trimStart().startsWith('#')) {
       const k = line.slice(0, i).trim();
@@ -106,12 +122,11 @@ async function main(): Promise<void> {
   }
 
   // --aplicar: ELEVENLABS_VOICE_ID no .env + PATCH do agente via el-setup.
-  const envPath = new URL('../.env', import.meta.url);
-  const env = readFileSync(envPath, 'utf8')
+  const env = readFileSync(ENV_PATH, 'utf8')
     .split('\n')
     .map((l) => (l.startsWith('ELEVENLABS_VOICE_ID=') ? `ELEVENLABS_VOICE_ID=${voiceId}` : l))
     .join('\n');
-  writeFileSync(envPath, env);
+  writeFileSync(ENV_PATH, env);
   console.log('ELEVENLABS_VOICE_ID atualizado no .env — aplicando no agente...');
   // execSync com string FIXA (sem input do usuário) — o shell é necessário
   // porque npm no Windows é npm.cmd.
