@@ -61,3 +61,25 @@ describe('stevi_parceria_v4', () => {
     expect(templateCategory(V4_NAME)).toBe('MARKETING');
   });
 });
+
+describe('painel mostra o que foi enviado', () => {
+  it('a thread do v4 renderiza a mensagem real, não um carimbo', async () => {
+    // A Meta não devolve o corpo do template no callback, então o painel
+    // RECONSTRÓI o texto a partir dos params. Com aridade 1 esse ramo devolvia
+    // "(template de parceria v1)" — um texto que nunca foi enviado a ninguém.
+    const { renderTemplateText } = await import('../api/_lib/prospect/personalize');
+    const texto = renderTemplateText(['Rural Consultoria']);
+
+    expect(texto).toBe('Oi! Falo com a Rural Consultoria? Aqui é a Vitória, da Stevi.');
+    expect(texto).not.toMatch(/template de parceria/i);
+  });
+
+  it('o texto do painel BATE com o corpo aprovado', async () => {
+    // Se um dia divergirem, o painel mente sobre o que a empresa recebeu — e é
+    // por ele que a gente lê as conversas.
+    const { renderTemplateText } = await import('../api/_lib/prospect/personalize');
+    const fonte = readFileSync('api/_lib/prospect/template.ts', 'utf8');
+    const corpo = /\[V4_NAME\]:\s*\{[\s\S]*?body:\s*'([^']*)'/.exec(fonte)?.[1] ?? '';
+    expect(renderTemplateText(['ACME'])).toBe(corpo.replace('{{1}}', 'ACME'));
+  });
+});

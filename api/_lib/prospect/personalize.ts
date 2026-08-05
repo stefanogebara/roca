@@ -158,5 +158,13 @@ export function renderTemplateText(params: string[]): string {
       `Faz sentido trocar uma ideia rápida sobre parceria?`
     );
   }
-  return `Oi, ${params[0]}! Aqui é a Vitória, da Stevi 🌱 (template de parceria v1)`;
+  // v4 (1 param, 05/ago): só a pergunta. A identificação fica DEPOIS dela porque
+  // a Meta recusa variável no fim do modelo — ver o registro em template.ts.
+  //
+  // Este ramo era um texto-carimbo do v1 ("(template de parceria v1)"), o que
+  // faria o painel mostrar uma mensagem que nunca foi enviada em toda thread do
+  // v4. O arquivo já avisava: "Mirrors the approved template texts — keep in
+  // sync when a new template version ships". Nenhum envio histórico usa aridade
+  // 1, então não há thread antiga para reinterpretar.
+  return `Oi! Falo com a ${params[0]}? Aqui é a Vitória, da Stevi.`;
 }
