@@ -135,8 +135,51 @@ function readCookie(req: VercelRequest, name: string): string | undefined {
  * 401 and returns false (caller should stop). Keeps every data endpoint one
  * line away from being locked down.
  */
+/**
+ * Tamanho mínimo do OPS_TOKEN.
+ *
+ * Um segredo fraco configurado por pressa é indistinguível de um forte para o
+ * código — a não ser que ele meça. 32 chars é o que `openssl rand -hex 16`
+ * produz; abaixo disso a porta é adivinhável e é melhor não existir.
+ */
+export const OPS_TOKEN_MIN_LEN = 32;
+
+/**
+ * Autenticação de AUTOMAÇÃO: `Authorization: Bearer <OPS_TOKEN>`.
+ *
+ * O painel entra por cookie assinado, emitido pela senha do Stefano. Isso trava
+ * a automação, porque rodar sourcing ou backfill de fora exigiria manipular a
+ * senha — a credencial que abre tudo e que uma pessoa digita. Credencial de
+ * gente não deve virar credencial de robô: perde-se a capacidade de revogar uma
+ * sem derrubar a outra.
+ *
+ * Este é o análogo do CRON_SECRET que os crons já usam. Duas travas, e as duas
+ * existem por bugs que esta base já pagou:
+ *
+ * - SEM A ENV, O CAMINHO NÃO EXISTE. Env ausente jamais pode virar "entra
+ *   qualquer um" — é exatamente o fusível de vidro do `verifyCardQuery`,
+ *   consertado ontem. Não se comete o mesmo erro na mesma semana.
+ * - Token curto é recusado mesmo batendo (ver OPS_TOKEN_MIN_LEN).
+ */
+function bearerOk(req: VercelRequest): boolean {
+  const esperado = process.env.OPS_TOKEN;
+  if (!esperado || esperado.length < OPS_TOKEN_MIN_LEN) return false;
+  const raw = req.headers['authorization'];
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  if (!header) return false;
+  const m = /^Bearer (.+)$/.exec(header);
+  if (!m) return false;
+  return safeEqual(m[1], esperado);
+}
+
+/**
+ * Guard for /api/ops/* endpoints. Returns true if authorized; otherwise writes
+ * 401 and returns false (caller should stop). Keeps every data endpoint one
+ * line away from being locked down.
+ */
 export function requireOps(req: VercelRequest, res: VercelResponse): boolean {
   if (verifyToken(readCookie(req, COOKIE))) return true;
+  if (bearerOk(req)) return true;
   res.status(401).json({ success: false, error: 'unauthorized' });
   return false;
 }
