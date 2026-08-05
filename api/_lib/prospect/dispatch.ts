@@ -113,7 +113,7 @@ function kindAllowed(kind: string): boolean {
   return kinds.includes('all') || kinds.includes(kind);
 }
 import { alertFounders } from '../alert';
-import { V2_NAME, COOP_NAME, registryParamCount, templateShapeError } from './template';
+import { V2_NAME, COOP_NAME, COOP_V2_NAME, registryParamCount, templateShapeError } from './template';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-dispatch');
@@ -135,6 +135,29 @@ const COOP_TEMPLATE_NAME = process.env.PROSPECT_COOP_TEMPLATE_NAME || COOP_NAME;
 export function templateForKind(kind: string | null): string {
   const k = (kind ?? '').toLowerCase();
   return k === 'cooperativa' || k === 'coop' || k === 'revenda' ? COOP_TEMPLATE_NAME : TEMPLATE_NAME;
+}
+
+/**
+ * Se um template usa o construtor de parâmetros de DISTRIBUIÇÃO.
+ *
+ * Isto era `tpl === COOP_TEMPLATE_NAME` — ou seja, usava "veio da env de coop?"
+ * como proxy para "qual a forma dos parâmetros?". Funcionava enquanto as duas
+ * envs apontavam para templates diferentes. Em 05/ago as duas passaram a
+ * apontar para o MESMO template (o v4 serve revenda, cooperativa e consultoria
+ * porque não diz nada específico de tipo), e o proxy inverteu de significado:
+ * `isCoopTpl` virou verdadeiro para todo prospect.
+ *
+ * A consequência seria o apagão de 13/jul de novo. `buildCoopParams` devolve
+ * DOIS parâmetros para qualquer template fora o coop_v2; o v4 tem UM. Dois num
+ * template de um é #132000 em todo envio: 0% de entrega e latch de saúde, em
+ * 29 dos 44 enviáveis.
+ *
+ * A régua certa é a que este arquivo já pregava para a aridade, três linhas
+ * acima: a forma vem do REGISTRO do template, nunca de qual env o nome veio.
+ * Estar na env de coop não torna um template um template de coop.
+ */
+export function usaParamsDeCoop(tpl: string): boolean {
+  return tpl === COOP_NAME || tpl === COOP_V2_NAME;
 }
 // Gentle spacing between individual sends in a batch (avoids a burst that spikes
 // the block/report rate). Skipped in dryRun.
@@ -349,7 +372,7 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
     // Per-kind routing: coops/revendas get the distribution pitch, everyone
     // else the intro. Param count comes from the registry for THAT template.
     const tpl = templateForKind(p.kind);
-    const isCoopTpl = tpl === COOP_TEMPLATE_NAME;
+    const isCoopTpl = usaParamsDeCoop(tpl);
     const params = isCoopTpl
       ? buildCoopParams(p, tpl)
       : buildTemplateParams(p, registryParamCount(tpl) ?? 3);
