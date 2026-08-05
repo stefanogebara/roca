@@ -848,9 +848,9 @@
         });
         hd.append(tg);
         box.append(hd);
+        const tw = el('div', 'thread');
         if (!thread.length) box.append(el('div','empty','Sem mensagens ainda — o primeiro contato foi o template aprovado.'));
         else {
-          const tw = el('div', 'thread');
           for (const m of thread) {
             const b = el('div', 'msg ' + (m.direction === 'out' ? 'out' : 'in'), m.text ?? '('+m.kind+')');
             b.append(el('span', 'tag', [m.kind !== 'text' ? m.kind : null, m.direction === 'out' ? 'Vitória' : pr.name, fmtDate(m.created_at)].filter(Boolean).join(' · ')));
@@ -858,6 +858,46 @@
           }
           box.append(tw);
         }
+
+        // Caixa de resposta manual (05/ago). Nasceu do caso da RT da Pró Solo:
+        // uma humana esperando e nenhum caminho para responder fora do agente —
+        // a primeira resposta dela acabou saindo por curl. Envia texto LIVRE
+        // pelo número da Stevi (ação `reply`), que só funciona na janela de 24h
+        // aberta pela última mensagem do prospect; fora dela a Meta recusa
+        // (131047) e o erro aparece aqui em português, sem fingir que foi.
+        const podeResponder = !!(pr.wa_phone_source && pr.wa_phone);
+        const rb = el('div');
+        rb.style.cssText = 'display:flex;gap:8px;margin-top:10px;align-items:flex-end';
+        const ta = document.createElement('textarea');
+        ta.rows = 2; ta.placeholder = podeResponder
+          ? 'Responder como a Stevi (vale dentro de 24h da última mensagem dele)…'
+          : 'Sem número com fonte citada — este prospect não é respondível.';
+        ta.style.cssText = 'flex:1;resize:vertical;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line, #ccc)';
+        ta.disabled = !podeResponder;
+        const sd = el('button', 'btn tiny', '📤 Enviar');
+        sd.disabled = !podeResponder;
+        if (!podeResponder) sd.title = 'Mesma régua do disparo: número sem fonte citada não recebe mensagem.';
+        sd.addEventListener('click', async () => {
+          const texto = ta.value.trim();
+          if (!texto) return;
+          sd.disabled = true; sd.textContent = '…';
+          try {
+            await api('prospects', { method:'POST', body: JSON.stringify({ action:'reply', id: pr.id, text: texto }) });
+            const b2 = el('div', 'msg out', texto);
+            b2.append(el('span', 'tag', 'você · agora'));
+            tw.append(b2);
+            if (!tw.parentElement) box.append(tw); // thread estava vazia até agora
+            ta.value = '';
+          } catch (e) {
+            if (e.message !== 'unauthorized') {
+              alert(/131047/.test(e.message)
+                ? 'A janela de 24h fechou — fora dela só template. A mensagem NÃO foi enviada.'
+                : 'Não foi: ' + e.message);
+            }
+          } finally { sd.disabled = false; sd.textContent = '📤 Enviar'; }
+        });
+        rb.append(ta, sd);
+        box.append(rb);
       } catch (e) {
         if (e.message!=='unauthorized') box.innerHTML = '<div class="empty">Erro: '+e.message+'</div>';
       }
