@@ -247,13 +247,12 @@ async function templateChecks(): Promise<CanaryCheck[]> {
   if (!process.env.WHATSAPP_CLOUD_TOKEN) return [];
   const { V2_NAME, COOP_NAME, templateShapeError, registryParamCount, getTemplateStatus } =
     await import('./prospect/template');
-  // Templates the dispatcher/bump paths SEND — checked for approved status AND
+  // Templates the dispatcher SENDS — checked for approved status AND
   // live shape vs the registry's params. An approved-but-reshaped template
   // fails every send with #132000 while a status-only check stays green — the
   // exact blind spot behind the Jul/13 outage (0% delivery → health latch).
   const shapeChecked = [
     process.env.PROSPECT_TEMPLATE_NAME || V2_NAME,
-    process.env.PROSPECT_BUMP_TEMPLATE_NAME || 'stevi_parceria_bump',
     process.env.PROSPECT_COOP_TEMPLATE_NAME || COOP_NAME,
     // The farmer-alert template (geada/fogo/vazio outside the 24h window). It
     // ships from alerts.ts, not the dispatcher — and was therefore invisible

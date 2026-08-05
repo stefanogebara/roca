@@ -22,7 +22,6 @@ import {
   countSentSince,
   countFailedSince,
   claimProspectForSend,
-  claimProspectForBump,
   recordSend,
   recordSendFailed,
 } from './db';
@@ -30,12 +29,10 @@ import { sendProspectTemplate } from './send';
 import {
   buildTemplateParams,
   renderTemplateText,
-  buildBumpParams,
-  renderBumpText,
   buildCoopParams,
   renderCoopText,
 } from './personalize';
-import { logProspectMessage, loadBumpDueProspects, recordBump } from './db';
+import { logProspectMessage } from './db';
 import {
   gradeCap,
   loadSendHealth,
@@ -431,137 +428,21 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   };
 }
 
-// ── D+3 bump (multi-touch cadence, Olímpia pattern) ─────────────────────────
-// One follow-up for never-repliers, 3+ days after the intro. Golden rule: the
-// touch only happens if its template is APPROVED at Meta — otherwise the run
-// reports 'template_not_approved' and does nothing (no error, no send).
-
-const BUMP_TEMPLATE = process.env.PROSPECT_BUMP_TEMPLATE_NAME || 'stevi_parceria_bump';
-const BUMP_AFTER_DAYS = Number(process.env.PROSPECT_BUMP_AFTER_DAYS || '3');
-
-export interface BumpReport {
-  skipped: string | null; // reason when nothing ran (outside hours / template / cap)
-  due: number;
-  sent: number;
-  failed: number;
-}
-
-export async function runBumpDispatch(opts: { dailyCap?: number } = {}): Promise<BumpReport> {
-  const now = new Date();
-  if (!isBusinessHours(now)) return { skipped: 'outside_hours', due: 0, sent: 0, failed: 0 };
-
-  // Golden rule: approved template WITH the shape our params match, or no touch.
-  try {
-    const reason = await templateShapeError(BUMP_TEMPLATE);
-    if (reason) return { skipped: reason, due: 0, sent: 0, failed: 0 };
-  } catch (e) {
-    return { skipped: `template_check_failed: ${(e as Error).message.slice(0, 80)}`, due: 0, sent: 0, failed: 0 };
-  }
-
-  // Same fail-closed preconditions as intros; bumps share the daily cap AND
-  // the graded number-health ramp (the intro run in the same cron pass already
-  // alerted if paused — bumps just skip quietly).
-  let optouts: Set<string>;
-  let due: Awaited<ReturnType<typeof loadBumpDueProspects>>;
-  let sentToday: number;
-  let capInfo: CapGrade;
-  try {
-    const manual = opts.dailyCap ?? envCapOverride();
-    const [o, d, s, healthRes] = await Promise.all([
-      loadOptouts(),
-      loadBumpDueProspects(BUMP_AFTER_DAYS),
-      countSentSince(brtDayStartIso(now)),
-      manual == null ? loadSendHealth(now) : Promise.resolve(null),
-    ]);
-    optouts = o;
-    due = d;
-    sentToday = s;
-    capInfo =
-      manual != null
-        ? { cap: clampDailyCap(manual), grade: 'manual', reasons: [] }
-        : gradeCap(healthRes!.health, healthRes!.lifetimeSends);
-  } catch (e) {
-    log.error('bump dispatch aborted — safety precondition unavailable:', (e as Error).message);
-    return { skipped: 'precondition_unavailable', due: 0, sent: 0, failed: 0 };
-  }
-
-  if (capInfo.cap === 0) {
-    const reason =
-      capInfo.grade === 'manual'
-        ? 'paused_by_override (PROSPECT_DAILY_CAP=0)'
-        : `number_health_paused (${capInfo.reasons.join('; ')})`;
-    return { skipped: reason, due: 0, sent: 0, failed: 0 };
-  }
-
-  // Kind gating applies to bumps too — the bump template carries the same
-  // lead-gen pitch that's wrong for coops/revendas.
-  // The bump must land on the SAME number the intro did — sendablePhone, not
-  // the sourced landline. Opt-out is checked on both so a "SAIR" on either
-  // record silences the follow-up.
-  const eligible = due.filter(
-    (p) =>
-      sendablePhone(p) &&
-      !optouts.has(sendablePhone(p) as string) &&
-      !(p.phone && optouts.has(p.phone)) &&
-      kindAllowed(p.kind) &&
-      // ICP reavaliado NA HORA do envio, não só na entrada. Um sinal de ICP
-      // nasce depois de a base já existir — quem entrou antes segue na esteira
-      // de follow-up para sempre. Em 04/ago um pet shop leu um bump nosso; o
-      // filtro tinha ganhado o sinal dele minutos antes. Segunda camada porque
-      // a varredura retroativa pode não ter rodado ainda: aqui a mensagem não
-      // sai, mesmo que a linha ainda esteja marcada como contatada.
-      !foraDoICP(p.name, p.source)
-  );
-  const cap = capInfo.cap;
-  const batch = planBatch(eligible, { dailyCap: cap, sentToday });
-  if (!batch.length) return { skipped: eligible.length ? 'daily_cap_reached' : null, due: eligible.length, sent: 0, failed: 0 };
-
-  let sent = 0;
-  let failed = 0;
-  for (const p of batch) {
-    // Same concurrent-safe cap recheck as intros (bumps share the daily cap).
-    try {
-      if ((await countSentSince(brtDayStartIso(new Date()))) >= cap) {
-        log.info('daily cap reached mid-run — stopping bumps');
-        break;
-      }
-    } catch (e) {
-      log.error('mid-run cap recheck unavailable — stopping bumps:', (e as Error).message);
-      break;
-    }
-    // Atomic claim (touches 1→2): only one overlapping run may bump this row.
-    // If the send below then fails, touches stays 2 and the prospect is never
-    // re-bumped — a missed follow-up is the safe failure direction here.
-    const claimed = await claimProspectForBump(p.id);
-    if (!claimed) {
-      log.info(`bump skipped ${p.id} — claimed by a concurrent run`);
-      continue;
-    }
-    const params = buildBumpParams(p);
-    let wamid: string;
-    try {
-      ({ wamid } = await sendProspectTemplate(sendablePhone(p) as string, BUMP_TEMPLATE, TEMPLATE_LANG, params));
-    } catch (e) {
-      failed++;
-      log.error(`bump send failed for ${p.id}:`, (e as Error).message);
-      if (batch.indexOf(p) < batch.length - 1) await sleep(jitteredDelay());
-      continue;
-    }
-    // Sent but unrecorded = re-bump risk next run → stop the batch, page ops.
-    try {
-      await recordBump(p.id, { wamid, template: BUMP_TEMPLATE });
-      sent++;
-      await logProspectMessage(p.id, 'out', 'text', renderBumpText(params)).catch(() => {});
-    } catch (e) {
-      sent++;
-      log.error(`recordBump failed after a live send for ${p.id}:`, (e as Error).message);
-      await alertFounders(
-        `⚠️ Prospecção: bump enviado pra ${p.name} (wamid ${wamid}) mas NÃO consegui gravar. Batch interrompido — confira pra não reenviar.`
-      );
-      break;
-    }
-    if (batch.indexOf(p) < batch.length - 1) await sleep(jitteredDelay());
-  }
-  if (failed > 0) await alertFounders(`⚠️ Prospecção (bump): ${failed} de ${batch.length} envio(s) falharam.`);
-  return { skipped: null, due: eligible.length, sent, failed };
-}
+// ── Onde morava o bump (D+3) ────────────────────────────────────────────────
+//
+// MORTO em 05/ago por decisão do Stefano, com o dado na mesa: 23 bumps
+// enviados, ZERO respostas humanas — as 4 "respostas" que ele gerou eram
+// atendimento automático, e uma delas foi o pet shop fora de ICP que motivou a
+// varredura retroativa. Cada bump custa um envio do teto diário e reputação de
+// número, pagando um canal que nunca converteu.
+//
+// A remoção é completa (runBumpDispatch, claims, loaders, renderers, testes) e
+// não uma flag, de propósito: follow-up desligável por env é follow-up que
+// religa sozinho numa env perdida — e a máquina de segurança que ele arrastava
+// (claim atômico, recheck de teto, ICP na hora do envio) vive duplicada aqui em
+// cima nos intros, que é onde continua valendo.
+//
+// Se um follow-up voltar um dia, que nasça reply-first como o v4, não como
+// reenvio de pitch: o template stevi_retomada_v1 (UTILITY, aprovado) cobre o
+// caso "conversa esfriou COM pendência real", que é o único follow-up com
+// evidência a favor até agora.

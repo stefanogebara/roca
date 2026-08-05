@@ -6,7 +6,7 @@
  * burning the batch as per-prospect failures).
  *
  * External modules are mocked; personalize/core stay real (pure). The clock is
- * faked to a BRT business-hours instant so runBumpDispatch (which has no
+ * faked to a BRT business-hours instant so the dispatch (which has no
  * `force` escape hatch) can run.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
@@ -19,10 +19,7 @@ vi.mock('../api/_lib/prospect/db', () => ({
   recordSend: vi.fn(),
   recordSendFailed: vi.fn(),
   logProspectMessage: vi.fn(),
-  loadBumpDueProspects: vi.fn(),
-  recordBump: vi.fn(),
   claimProspectForSend: vi.fn(),
-  claimProspectForBump: vi.fn(),
 }));
 vi.mock('../api/_lib/prospect/send', () => ({ sendProspectTemplate: vi.fn() }));
 vi.mock('../api/_lib/prospect/template', async (importOriginal) => {
@@ -43,7 +40,7 @@ vi.mock('../api/_lib/prospect/health', async (importOriginal) => {
   };
 });
 
-import { runDispatch, runBumpDispatch } from '../api/_lib/prospect/dispatch';
+import { runDispatch } from '../api/_lib/prospect/dispatch';
 import {
   loadSendHealth,
   isDispatchLatched,
@@ -57,10 +54,7 @@ import {
   recordSend,
   recordSendFailed,
   logProspectMessage,
-  loadBumpDueProspects,
-  recordBump,
   claimProspectForSend,
-  claimProspectForBump,
   type ProspectRow,
 } from '../api/_lib/prospect/db';
 import { sendProspectTemplate } from '../api/_lib/prospect/send';
@@ -109,7 +103,7 @@ const prospectBase = (over: Partial<ProspectRow> = {}): ProspectRow => ({
   ...over,
 });
 
-// Tuesday 15:00 BRT — inside the outreach window, so runBumpDispatch (no
+// Tuesday 15:00 BRT — inside the outreach window, so the dispatch (no
 // `force` option) can execute. Only Date is faked; timers stay real.
 vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-07-14T15:00:00-03:00') });
 afterAll(() => vi.useRealTimers());
@@ -137,12 +131,9 @@ beforeEach(() => {
   vi.mocked(countSentSince).mockResolvedValue(0);
   vi.mocked(countFailedSince).mockResolvedValue(0);
   vi.mocked(loadReadyProspects).mockResolvedValue([]);
-  vi.mocked(loadBumpDueProspects).mockResolvedValue([]);
   vi.mocked(claimProspectForSend).mockResolvedValue(true);
-  vi.mocked(claimProspectForBump).mockResolvedValue(true);
   vi.mocked(sendProspectTemplate).mockResolvedValue({ wamid: 'wamid-1' });
   vi.mocked(recordSend).mockResolvedValue(undefined);
-  vi.mocked(recordBump).mockResolvedValue(undefined);
   vi.mocked(recordSendFailed).mockResolvedValue(undefined);
   vi.mocked(logProspectMessage).mockResolvedValue(undefined);
   vi.mocked(alertFounders).mockResolvedValue(undefined);
@@ -378,39 +369,6 @@ describe('runDispatch — per-kind template routing', () => {
   });
 });
 
-describe('runBumpDispatch — atomic claim', () => {
-  const due = () =>
-    prospect({ status: 'contacted', send_status: 'sent', touches: 1, sent_at: '2026-07-10T12:00:00Z' });
-
-  it('skips a bump another concurrent run already claimed', async () => {
-    vi.mocked(loadBumpDueProspects).mockResolvedValue([due()]);
-    vi.mocked(claimProspectForBump).mockResolvedValue(false);
-    const rep = await runBumpDispatch();
-    expect(sendProspectTemplate).not.toHaveBeenCalled();
-    expect(rep.sent).toBe(0);
-  });
-
-  it('claims, sends, and records the bump', async () => {
-    vi.mocked(loadBumpDueProspects).mockResolvedValue([due()]);
-    const rep = await runBumpDispatch();
-    expect(claimProspectForBump).toHaveBeenCalledWith('p1');
-    expect(sendProspectTemplate).toHaveBeenCalledTimes(1);
-    expect(recordBump).toHaveBeenCalledWith('p1', { wamid: 'wamid-1', template: expect.any(String) });
-    expect(rep.sent).toBe(1);
-  });
-
-  it('bumps share the health pause (quiet skip — the intro run already paged)', async () => {
-    vi.mocked(loadSendHealth).mockResolvedValue({
-      health: { windowSends: 40, delivered: 16, failed: 2, deliveredRate: 0.4, failRate: 0.05, optoutRate: 0.02 },
-      lifetimeSends: 400,
-    });
-    vi.mocked(loadBumpDueProspects).mockResolvedValue([due()]);
-    const rep = await runBumpDispatch();
-    expect(rep.skipped).toMatch(/number_health_paused/);
-    expect(sendProspectTemplate).not.toHaveBeenCalled();
-    expect(alertFounders).not.toHaveBeenCalled();
-  });
-});
 
 // ── Pure shape/routing helpers (the by-construction fix for the Jul/13 outage) ──
 import { templateForKind } from '../api/_lib/prospect/dispatch';

@@ -4,8 +4,6 @@ import {
   shortName,
   kindHook,
   buildTemplateParams,
-  buildBumpParams,
-  renderBumpText,
   renderTemplateText,
 } from '../api/_lib/prospect/personalize';
 import { computeFunnelStats, playbookBlock } from '../api/_lib/prospect/learn';
@@ -68,22 +66,6 @@ describe('personalization', () => {
   });
 });
 
-describe('bump cadence (D+3)', () => {
-  it('buildBumpParams: short name + city with safe default', () => {
-    expect(buildBumpParams({ name: 'Agro Forte Ltda', city: 'Varginha' })).toEqual(['Agro Forte', 'Varginha']);
-    expect(buildBumpParams({ name: 'Cocatrel', city: null })[1]).toBe('Sul de Minas');
-  });
-  it('renderBumpText interpolates and never mentions price', () => {
-    const t = renderBumpText(['Agro Forte', 'Varginha']);
-    expect(t).toContain('Agro Forte');
-    expect(t).toContain('Varginha');
-    expect(t).not.toMatch(/R\$\s?\d/);
-  });
-  it('renderTemplateText covers both intro arities', () => {
-    expect(renderTemplateText(['A', 'fazem x', 'C'])).toContain('região de C');
-    expect(renderTemplateText(['A'])).toContain('A');
-  });
-});
 
 describe('learning loop', () => {
   it('computes funnel stats by kind', () => {

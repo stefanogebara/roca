@@ -8,7 +8,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { runDispatch, runBumpDispatch } from '../_lib/prospect/dispatch';
+import { runDispatch } from '../_lib/prospect/dispatch';
 import { createLogger } from '../_lib/logger';
 import { alertFounders } from '../_lib/alert';
 
@@ -52,17 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         (report.skippedOutsideHours ? ' (outside hours)' : '') +
         (report.aborted ? ' (ABORTED)' : '')
     );
-    // D+3 bumps run after intros and share the daily cap (countSentSince sees
-    // the intros just sent). Isolated: a bump problem never fails the cron.
-    let bumps = null;
-    try {
-      bumps = await runBumpDispatch();
-      if (bumps.sent > 0 || bumps.failed > 0) {
-        log.info(`bump dispatch: sent=${bumps.sent} failed=${bumps.failed} due=${bumps.due}`);
-      }
-    } catch (e) {
-      log.error('bump dispatch failed:', (e as Error).message);
-    }
+    // O bump D+3 rodava aqui. Morto em 05/ago: 23 envios, zero humanos — ver o
+    // epitáfio em prospect/dispatch.ts. `bumps` fica null para o resumo, que já
+    // tratava a ausência (o dry-run sempre mandou null).
+    const bumps = null;
     // A "automação diária" (02/ago): o resumo do lote vai pros founders por
     // WhatsApp no fim de cada lote REAL — o disparo é o evento, sem cron novo.
     // Fail-soft: um ping que falha jamais derruba um lote que já saiu.

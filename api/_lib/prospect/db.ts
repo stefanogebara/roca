@@ -141,34 +141,10 @@ export async function claimProspectForSend(id: string): Promise<boolean> {
   return (data ?? []).length > 0;
 }
 
-/**
- * Atomically claim a prospect for the D+3 bump (touches 1 → 2, conditional on
- * the still-bumpable state). Same overlap scenario as claimProspectForSend;
- * sent_at is stamped at claim time for the same cap-consumption reason (it also
- * drops the row out of loadBumpDueProspects' window immediately). If the send
- * then fails, touches stays 2 and the prospect simply never gets re-bumped —
- * a missed follow-up is the safe failure direction.
- */
-export async function claimProspectForBump(id: string): Promise<boolean> {
-  const db = getDb();
-  const now = new Date().toISOString();
-  const { data, error } = await db
-    .from('prospects')
-    .update({ touches: 2, sent_at: now, updated_at: now })
-    .eq('id', id)
-    .eq('status', 'contacted')
-    .in('send_status', ['sent', 'delivered', 'read'])
-    .eq('touches', 1)
-    .select('id');
-  if (error) {
-    log.error('claimProspectForBump failed (treated as not claimed):', error.message);
-    return false;
-  }
-  return (data ?? []).length > 0;
-}
 
-// Give-up window: a contacted prospect whose last touch (intro or D+3 bump —
-// both stamp sent_at) got no reply for this many days is dead, not "waiting".
+// Give-up window: a contacted prospect whose last touch got no reply for this
+// many days is dead, not "waiting". (Era "intro ou bump"; o bump morreu em
+// 05/ago — hoje o único toque que carimba sent_at é o intro.)
 // Clamped: a misparsed env must neither detonate (0/NaN would stale everything
 // or throw) nor silently disable the sweep.
 const STALE_DAYS_RAW = Number(process.env.PROSPECT_STALE_AFTER_DAYS || '14');
@@ -272,55 +248,7 @@ export async function recordSend(
   if (error) throw new Error(`recordSend failed for ${id} (wamid ${fields.wamid}): ${error.message}`);
 }
 
-/**
- * Prospects due a D+3 bump: intro sent, never replied (status still
- * 'contacted' — any inbound flips it to 'replied'), exactly one touch so far.
- */
-export async function loadBumpDueProspects(days = 3, limit = 50): Promise<ProspectRow[]> {
-  const db = getDb();
-  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
-  const { data, error } = await db
-    .from('prospects')
-    .select('*')
-    .eq('status', 'contacted')
-    // Status webhooks progress 'sent' → 'delivered'/'read'; all three are
-    // "intro landed, no reply yet" for bump purposes.
-    .in('send_status', ['sent', 'delivered', 'read'])
-    .eq('touches', 1)
-    .not('phone', 'is', null)
-    .lt('sent_at', cutoff)
-    .order('sent_at', { ascending: true })
-    .limit(limit);
-  if (error) {
-    log.error('loadBumpDueProspects failed:', error.message);
-    return [];
-  }
-  return (data ?? []) as ProspectRow[];
-}
 
-/**
- * Record a bump send: second touch, refresh sent_at (feeds the daily cap).
- * send_status RESETS to 'sent': the row's send-state describes the LATEST
- * message (matching the wamid written here), so the bump's own status
- * callbacks — including a per-user-frequency-cap 'failed' — progress it
- * normally. Leaving the intro's 'delivered'/'read' would make a failed bump
- * invisible AND count it as a delivered send in the health window.
- */
-export async function recordBump(id: string, fields: { wamid: string; template: string }): Promise<void> {
-  const db = getDb();
-  const { error } = await db
-    .from('prospects')
-    .update({
-      touches: 2,
-      sent_at: new Date().toISOString(),
-      send_status: 'sent',
-      wamid: fields.wamid,
-      template_used: fields.template,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id);
-  if (error) throw new Error(`recordBump failed for ${id} (wamid ${fields.wamid}): ${error.message}`);
-}
 
 /** Mark a prospect's send as failed (surfaced in ops; never silently dropped). */
 export async function recordSendFailed(id: string): Promise<void> {
