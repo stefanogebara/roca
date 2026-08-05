@@ -23,6 +23,20 @@ export const COOP_NAME = 'stevi_parceria_coop_v1';
 /** Reply-first rewrites approved 27/jul: declare the AI in the first touch and
  * ask ONE question instead of pitching (pitch-first measured <5% reply). */
 export const V3_NAME = 'stevi_parceria_v3';
+/**
+ * SÓ A PERGUNTA (aprovado pelo Stefano em 05/ago).
+ *
+ * O v3 já era reply-first, mas ainda carregava apresentação e contexto no mesmo
+ * balão. A medição de 05/ago mostrou por que isso desperdiça: de 13 respostas em
+ * 69 envios, ONZE vieram de atendimento automático ("agradece seu contato", menu
+ * numerado, "aguarde um técnico"). Quem atende a porta da empresa é um robô.
+ *
+ * Bloco de texto gasto no porteiro é bloco perdido. Uma pergunta de cinco
+ * palavras é barata de queimar com ele, e é o que faz uma PESSOA aparecer
+ * ("sim, é a X, quem fala?"). A conversa começa aí, com a janela de 24h já
+ * aberta pela resposta dela — e o resto vem uma coisa por mensagem.
+ */
+export const V4_NAME = 'stevi_parceria_v4';
 export const COOP_V2_NAME = 'stevi_parceria_coop_v2';
 /** Proactive farmer alerts (geada/fogo/vazio) outside Meta's 24h window. Lives
  * in this registry — even though alerts.ts sends it, not the dispatcher — so the
@@ -91,6 +105,19 @@ const TEMPLATE_DEFS: Record<string, TemplateDef> = {
       'vocês como? Pergunto porque a gente recebe esses pedidos no WhatsApp e queria saber se faz sentido ' +
       'indicar vocês.',
     example: ['Rural Center', 'Machado'],
+  },
+  // Só a pergunta (05/ago) — {{1}}=nome da empresa. O rodapé SAIR é anexado
+  // automaticamente por ser MARKETING; a pessoa vê a pergunta e, embaixo, a
+  // saída. É o corpo mais curto do registro, de propósito.
+  [V4_NAME]: {
+    // A Meta RECUSA variável no fim do modelo ("As variáveis não podem estar no
+    // início ou no fim"), e `{{1}}?` conta como fim — a pontuação não vale como
+    // conteúdo. Daí a identificação vir DEPOIS da pergunta: satisfaz a regra e
+    // mantém o que foi pedido, que é a pergunta abrir a mensagem. De quebra
+    // resolve o risco de uma pergunta sem remetente, com rodapé de descadastro,
+    // ler como golpe.
+    body: 'Oi! Falo com a {{1}}? Aqui é a Vitória, da Stevi.',
+    example: ['Rural Consultoria'],
   },
   // Distribution pitch reply-first (aprovado 27/jul) — {{1}}=name, {{2}}=name
   // again ("pro time da {{2}}"): the slot takes the ORGANIZATION's name, not
