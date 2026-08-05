@@ -139,6 +139,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
+    if (action === 'reply') {
+      // Resposta LIVRE dentro da janela de 24h. Existe porque o porteiro pode
+      // errar e desligar a agente logo antes de um humano aparecer — foi o caso
+      // da RT da Pró Solo em 05/ago. Sem isto, a única saída era template, que
+      // dentro de conversa aberta lê como robô que esqueceu o papo.
+      const { responderProspect } = await import('../_lib/prospect/reply');
+      const id = String((body as { id?: unknown }).id ?? '');
+      const texto = String((body as { text?: unknown }).text ?? '');
+      const r = await responderProspect(id, texto);
+      res.status(r.ok ? 200 : 400).json({ success: r.ok, ...(r.erro ? { error: r.erro } : {}) });
+      return;
+    }
+
     if (action === 'template') {
       // Submit a registry template (idempotent) and report its approval
       // status — avoids the WhatsApp Manager UI round-trip. Defaults to the

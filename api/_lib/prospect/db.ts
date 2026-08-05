@@ -438,6 +438,17 @@ export async function setProspectStatus(id: string, status: ProspectStatus): Pro
  * `.or()`/`.filter()` com string interpolada, e manter essa propriedade vale
  * mais que uma ida a menos ao banco.
  */
+/** Um prospect pelo id. Usado pela resposta manual (reply.ts). */
+export async function getProspectById(id: string): Promise<ProspectRow | null> {
+  const db = getDb();
+  const { data, error } = await db.from('prospects').select('*').eq('id', id).maybeSingle();
+  if (error) {
+    log.error('getProspectById failed:', error.message);
+    return null;
+  }
+  return (data as ProspectRow) ?? null;
+}
+
 export async function findProspectByPhone(phone: string): Promise<ProspectRow | null> {
   const db = getDb();
   const { data, error } = await db.from('prospects').select('*').eq('phone', phone).maybeSingle();
