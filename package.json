@@ -18,7 +18,8 @@
     "gym:vitoria": "tsx scripts/prospect-gym-run.ts",
     "gym:vitoria:paired": "tsx scripts/prospect-gym-paired.ts",
     "golden": "tsx scripts/golden-run.ts",
-    "el:setup": "tsx scripts/el-setup.ts"
+    "el:setup": "tsx scripts/el-setup.ts",
+    "el:clone": "tsx scripts/el-clone.ts"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",

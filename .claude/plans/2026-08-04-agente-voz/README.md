@@ -157,3 +157,46 @@ EL Multilingual v2 + PVC em naturalidade pt-BR hoje.
 **Acoes aplicadas na hora**: prompt ganhou registro de giria (nunca forcar
 regionalismo) e tom-acompanha-assunto (entusiasmo fora de hora soa falso).
 **Acao founder**: gravar a Vitoria 1-3h em TOM DE CONVERSA (nao locucao) pro PVC.
+
+
+---
+
+## Roteiro de gravacao — clone da voz da Vitoria (05/ago)
+
+O objetivo NAO e locucao bonita. E capturar a Vitoria FALANDO DE VERDADE —
+sotaque, ritmo, risada, hesitacao. O clone herda o que ouvir.
+
+### Setup (2 min)
+- Celular serve. Gravador de voz normal, formato .m4a ou .wav.
+- Comodo silencioso, SEM eco (quarto com cama/cortina > sala vazia). Janela
+  fechada, ar e ventilador DESLIGADOS.
+- Celular a ~20cm da boca. Volume de conversa normal.
+- Teste de 15s, ouvir com fone: sem eco, sem estouro? Segue.
+
+### O que gravar — minimo 3 min uteis (IVC); ideal 15-30 min (ja serve pro PVC)
+Tom de CONVERSA, como no telefone com uma amiga. Pode errar, rir, pausar.
+1. (2-3 min) Papo livre: como foi o dia, um caso engracado, um perrengue.
+2. (2-3 min) Simulacao de ligacao (a parte mais valiosa): fingir que liga pra
+   um parceiro da Stevi — se apresentar, perguntar como chegam clientes,
+   reagir ("ah, entendi...", "que bom!"), se despedir.
+3. (2-3 min) Numeros e termos por extenso em frases faladas: "a saca ta dois
+   mil e quatrocentos", "amanha as quatorze horas", "arroba", "lavoura", "Stevi".
+4. (1 min) Emocoes: uma frase animada, uma seria, uma risada de verdade.
+
+### O que NAO fazer
+- NAO ler texto corrido com voz de locutora — o clone sai "dublado".
+- NAO gravar com musica/TV/gente ao fundo. NAO sussurrar nem gritar.
+
+### Depois de gravar
+1. Salvar os arquivos numa pasta (ex.: gravacoes-vitoria na home do Stefano).
+2. Conferir na chave EL a permissao de ESCRITA em Voices (mesma tela dos
+   webhooks) — sem ela o clone e bloqueado.
+3. Mandar o caminho da pasta pro Claude, que roda:
+   - npm run el:clone -- <pasta>  -> cria o clone + vitoria-clone-teste.mp3
+   - os dois ouvem a amostra; aprovou ->
+   - npm run el:clone -- <pasta> --aplicar  -> agente passa a falar com a voz dela
+4. Ligacao de validacao no +55 11 5028-1932.
+
+Consentimento: voz da Vitoria, cofundadora, gravada por ela pra este fim.
+No PVC (30min+, qualidade maxima) o voice captcha tem que ser feito por ELA
+no dashboard — agendar 10 min juntos.
