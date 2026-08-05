@@ -91,6 +91,19 @@ export async function setUserSource(userId: string, source: string): Promise<voi
   if (error) log.error('setUserSource failed:', error.message);
 }
 
+/**
+ * Prospect da Vitória respondeu → a linha dele em `users` é empresa, não
+ * produtor. A linha existe porque o usuário é resolvido ANTES do ramo de
+ * prospect (de propósito — idempotência e rate limit precisam dela), então o
+ * conserto é carimbar na hora, não impedir a criação. Idempotente (UPDATE para
+ * o mesmo valor) e fail-soft: métrica errada não pode derrubar a resposta.
+ */
+export async function markUserEmpresa(userId: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from('users').update({ kind: 'empresa' }).eq('id', userId);
+  if (error) log.error('markUserEmpresa failed:', error.message);
+}
+
 /** Stamp the referral nudge so the 14-day cooldown holds. */
 export async function markReferralPrompted(userId: string): Promise<void> {
   const db = getDb();
