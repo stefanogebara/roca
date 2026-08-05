@@ -118,3 +118,42 @@ recomendação inalterada: ligação esperada e atendimento de produtor.
   piloto nao exige nem upgrade de plano — so importar um numero Twilio BR e
   montar o agente. Barreira de custo: eliminada; os tres vetos de negocio:
   inalterados.
+
+
+---
+
+## Adendo 3 (04/ago, noite) — Estudo: voz nivel Sesame/GPT e o caminho pt-BR
+
+Pergunta do founder: "quero voz igual Sesame/GPT — estude elas ou modelos open source".
+
+**O que faz a Maya (Sesame) soar humana**: CSM — prosodia condicionada no contexto
+da CONVERSA inteira (texto+audio dos dois lados), treinado em ~1M h de dialogo.
+O CSM-1B aberto (Apache 2.0) e so a fundacao menor, **essencialmente ingles** —
+nao serve pra pt-BR sem fine-tune caro. Nada novo aberto em 2026 (viraram app iOS).
+
+**OpenAI gpt-realtime**: speech-to-speech nativo + conector SIP oficial (Twilio).
+PORA: thread oficial (jun/2026) documenta qualidade FRACA em portugues ao telefone
+(nomes errados, G.711 8kHz), vozes sem sotaque BR nativo. ~$0,05-0,12/min.
+
+**Open source pt-BR (ago/2026)**: Chatterbox Multilingual v3 (MIT, pt-BR dedicado)
+e o melhor TTS aberto; Kyutai TTS 1.6B agora fala pt; Qwen3-Omni e o unico
+"gpt-realtime aberto" com pt (GPU parruda). Dia/CSM/Orpheus: ingles. Nenhum supera
+EL Multilingual v2 + PVC em naturalidade pt-BR hoje.
+
+**Dentro do EL**: v3 (audio tags, 70+ linguas) NAO roda em agentes/tempo real —
+"v3 realtime" e roadmap sem data. Agents = Flash v2.5 / Multilingual v2.
+
+**Veredito (ganho / custo / risco)**:
+1. **Ficar no EL + PVC de voz brasileira REAL em tom de conversa** (a clonagem da
+   Vitoria ja planejada e exatamente isso) + prompt de registro emocional. A maior
+   parte do "soa dublado" vem da voz generica + texto do LLM, nao do motor TTS.
+   Teto honesto: "humano bom de call center", nao Maya — prosodia contextual de
+   conversa nao existe em produto comprado hoje.
+2. Piloto paralelo OpenAI Realtime via SIP (50 ligacoes A/B) — SO depois do PVC,
+   e com a queixa pt documentada em mente.
+3. Rebuild Pipecat/LiveKit + Chatterbox/Qwen3-Omni: semanas de engenharia pra
+   empatar com o que o EL ja da; so por custo em escala.
+
+**Acoes aplicadas na hora**: prompt ganhou registro de giria (nunca forcar
+regionalismo) e tom-acompanha-assunto (entusiasmo fora de hora soa falso).
+**Acao founder**: gravar a Vitoria 1-3h em TOM DE CONVERSA (nao locucao) pro PVC.
