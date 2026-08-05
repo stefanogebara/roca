@@ -63,7 +63,32 @@ export async function computeDigestStats(since: string, until: string): Promise<
     .lt('created_at', until)
     .order('created_at', { ascending: false });
   if (error) log.error('digest messages query failed:', error.message);
-  const rows = (msgs ?? []) as MsgRow[];
+
+  // EMPRESAS FORA DA MÉTRICA DE TRAÇÃO.
+  //
+  // O bug do nono dígito (05/ago) fazia a resposta de um prospect cair no fluxo
+  // de produtor; e mesmo com ele consertado, todo prospect que responde ganha
+  // linha em `users`, porque o usuário é resolvido antes do ramo de prospect.
+  // Resultado medido: 15 empresas contra 10 produtores, e 1719 das 1888
+  // mensagens — 91% do volume. WAU, retenção D7 e "voltaram" contavam revenda,
+  // consultoria e software de agro como se fossem lavoura.
+  //
+  // Filtra AQUI, num ponto só, porque tudo abaixo deriva de `rows`: usuários
+  // únicos, intents, kinds, falhas, amostra de perguntas e a coorte. Espalhar o
+  // filtro por cada métrica é como uma delas fica para trás.
+  const { data: empresas, error: empErr } = await db
+    .from('users')
+    .select('id')
+    .neq('kind', 'produtor');
+  if (empErr) log.error('digest empresas query failed:', empErr.message);
+  const empresaIds = new Set(((empresas ?? []) as Array<{ id: string }>).map((e) => e.id));
+  /** Fail-soft: mensagem sem dono ainda não adotada continua contando como
+   * tráfego. Sumir com ela seria esconder atividade real por um detalhe de
+   * ordem de escrita. */
+  const soProdutor = <T extends { user_id: string | null }>(rs: T[]): T[] =>
+    rs.filter((r) => !r.user_id || !empresaIds.has(r.user_id));
+
+  const rows = soProdutor((msgs ?? []) as MsgRow[]);
 
   const inbound = rows.filter((r) => r.direction === 'in');
   const outbound = rows.filter((r) => r.direction === 'out');
@@ -122,6 +147,7 @@ export async function computeDigestStats(since: string, until: string): Promise<
     db
       .from('users')
       .select('id', { count: 'exact', head: true })
+      .eq('kind', 'produtor')
       .gte('created_at', since)
       .lt('created_at', until),
     db
@@ -147,6 +173,7 @@ export async function computeDigestStats(since: string, until: string): Promise<
     db
       .from('users')
       .select('id, created_at, source')
+      .eq('kind', 'produtor')
       .gte('created_at', twoWeeksAgo)
       .order('created_at', { ascending: false })
       .limit(2000),
@@ -175,7 +202,10 @@ export async function computeDigestStats(since: string, until: string): Promise<
   if (!cohortMsgs.error && !cohortUsers.error) {
     cohort = cohortStats(
       (cohortUsers.data ?? []) as Array<{ id: string; created_at: string; source: string | null }>,
-      (cohortMsgs.data ?? []) as CohortMsg[],
+      // Mesmo filtro do bloco de cima: a coorte lê sua própria janela de 14
+      // dias, então precisa tirar as empresas por conta própria — senão WAU e
+      // retenção D7 seguiriam contando o loop da Corpal.
+      soProdutor((cohortMsgs.data ?? []) as CohortMsg[]),
       now
     );
   } else {
