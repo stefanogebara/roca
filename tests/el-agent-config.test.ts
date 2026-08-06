@@ -4,8 +4,10 @@
  * O agente nasce apontado pro quadrante certo (plano 2026-08-04-agente-voz):
  * LIGAÇÃO ESPERADA — quem atende já conversou com a Vitória no WhatsApp e
  * concordou em receber a chamada. As regras duras da Vitória-texto migram
- * intactas: nunca preço, escala pro Stefano, nunca inventa, e se apresenta
- * como assistente digital — em chamada esperada o disclosure não é surpresa.
+ * intactas: nunca preço, escala pro Stefano, nunca inventa, e avisa que é
+ * automatizada logo no início — em palavra de gente, sem rótulo de call
+ * center ("assistente digital/virtual"), que é a regra de 06/ago. Em chamada
+ * esperada o aviso é continuidade, não surpresa.
  */
 import { describe, it, expect } from 'vitest';
 import { montarConfigAgente, AGENT_NAME_EL } from '../api/_lib/voice/elAgent';
@@ -50,18 +52,24 @@ describe('montarConfigAgente', () => {
 
   it('o prompt carrega as regras duras da casa', () => {
     const p = cfg.conversation_config.agent.prompt.prompt;
-    expect(p).toMatch(/assistente digital/i); // disclosure
+    expect(p).toMatch(/automatizada/i); // disclosure: aviso natural + confirmação quando perguntam
+    expect(p).not.toMatch(/Apresente-se como assistente digital/i); // sem rótulo de call center (06/ago)
     expect(p).toMatch(/nunca.*(pre[çc]o|valor)/i); // regra de preço
     expect(p).toMatch(/Stefano/); // escalada
     expect(p).toMatch(/combinad/i); // quadrante certo: ligação combinada…
     expect(p).toMatch(/NUNCA liga fria/i); // …e a proibição explícita de cold call
   });
 
-  it('primeira fala é curta, se apresenta e ancora na conversa do WhatsApp', () => {
+  it('primeira fala é curta, se apresenta, avisa que é automatizada e ancora no WhatsApp', () => {
+    // O aviso mora na fala FIXA de propósito: é o único ponto do disclosure que
+    // não depende do LLM obedecer prompt — em voz, silêncio sobre isso é se
+    // passar por pessoa.
     const f = cfg.conversation_config.agent.first_message;
     expect(f.length).toBeLessThan(220);
     expect(f).toMatch(/Vit[óo]ria/);
     expect(f).toMatch(/WhatsApp/i);
+    expect(f).toMatch(/automatizada/i);
+    expect(f).not.toMatch(/assistente (digital|virtual)/i);
   });
 
   it('as tools de webhook apontam pro nosso endpoint com o secret no header', () => {
