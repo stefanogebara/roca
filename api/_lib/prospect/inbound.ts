@@ -6,7 +6,7 @@
  * handling, so a curious coop rep can still talk to Stevi.
  */
 
-import { normalizePhoneBR, isOptOut } from './core';
+import { normalizePhoneBR, isOptOut, extrairNumerosCitados } from './core';
 import {
   findProspectByPhone,
   addOptout,
@@ -25,10 +25,11 @@ import {
   buildAgentReply,
   extractQualification,
   decidirTurno,
+  pareceAutoAtendimento,
   PORTEIRO_MAX,
 } from './agent';
 import { alertFounders } from '../alert';
-import { sendProspectReplyNotification } from '../notify';
+import { sendProspectReplyNotification, sendLeadContactNotification } from '../notify';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-inbound');
@@ -165,6 +166,36 @@ export async function respondAsProspectAgent(
   const thread = await getProspectThread(prospect.id);
 
   await logProspectMessage(prospect.id, 'in', inboundKind, inboundText);
+
+  // Contato citado ("fala com o Roberto no 35 9...") → email com botão wa.me
+  // pros fundadores (pedido 06/ago). Robô institucional cita 0800/ramal o tempo
+  // todo, então só mensagem de GENTE conta; número do próprio prospect e número
+  // já citado antes na thread não re-disparam.
+  if (!pareceAutoAtendimento(inboundText)) {
+    const conhecidos = new Set<string>(
+      [prospect.phone, (prospect as ProspectRow & { wa_phone?: string | null }).wa_phone]
+        .filter((n): n is string => !!n)
+    );
+    for (const t of thread) for (const n of extrairNumerosCitados(t.text)) conhecidos.add(n);
+    const novos = extrairNumerosCitados(inboundText).filter((n) => !conhecidos.has(n));
+    if (novos.length) {
+      try {
+        await sendLeadContactNotification({
+          prospectName: prospect.name ?? null,
+          kind: prospect.kind,
+          city: prospect.city ?? null,
+          uf: prospect.uf ?? null,
+          citedPhones: novos,
+          replyText: inboundText,
+        });
+        await alertFounders(
+          `📲 ${prospect.name ?? 'Prospect'} passou um contato pra falar direto — email com o botão de WhatsApp na caixa de vocês.`
+        );
+      } catch (e) {
+        log.error('lead-contact notification failed:', (e as Error).message);
+      }
+    }
+  }
 
   if (needsEscalation(inboundText)) {
     await alertFounders(
