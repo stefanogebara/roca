@@ -99,6 +99,29 @@ export function normalizePhoneBR(raw: string | null | undefined): string | null 
 }
 
 /**
+ * Números de telefone BR citados num texto livre, em E.164, na ordem em que
+ * aparecem e sem repetição.
+ *
+ * O caso de uso é o handoff: um prospect escreve "fala com o Roberto no (35)
+ * 98888-7777" e esse número precisa chegar aos fundadores como botão de
+ * WhatsApp. Toda validação é do normalizePhoneBR — inclusive o celular de 8
+ * dígitos sem o nono (JID antigo) — então CPF, pedido, dinheiro e data caem
+ * fora porque não formam número BR válido, não por regex esperta.
+ */
+export function extrairNumerosCitados(texto: string | null | undefined): string[] {
+  if (!texto) return [];
+  const out: string[] = [];
+  // Candidato: DDD (com ou sem parênteses/+55) + assinante em 1 ou 2 blocos.
+  // Lookarounds impedem fatiar um run de dígitos maior (CPF, protocolo).
+  const re = /(?<!\d)(?:\+?55[\s.\-]*)?\(?\d{2}\)?[\s.\-]*\d{4,5}[\s.\-]?\d{4}(?!\d)/g;
+  for (const m of texto.matchAll(re)) {
+    const norm = normalizePhoneBR(m[0]);
+    if (norm && !out.includes(norm)) out.push(norm);
+  }
+  return out;
+}
+
+/**
  * Whether a normalized BR number is a MOBILE line.
  *
  * A SIGNAL, never a send gate. On 27/jul this was briefly used to block every

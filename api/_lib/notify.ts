@@ -118,13 +118,108 @@ export function formatProspectReplyEmail(n: ProspectReplyNotice): { subject: str
   };
 }
 
+// ── Contato citado numa conversa de prospecção ───────────────────────────────
+
+/**
+ * O handoff mais quente depois da primeira resposta: alguém escreveu "fala com
+ * o Roberto nesse número". O fundador precisa estar NO WhatsApp da pessoa em um
+ * toque — achar o número no painel, copiar e escrever do zero é onde o lead
+ * esfriava.
+ *
+ * Postura de dado DELIBERADAMENTE diferente dos outros dois emails: aqui o
+ * número vai COMPLETO, porque o botão wa.me É o número (pedido do Stefano,
+ * 06/ago). Os fundadores são os controladores do dado e o email é interno;
+ * mascarar aqui mataria o propósito.
+ */
+export interface LeadContactNotice {
+  prospectName: string | null;
+  kind: string;
+  city: string | null;
+  uf: string | null;
+  /** Números E.164 citados pelo lead (validados pelo core — nunca palpite). */
+  citedPhones: string[];
+  replyText: string;
+}
+
+/** Deep link do WhatsApp com a mensagem já digitada (editável antes de enviar). */
+export function waMeLink(phone: string, text: string): string {
+  return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+}
+
+/** "+5535988887777" → "+55 35 98888-7777" (só exibição). */
+function fmtPhoneBR(e164: string): string {
+  const m = /^\+55(\d{2})(\d{4,5})(\d{4})$/.exec(e164);
+  return m ? `+55 ${m[1]} ${m[2]}-${m[3]}` : e164;
+}
+
+/** Subject + texto + html (botões) do email de contato citado. Pure — testado. */
+export function formatLeadContactEmail(n: LeadContactNotice): {
+  subject: string;
+  body: string;
+  html: string;
+} {
+  const name = n.prospectName?.trim() || 'Um prospect';
+  const region = [n.city, n.uf].filter(Boolean).join(' · ') || 'região não informada';
+  const excerpt = n.replyText.length > 240 ? `${n.replyText.slice(0, 240)}…` : n.replyText;
+  const prefill =
+    `Oi! Tudo bem? Aqui é da Stevi 🌱 O pessoal da ${name} passou seu contato pra gente ` +
+    `conversar sobre a parceria (a gente indica produtores de café da região com o caso técnico ` +
+    `já organizado). Posso te explicar rapidinho como funciona?`;
+  const links = n.citedPhones.map((p) => ({ label: fmtPhoneBR(p), url: waMeLink(p, prefill) }));
+
+  const body = [
+    `${name} (${n.kind} · ${region}) passou um contato pra falar direto.`,
+    '',
+    `Mensagem: "${excerpt}"`,
+    '',
+    ...links.map((l) => `Chamar ${l.label} no WhatsApp (mensagem já pronta): ${l.url}`),
+    '',
+    `Thread completa no painel: ${PAINEL_URL}`,
+    'Lead quente esfria em horas — o botão abre o WhatsApp com a mensagem digitada, é só enviar.',
+  ].join('\n');
+
+  const buttons = links
+    .map(
+      (l) =>
+        `<p style="margin:16px 0"><a href="${l.url}" ` +
+        `style="background:#1a7f37;color:#ffffff;padding:12px 22px;border-radius:8px;` +
+        `text-decoration:none;font-weight:bold;display:inline-block">` +
+        `💬 Chamar ${l.label} no WhatsApp</a></p>`
+    )
+    .join('');
+  const html =
+    `<div style="font-family:sans-serif;max-width:560px">` +
+    `<p><strong>${name}</strong> (${n.kind} · ${region}) passou um contato pra falar direto.</p>` +
+    `<blockquote style="border-left:3px solid #1a7f37;margin:12px 0;padding:4px 12px;color:#444">${excerpt}</blockquote>` +
+    buttons +
+    `<p style="color:#666;font-size:13px">A mensagem já vai digitada no WhatsApp — revise e envie. ` +
+    `Thread completa no <a href="${PAINEL_URL}">painel</a>.</p>` +
+    `</div>`;
+
+  return { subject: `📲 Stevi: ${name} passou um contato — é só clicar e chamar`, body, html };
+}
+
+/**
+ * Email do contato citado pros dois fundadores. Fail-soft com log alto — o
+ * fluxo de resposta ao prospect nunca quebra porque o SMTP soluçou.
+ */
+export async function sendLeadContactNotification(n: LeadContactNotice): Promise<void> {
+  const { subject, body, html } = formatLeadContactEmail(n);
+  try {
+    if (await sendFounderEmail(subject, body, html)) log.info('lead-contact notification emailed');
+  } catch (e) {
+    log.error('lead-contact email failed:', (e as Error).message);
+    await alertFounders(`⚠️ Stevi: email de contato citado falhou — ${(e as Error).message.slice(0, 200)}`);
+  }
+}
+
 /** Comma-separated founder inbox list; nodemailer accepts the string as-is. */
 function founderRecipients(fallback: string): string {
   return process.env.FOUNDER_NOTIFY_TO || process.env.REFERRAL_NOTIFY_TO || fallback;
 }
 
 /** Shared Gmail-SMTP send for founder notifications. Throws on failure. */
-async function sendFounderEmail(subject: string, body: string): Promise<boolean> {
+async function sendFounderEmail(subject: string, body: string, html?: string): Promise<boolean> {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) {
@@ -144,6 +239,7 @@ async function sendFounderEmail(subject: string, body: string): Promise<boolean>
         to: founderRecipients(user),
         subject,
         text: body,
+        ...(html ? { html } : {}),
       }),
     { attempts: 2 }
   );
