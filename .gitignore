@@ -24,3 +24,9 @@ web/_shots/
 
 # Vigias temporários de sessão do Claude (não são código do produto).
 .claude-watch-*.mjs
+
+# Artefatos do Playwright (screenshots do painel têm dado real de prospect;
+# o error-context chega a capturar o que foi digitado no campo de senha).
+test-screenshots/
+playwright-report/
+

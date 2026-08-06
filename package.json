@@ -31,6 +31,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^20.14.0",
     "@types/nodemailer": "^8.0.1",
     "@types/qrcode": "^1.5.6",
