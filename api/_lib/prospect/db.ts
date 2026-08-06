@@ -308,9 +308,37 @@ export async function importProspects(rows: ProspectInput[]): Promise<number> {
     for (const r of (data ?? []) as Array<{ phone: string | null }>) if (r.phone) existing.add(r.phone);
   }
 
+  // Linha SEM phone entra para review — mas review vale UMA vez. O dedup era
+  // só por phone, então cada rodada de sourcing que reencontrava o mesmo
+  // negócio phoneless inseria de novo (AGRO COFFEE ×4 na base, 06/ago). Sem
+  // phone, a identidade é (name, city), case-insensitive — o Places não é
+  // consistente com caixa. Cidade diferente NÃO é duplicata: filial legítima.
+  // Ressalva: o `.in('name', …)` do banco é exact-case (não há ilike de lista);
+  // a comparação insensitive vale plenamente dentro do lote e para a cidade.
+  // Mesmo fornecedor devolve a mesma caixa, então cobre o caso real — o índice
+  // único parcial em (lower(name), lower(city)) where phone is null é a rede.
+  const nameKey = (name: string, city: string | null | undefined) =>
+    `${name.trim().toLowerCase()}|${(city ?? '').trim().toLowerCase()}`;
+  const phonelessNames = [...new Set(rows.filter((r) => !r.phone).map((r) => r.name))];
+  const existingNames = new Set<string>();
+  if (phonelessNames.length) {
+    const { data, error } = await db.from('prospects').select('name, city').in('name', phonelessNames);
+    // Fail-soft de propósito: esta query é defesa contra RUÍDO (duplicata de
+    // review), não contra envio — quebrar o sourcing inteiro por causa dela
+    // seria pagar mais caro que o problema que ela evita.
+    if (error) log.error('importProspects phoneless dedup query failed:', error.message);
+    for (const r of (data ?? []) as Array<{ name: string; city: string | null }>)
+      existingNames.add(nameKey(r.name, r.city));
+  }
+
   const seen = new Set<string>();
   const toInsert = rows.filter((r) => {
-    if (!r.phone) return true; // invalid — always keep for review
+    if (!r.phone) {
+      const key = nameKey(r.name, r.city);
+      if (existingNames.has(key) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }
     if (existing.has(r.phone) || seen.has(r.phone)) return false; // dedup vs DB + within batch
     seen.add(r.phone);
     return true;
