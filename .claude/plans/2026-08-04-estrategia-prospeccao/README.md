@@ -52,7 +52,12 @@ agente stevi-pesquisa-prospeccao, 04/ago).
 - [ ] Resequenciar Vitória: valor primeiro, "sou IA" na sequência imediata
       (decisão dos founders — toca a regra zero).
 ### Out-nov (onde o mercado se encontra)
-- [ ] CBPC Poços de Caldas 28-31/out (inscrever AGORA).
+- [ ] ~~CBPC Poços de Caldas 28-31/out (inscrever AGORA)~~ **CORRIGIDO 06/ago
+      (fonte: fundacaoprocafe.com.br/congresso-cbpc): Poços 28-31/out era o
+      49º, de 2025. O de 2026 é o 50º CBPC, em CAXAMBU-MG, 27-30/out, com dia
+      de campo de encerramento na Fda. Experimental de Varginha.** Inscrição
+      AINDA NÃO ABRIU (eventos.fundacaoprocafe.com.br mostra "em breve") —
+      monitorar o portal; trabalhos via trabalhos@fundacaoprocafe.com.br.
 - [ ] Semana Internacional do Café, BH, 11-13/nov.
 - [ ] Etapas do Circuito Emater pós-colheita.
 
