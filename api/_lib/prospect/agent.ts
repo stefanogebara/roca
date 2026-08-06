@@ -622,11 +622,19 @@ export function decidirTurno(e: EstadoDoTurno): DecisaoTurno {
   const robo = pareceAutoAtendimento(e.inboundText) || ecoDeMaquina(e.thread, e.inboundText);
   if (robo && porteiroEsgotado(e.tentativas)) return { acao: 'porteiro-esgotado' };
 
-  const ultimaNossa = [...e.thread].reverse().find((m) => m.direction === 'out');
-  if (ultimaNossa?.created_at) {
-    const quando = new Date(ultimaNossa.created_at);
-    if (!podeFalarDeNovo(quando, e.agora)) {
-      return { acao: 'segurar-cadencia', desdeMs: e.agora.getTime() - quando.getTime() };
+  // Cadência só vale para HUMANO: ela existe pra não metralhar uma pessoa com
+  // duas mensagens seguidas. Atendimento automático responde em segundos por
+  // natureza — segurar aqui DROPAVA o turno pra sempre (não há retry em
+  // serverless) e o porteiro nunca tentava furar. Foi assim que Conntacta e
+  // Minas Cafeeira ficaram sem resposta em 05/ago: menu em ~14s do nosso
+  // envio, teto de cadência engoliu, humano nunca apareceu do outro lado.
+  if (!robo) {
+    const ultimaNossa = [...e.thread].reverse().find((m) => m.direction === 'out');
+    if (ultimaNossa?.created_at) {
+      const quando = new Date(ultimaNossa.created_at);
+      if (!podeFalarDeNovo(quando, e.agora)) {
+        return { acao: 'segurar-cadencia', desdeMs: e.agora.getTime() - quando.getTime() };
+      }
     }
   }
 

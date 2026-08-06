@@ -88,6 +88,17 @@ describe('decidirTurno — teto de cadência', () => {
     const d = decidirTurno({ ...base, thread: recem as never, inboundText: MENU, tentativas: PORTEIRO_MAX });
     expect(d.acao).toBe('porteiro-esgotado');
   });
+
+  it('robô com tentativa SOBRANDO dentro da cadência: tenta furar, não segura (Conntacta/Minas 05-ago)', () => {
+    // O caso real que perdeu dois leads em 05/ago: o atendimento automático
+    // responde em ~14s do nosso envio (é robô, é instantâneo por natureza),
+    // caía no teto de cadência e o turno era DROPADO para sempre — o porteiro
+    // nunca tentava furar. Cadência protege HUMANO de rajada nossa; menu
+    // automático não é gente sendo apressada.
+    const d = decidirTurno({ ...base, thread: recem as never, inboundText: MENU, tentativas: 0 });
+    expect(d.acao).toBe('responder');
+    if (d.acao === 'responder') expect(d.turno.robo).toBe(true);
+  });
 });
 
 describe('decidirTurno — ordem de precedência é explícita', () => {
