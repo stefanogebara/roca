@@ -68,6 +68,8 @@ export interface PlaceHit {
   name: string;
   phone: string | null;
   city: string | null;
+  /** UF extraída do endereço do Places, no mesmo match da cidade. */
+  uf: string | null;
   source: string;
   /** Site do negócio (Places websiteUri) — insumo do enriquecimento. */
   website: string | null;
@@ -85,15 +87,18 @@ export function buildQueries(
   cities: string[] = ICP_CITIES,
   maxCities = 4,
   offset = 0
-): Array<{ kind: string; q: string; city: string }> {
-  const out: Array<{ kind: string; q: string; city: string }> = [];
+): Array<{ kind: string; q: string; city: string; uf: string }> {
+  const out: Array<{ kind: string; q: string; city: string; uf: string }> = [];
   const n = cities.length;
   const janela = n
     ? Array.from({ length: Math.min(maxCities, n) }, (_, i) => cities[(offset + i) % n])
     : [];
   for (const city of janela) {
+    // A UF vem do sufixo da grade — gravar 'MG' fixo mandou Franca SP pro
+    // banco como mineira (04/ago, quando a Mogiana entrou na grade).
+    const uf = city.match(/\s(MG|SP)$/)?.[1] ?? 'MG';
     for (const { kind, term } of ICP_QUERIES) {
-      out.push({ kind, q: `${term} em ${city}`, city: city.replace(/\s+(MG|SP)$/, '') });
+      out.push({ kind, q: `${term} em ${city}`, city: city.replace(/\s+(MG|SP)$/, ''), uf });
     }
   }
   return out;
@@ -181,7 +186,8 @@ export async function contarPorCidade(): Promise<Map<string, number>> {
 export function toProspectInput(
   hit: PlaceHit,
   kind: string,
-  city: string
+  city: string,
+  uf: string
 ): ProspectInput {
   const phone = normalizePhoneBR(hit.phone);
   return {
@@ -190,7 +196,9 @@ export function toProspectInput(
     wa_status: phone ? 'pending' : 'invalid',
     kind: kind.slice(0, 40),
     city: (hit.city ?? city).slice(0, 80),
-    uf: 'MG',
+    // Cidade e UF andam juntas: se o endereço do Places forneceu o par, ele
+    // vence; senão vale o da query da grade. Nunca 'MG' fixo.
+    uf: hit.uf ?? uf,
     source: hit.source.slice(0, 300),
   };
 }
@@ -220,13 +228,19 @@ async function searchOnce(apiKey: string, q: string): Promise<PlaceHit[]> {
   };
   return (data.places ?? [])
     .filter((p) => p.displayName?.text)
-    .map((p) => ({
-      name: p.displayName!.text as string,
-      phone: p.nationalPhoneNumber ?? null,
-      city: p.formattedAddress?.match(/,\s*([^,]+)\s*-\s*MG/)?.[1]?.trim() ?? null,
-      source: p.googleMapsUri ?? 'google-places',
-      website: p.websiteUri ?? null,
-    }));
+    .map((p) => {
+      // Cidade e UF saem do MESMO match ("..., Franca - SP, ..."): par
+      // consistente ou nada. Só MG aqui deixava toda cidade paulista sem match.
+      const end = p.formattedAddress?.match(/,\s*([^,]+)\s*-\s*(MG|SP)\b/);
+      return {
+        name: p.displayName!.text as string,
+        phone: p.nationalPhoneNumber ?? null,
+        city: end?.[1]?.trim() ?? null,
+        uf: end?.[2] ?? null,
+        source: p.googleMapsUri ?? 'google-places',
+        website: p.websiteUri ?? null,
+      };
+    });
 }
 
 export interface SourceReport {
@@ -267,7 +281,7 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
   // uma base que encolhe sem explicação.
   const descartados: string[] = [];
   let failures = 0;
-  for (const { kind, q, city } of queries) {
+  for (const { kind, q, city, uf } of queries) {
     try {
       for (const hit of await searchOnce(apiKey, q)) {
         // Barrar pet/ração/veterinária ANTES da fila: um disparo errado queima
@@ -277,7 +291,7 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
           descartados.push(`${hit.name} (${motivo})`);
           continue;
         }
-        rows.push({ input: toProspectInput(hit, kind, city), website: hit.website });
+        rows.push({ input: toProspectInput(hit, kind, city, uf), website: hit.website });
       }
     } catch (e) {
       failures++;

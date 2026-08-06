@@ -137,6 +137,9 @@ export interface BackfillRow {
   id: string;
   name: string;
   city: string | null;
+  /** UF do prospect — a query de reencontro no Places usa cidade+UF reais;
+   * 'MG' fixo mandava buscar "Franca MG" para prospect paulista. */
+  uf?: string | null;
   status: string;
   phone: string | null;
   wa_phone_source: string | null;
@@ -231,7 +234,7 @@ export async function runBackfill(limite = BACKFILL_POR_RODADA): Promise<Backfil
   const db = getDb();
   const { data, error } = await db
     .from('prospects')
-    .select('id, name, city, status, phone, wa_phone_source, send_status, enrich_tried_at')
+    .select('id, name, city, uf, status, phone, wa_phone_source, send_status, enrich_tried_at')
     .in('status', ['ready', 'discovered']);
   if (error) {
     return {
@@ -257,7 +260,7 @@ export async function runBackfill(limite = BACKFILL_POR_RODADA): Promise<Backfil
               'X-Goog-FieldMask': 'places.displayName,places.nationalPhoneNumber,places.websiteUri',
             },
             body: JSON.stringify({
-              textQuery: `${p.name} ${p.city ?? ''} MG`.trim(),
+              textQuery: `${p.name} ${p.city ?? ''} ${p.uf ?? 'MG'}`.trim(),
               languageCode: 'pt-BR',
               regionCode: 'BR',
               pageSize: 3,
