@@ -798,3 +798,26 @@ exemplos com mecanismo.
   prospects TÊM site — não há extrator que resolva metade da lista. O gargalo
   virou sourcing, e reconhecer isso vale mais que a próxima otimização do
   extrator.
+
+
+## 06/ago — envio externo com timeout: verificar antes de reenviar, sempre
+
+Um script de envio (2 mensagens WhatsApp) estourou o timeout do Bash e morreu
+sem dizer o que saiu. Reenviar às cegas = mensagem duplicada para lead real.
+
+O caminho certo, que funcionou: (1) NÃO reenviar; (2) reconstruir o que
+aconteceu por evidência — callbacks no webhook, e um PROBE do próprio script
+sem os efeitos (mesmos imports, corpo inerte) para descobrir se o módulo sequer
+carregava. O probe revelou o quadro exato: o vitest/esbuild deixa import de
+export inexistente virar `undefined` em vez de quebrar o link — então metade do
+script rodou (enviou) e a outra metade falhou (template undefined, Meta recusa).
+Um envio saiu, o outro não; só o que faltava foi reenviado.
+
+Regras que ficam:
+- Efeito externo + timeout = estado desconhecido. A primeira ação é FORENSE,
+  nunca retry.
+- Import entre módulos TS no vitest não é verificado no link: `import { X }`
+  de onde X não existe vira `undefined` silencioso. Guard de runtime
+  (`typeof X !== 'string'`) em script descartável que envia coisa real.
+- Enviar 2 mensagens num script só dobra o raio da ambiguidade. Um efeito
+  externo por execução.
