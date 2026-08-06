@@ -31,14 +31,48 @@ describe('sourcing query grid', () => {
 
 describe('toProspectInput', () => {
   it('validates phones through the P1 core, never fabricates', () => {
-    const ok = toProspectInput({ name: 'Agro X', phone: '(35) 99999-1234', city: null, source: 'maps://x', website: null }, 'revenda', 'Lavras');
+    const ok = toProspectInput({ name: 'Agro X', phone: '(35) 99999-1234', city: null, uf: null, source: 'maps://x', website: null }, 'revenda', 'Lavras', 'MG');
     expect(ok.phone).toBe('+5535999991234');
     expect(ok.wa_status).toBe('pending');
     expect(ok.city).toBe('Lavras');
-    const bad = toProspectInput({ name: 'Agro Y', phone: '1234', city: 'Alfenas', source: 'maps://y', website: null }, 'revenda', 'Lavras');
+    const bad = toProspectInput({ name: 'Agro Y', phone: '1234', city: 'Alfenas', uf: 'MG', source: 'maps://y', website: null }, 'revenda', 'Lavras', 'MG');
     expect(bad.phone).toBeNull();
     expect(bad.wa_status).toBe('invalid');
     expect(bad.city).toBe('Alfenas'); // listing city wins over query city
+  });
+});
+
+/**
+ * UF vem da grade, nunca fixa. 04/ago a grade ganhou a Mogiana paulista
+ * (Franca SP, São João da Boa Vista SP), mas toProspectInput gravava uf:'MG'
+ * para TODO prospect — paulista entrava no banco como mineiro.
+ */
+describe('toProspectInput — a UF acompanha a cidade da grade', () => {
+  it('buildQueries deriva a UF do sufixo da cidade', () => {
+    const qs = buildQueries(['Franca SP', 'Varginha MG'], 2, 0);
+    expect(qs[0].uf).toBe('SP');
+    expect(qs[ICP_QUERIES.length].uf).toBe('MG');
+  });
+
+  it('prospect da Mogiana grava SP, não MG', () => {
+    const q = buildQueries(['Franca SP'], 1, 0)[0];
+    const p = toProspectInput(
+      { name: 'Agro Franca', phone: '(16) 99999-1234', city: null, uf: null, source: 'maps://f', website: null },
+      q.kind, q.city, q.uf
+    );
+    expect(p.uf).toBe('SP');
+    expect(p.city).toBe('Franca');
+  });
+
+  it('UF do endereço do Places vence a da query — mesmo critério da cidade', () => {
+    // Listagem devolvida com endereço em outra cidade/UF: cidade e UF vêm
+    // juntas do mesmo match do endereço, nunca misturadas com a query.
+    const p = toProspectInput(
+      { name: 'Agro Y', phone: null, city: 'Alfenas', uf: 'MG', source: 'maps://y', website: null },
+      'revenda', 'Franca', 'SP'
+    );
+    expect(p.city).toBe('Alfenas');
+    expect(p.uf).toBe('MG');
   });
 });
 
