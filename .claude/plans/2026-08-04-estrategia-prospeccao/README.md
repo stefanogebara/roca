@@ -84,8 +84,11 @@ os gates de sempre (PROSPECT_DAILY_CAP, aprovação de founder).
 | 7 | Emerj Consultoria Agronômica | Boa Esperança | **Walter Luiz Pinheiro** (+ Marcos Anastacio Barbosa; João Paulo Pinheiro 03/2025) | pequena | +553538512562 (FIXO) | Café/crédito rural/certificação. IG @emerjconsultoria. Fixo = idem |
 | 8 | Syagro Soluções Agrícolas | Boa Esperança | **Karina Maieru Carlos** e **Savio Junior Almeida** | ME nova (dez/2025) | +5535998858630 | CNAE agronomia; sem presença web ainda |
 
-Ordem de disparo sugerida (leitura provável): 1 → 3 → 2 → 5 → 4 → 8; 6 e 7 só
-depois de achar celular (o funil já provou que fixo de balcão não lê).
+| 9 | Vilela Consultoria Agrícola e Treinamentos | Boa Esperança | **Diego Junior Martins Vilela** | 2 sócios | +5535988263528 (celular; 2º: +5535991775058) | Adicionada 06/ago via registro CNAE da cidade. CNAE agronomia + treinamentos desde 2020 |
+
+Ordem de disparo sugerida (leitura provável): 1 → 3 → 2 → 9 → 5 → 4 → 8; 6 e 7
+só depois de achar celular (caça de 06/ago: NÃO existe celular público de
+nenhum dos dois — rota é testar WA no fixo ou primeira ligação).
 
 ### ⚠️ Borderline — decisão de founder
 
@@ -113,10 +116,20 @@ depois de achar celular (o funil já provou que fixo de balcão não lê).
 
 ### 🎁 Descobertas colaterais
 
-1. As DUAS únicas consultorias agro registradas em Boa Esperança **não estão
-   na base**: Vilela Consultoria Agrícola e Treinamentos (CNPJ
-   36.560.686/0001-12) e Alcântara Consultoria Agrícola (CNPJ
-   46.435.307/0001-16). Adicionar ao sourcing.
+1. ~~As DUAS únicas consultorias agro registradas em Boa Esperança não estão
+   na base~~ **RESOLVIDO 06/ago (follow-up):**
+   - **Vilela Consultoria Agrícola e Treinamentos** (CNPJ 36.560.686/0001-12)
+     → **ADICIONADA como #9 da lista** (ready/valid). Dono citado: **Diego
+     Junior Martins Vilela** (sócio-admin; sócia Tavia Lorenzo Mota). CNAE
+     agronomia + treinamentos, ativa desde 2020. Celulares do registro:
+     +5535988263528 (principal) e +5535991775058; email
+     diegovilela26@yahoo.com.br.
+   - **Alcântara** (CNPJ 46.435.307/0001-16) era FALSO — o CNPJ é MEI de
+     **varejo de vestuário** (Natiely de Alcantara Nogueira). Listagem da
+     econodata estava errada. Não adicionada.
+   - Bônus: **S 3 Consultoria Agronômica** (CNPJ 48.926.816/0001-77, 3 sócios
+     jovens) opera do MESMO endereço/fone/email da Emerj — não é alvo novo, é
+     a mesma porta (cluster de 6 agrônomos).
 2. Duplicatas na base (AGRO COFFEE ×4, Fazenda Terra Nova ×4, Cooxupé ×4…) —
    chip de task separado já aberto para dedup + índice único.
 3. Base grava "Varginha" para empresa de Nepomuceno (Gonzaga) — Places devolve
