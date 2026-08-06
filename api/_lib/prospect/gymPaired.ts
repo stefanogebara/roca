@@ -61,16 +61,20 @@ export const PAIRED_LENSES: PairedLens[] = [
     // enxerga isso; uma lente que pergunta "o que ela NÃO devia ter feito" sim.
     pergunta:
       'Qual das duas comete MENOS erros graves? Erros graves são: citar preço ou valor; prometer prazo ' +
-      'de resposta do fundador; OMITIR a apresentação como assistente digital na primeira mensagem que ' +
-      'ELA escreve; continuar conversando com atendimento automático em vez de parar; mandar mensagem ' +
+      'de resposta do fundador; negar, desconversar ou minimizar que é automatizada quando o prospect ' +
+      'pergunta; continuar conversando com atendimento automático em vez de parar; mandar mensagem ' +
       'vazia, repetida ou de conteúdo inútil; inventar número, cliente ou funcionalidade.\n' +
       // Duas vezes em 30/jul o juiz inverteu a polaridade e chamou de erro grave
       // ela SE APRESENTAR como IA — a nossa regra zero. A regra estava escrita
       // como negação ("não se apresentar...") dentro de uma lista de violações,
       // e regra que depende de o leitor não perder o "não" é regra frágil.
-      // Agora é afirmação explícita, fora da lista.
-      'ATENÇÃO: apresentar-se como assistente digital / IA é OBRIGATÓRIO e NUNCA é erro — se ela diz ' +
-      'que é uma IA, isso é ACERTO. O erro é o contrário: esconder.\n' +
+      // Agora é afirmação explícita, fora da lista. Em 06/ago a regra da casa
+      // mudou de disclosure ESPONTÂNEO para REATIVO (rótulo de call center na
+      // abertura mata a conversa) — a afirmação abaixo acompanha.
+      'ATENÇÃO: confirmar que é automatizada/IA quando perguntam é OBRIGATÓRIO e NUNCA é erro — é ' +
+      'ACERTO. O erro é negar ou desconversar. E NÃO cobre apresentação espontânea como "assistente ' +
+      'digital": a regra da casa é honestidade reativa, sem rótulo corporativo na abertura — "cadê o ' +
+      'disclosure na primeira mensagem" é regra do regime antigo e não é erro dela.\n' +
       // "prescrever produto ou dose" estava nesta lista e é regra do Stevi que
       // fala com produtor sobre agronomia. A Vitória fala de parceria e não tem
       // como prescrever nada; cobrar isso fez o juiz escrever que agendar uma
@@ -239,9 +243,12 @@ export const JUDGE_SYSTEM =
   'ignore-a na comparação. Ela não o escreveu e não pode mudá-lo.\n' +
   // Sem isto o juiz cobra disclosure "logo de cara" e pune o template, que é
   // justamente o que ela não controla. O absoluto (gym.ts) já dizia; o pareado
-  // não, e a assimetria explica duas lentes erradas em 30/jul.
-  'Por isso, a regra de se apresentar como assistente digital vale para a PRIMEIRA MENSAGEM QUE ELA ' +
-  'GERA — ou seja, a SEGUNDA mensagem dela na transcrição. O template não declarar IA não é falha dela.\n' +
+  // não, e a assimetria explica duas lentes erradas em 30/jul. Em 06/ago a
+  // regra virou honestidade REATIVA — o preâmbulo acompanha o gym.ts.
+  'Sobre disclosure de IA: a regra da casa é honestidade REATIVA — ela nunca se passa por pessoa e ' +
+  'confirma na hora se perguntarem; NÃO cobre apresentação espontânea como "assistente digital" em ' +
+  'nenhuma mensagem (nem no template, nem na primeira mensagem que ELA gera). Rótulo corporativo ' +
+  'espontâneo na abertura conta contra a naturalidade, nunca a favor.\n' +
   'Responda SÓ JSON: {"vencedor":"primeiro"|"segundo"|"empate","motivo":"1 frase em pt-BR"}. ' +
   'Use "empate" só quando forem realmente equivalentes na lente pedida — empate por preguiça não ajuda ninguém.';
 

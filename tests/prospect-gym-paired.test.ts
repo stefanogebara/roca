@@ -235,7 +235,7 @@ describe('rubrica do juiz pareado', () => {
     for (const l of PAIRED_LENSES) expect(l.pergunta).not.toMatch(/prescrev|dose/i);
   });
 
-  it('diz que se apresentar como IA é OBRIGATÓRIO, não um erro', () => {
+  it('confirmar que é IA quando perguntam é OBRIGATÓRIO, não um erro', () => {
     expect(lente('correcao')).toMatch(/obrigat/i);
   });
 
@@ -243,12 +243,21 @@ describe('rubrica do juiz pareado', () => {
     expect(lente('correcao')).not.toMatch(/n[ãa]o se apresentar como assistente digital/i);
   });
 
+  it('não cobra apresentação espontânea como "assistente digital" — regra de 06/ago', () => {
+    // O rótulo de call center na abertura mata a conversa; a honestidade é
+    // reativa (confirma quando perguntam, nunca nega). Um juiz que cobra "cadê
+    // o disclosure na primeira mensagem" treinaria o agente CONTRA o prompt.
+    expect(lente('correcao')).toMatch(/reativa|quando perguntam/i);
+    expect(lente('correcao')).not.toMatch(/OMITIR a apresenta/i);
+  });
+
   it('a lente de condução exige citar a pergunta repetida', () => {
     expect(lente('conducao')).toMatch(/cit(e|ando)|entre aspas|transcrev/i);
   });
 
-  it('o preâmbulo diz ONDE a disclosure é esperada — o template não conta', () => {
-    expect(JUDGE_SYSTEM).toMatch(/primeira mensagem que ELA gera|segunda mensagem dela/i);
+  it('o preâmbulo diz que disclosure é reativa — nem o template nem a 1ª mensagem dela devem ser cobrados', () => {
+    expect(JUDGE_SYSTEM).toMatch(/honestidade REATIVA/i);
+    expect(JUDGE_SYSTEM).toMatch(/primeira mensagem que ELA gera/i);
   });
 
   it('o orçamento de tokens do juiz cabe um JSON com frase — 200 truncava', () => {
