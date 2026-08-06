@@ -71,12 +71,22 @@ async function extractPestTarget(
   }
 }
 
-/** Agrofit grounding for a pest question, or null if nothing matched. */
-async function pestGrounding(text: string, knownCrops?: string[] | null): Promise<string | null> {
+/**
+ * Agrofit grounding for a pest question. Devolve também a CULTURA VISTA em
+ * texto livre: o chamador precisa distinguir "não citou cultura" de "citou uma
+ * cultura que não é de casa" — a mesma distinção que o caminho de foto já faz
+ * (cropVisto/foraDeDominio). Antes essa informação morria aqui dentro, e o
+ * mamão por TEXTO saía com segurança de diagnóstico plena; o caso
+ * pest-fora-de-dominio-mamao do goldenset falhou exatamente nisso (05/ago).
+ */
+async function pestGrounding(
+  text: string,
+  knownCrops?: string[] | null
+): Promise<{ grounding: string | null; cropVisto: string | null }> {
   const target = await extractPestTarget(text);
-  if (!target.pest) return null;
+  if (!target.pest) return { grounding: null, cropVisto: target.crop };
   const hit = groundedHit(target.crop, target.pest, knownCrops);
-  return hit ? groundingBlock(hit) : null;
+  return { grounding: hit ? groundingBlock(hit) : null, cropVisto: target.crop };
 }
 
 /** Format a spray-window result into a compact WhatsApp reply. */
@@ -410,12 +420,30 @@ async function handleText(
   // Ground pest/disease questions in the Agrofit registry (scoped to the
   // farmer's crop when the message doesn't name one).
   let grounding: string | null = null;
+  let cropForaDeDominio: string | null = null;
   if (intent === 'pest_triage' && msg.text) {
-    grounding = await pestGrounding(msg.text, knownCrops);
+    const g = await pestGrounding(msg.text, knownCrops);
+    grounding = g.grounding;
+    // Cultura citada que o normalizeCrop não reconhece = fora das cinco de
+    // casa. Mesma régua do caminho de foto (foraDeDominio): "vi e não é minha"
+    // é diferente de "não vi".
+    if (g.cropVisto && normalizeCrop(g.cropVisto) === null) cropForaDeDominio = g.cropVisto;
   }
 
   const blocks: string[] = [];
   if (history) blocks.push(history);
+  // Espelho do bloco do caminho de foto (triagePhoto): sem isto a resposta de
+  // mamão saía com a MESMA embalagem de confiança de uma de soja — e por
+  // texto, que é como a maioria pergunta. Pego pelo caso
+  // pest-fora-de-dominio-mamao do goldenset (05/ago).
+  if (cropForaDeDominio) {
+    blocks.push(
+      `[ATENÇÃO] A cultura (${cropForaDeDominio}) está FORA das culturas que você acompanha de perto (${CULTURAS_DE_CASA}). ` +
+        'Diga isso ao produtor logo no começo, com naturalidade: seu forte são aquelas, e aqui você vai pelo geral. ' +
+        'Oriente só o que vale para qualquer cultura (monitorar, coletar amostra, análise), NÃO cite registro do Agrofit ' +
+        'e reforce mais que o normal a procura por um agrônomo local que conheça a cultura.'
+    );
+  }
   if (grounding) blocks.push(`[Registro Agrofit — use isto como base, não invente]\n${grounding}`);
   if (context) blocks.push(`[Dados derivados da lavoura]\n${context}`);
   const ctx = blocks.length ? '\n\n' + blocks.join('\n\n') : '';
