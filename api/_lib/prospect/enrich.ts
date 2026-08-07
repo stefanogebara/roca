@@ -48,13 +48,34 @@ const MAX_HTML_BYTES = 300_000;
  * bônus, nunca bloqueio.
  */
 export async function enriquecerDoSite(url: string): Promise<{ waPhone: string; fonte: string } | null> {
+  return (await caminharSite(url)).achado;
+}
+
+/**
+ * A caminhada pelo site, com o que a cadeia maior precisa saber depois dela.
+ *
+ * Devolve o HTML da home junto porque `enriquecerContato` precisa dele para
+ * achar o Linktree da bio — e buscá-lo de novo seria um fetch a mais por
+ * prospect sem site com Zap, que é justamente o caso comum. `hostMorto`
+ * atravessa pelo mesmo motivo: host que não responde não merece uma segunda
+ * perna de tentativas.
+ */
+interface CaminhadaSite {
+  achado: { waPhone: string; fonte: string } | null;
+  homeHtml: string | null;
+  hostMorto: boolean;
+}
+
+async function caminharSite(url: string): Promise<CaminhadaSite> {
+  const vazio: CaminhadaSite = { achado: null, homeHtml: null, hostMorto: false };
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    return null;
+    return vazio;
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return vazio;
+  let homeHtml: string | null = null;
 
   // HIPÓTESE NÃO CONFIRMADA — mantida de propósito, mas não a trate como fato.
   //
@@ -75,20 +96,142 @@ export async function enriquecerDoSite(url: string): Promise<{ waPhone: string; 
     const alvo = new URL(caminho || parsed.pathname, parsed);
     const r = await buscarPagina(alvo);
     if (r.html) {
+      if (homeHtml === null) homeHtml = r.html; // a primeira que responde é a home
       const waPhone = extrairWhatsAppDeHtml(r.html);
       // A fonte cita a PÁGINA onde o link estava, não a home — a citação é a
       // prova, e prova que aponta pro lugar errado não é prova.
-      if (waPhone) return { waPhone, fonte: alvo.href.slice(0, 300) };
+      if (waPhone) return { achado: { waPhone, fonte: alvo.href.slice(0, 300) }, homeHtml, hostMorto: false };
     }
     // Host morto/inalcançável: insistir nos subcaminhos é queimar timeout por
     // nada. Página ausente (404) não diz nada sobre as outras — segue.
-    if (r.hostMorto) return null;
+    if (r.hostMorto) return { achado: null, homeHtml, hostMorto: true };
   }
-  return null;
+  return { achado: null, homeHtml, hostMorto: false };
 }
 
 /** Caminhos tentados, em ordem, até o primeiro link encontrado. */
 const CAMINHOS_CANDIDATOS = ['', '/contato', '/fale-conosco', '/atendimento'];
+
+// ── Fontes além do site: bio-link, Instagram, Facebook ──────────────────────
+//
+// Por que isto existe (07/ago): dos 9 alvos melhor pesquisados da base
+// (consultoria pequena, dono citável), UM tem site próprio. O resto vive em
+// Instagram, Linktree e diretório de terceiros. Como `enriquecerDoSite` só
+// sabia ler site, a máquina secou — 0 de 114 `ready` enviáveis, e o backfill
+// automático rendeu 6 citações em 215 tentativas (2,8%).
+//
+// A regra do `sendablePhone` NÃO afrouxa, e é ela que dá o desenho: continua
+// valendo só link publicado pelo PRÓPRIO negócio. O que muda é ONDE procurar.
+// Micro-negócio agro não tem site; ele tem um Linktree na bio do Instagram com
+// o botão de WhatsApp em cima.
+
+/** Agregadores de bio-link. Página estática, um fetch, alto rendimento. */
+const AGREGADORES = new Set([
+  'linktr.ee', 'linktree.com', 'beacons.ai', 'bio.link', 'campsite.bio',
+  'linkbio.co', 'lnk.bio', 'solo.to', 'linkme.bio', 'bio.site', 'many.link',
+  'znap.link', 'flowpage.com', 'linkfly.to', 'linklist.bio',
+]);
+
+export type TipoDeFonte = 'site' | 'agregador' | 'instagram' | 'facebook' | 'invalida';
+
+/** Que tipo de fonte é esta URL. `invalida` nunca vira fetch. */
+export function classificarFonte(url: string): TipoDeFonte {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return 'invalida';
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return 'invalida';
+  const host = u.hostname.replace(/^(www\.|m\.)/, '').toLowerCase();
+  if (AGREGADORES.has(host)) return 'agregador';
+  if (host === 'instagram.com') return 'instagram';
+  if (host === 'facebook.com' || host === 'fb.com') return 'facebook';
+  return 'site';
+}
+
+/**
+ * Quantas fontes secundárias vale a pena seguir. Cada uma é um fetch de até 6s
+ * e a function tem 60s; a cadeia já gastou até 4 no site. Teto de 3 mantém o
+ * pior caso em ~7 fetches. Sem teto, um site com 30 ícones de rede social
+ * viraria 30 fetches sequenciais e o backfill morreria no meio da fila.
+ */
+const MAX_FONTES_SECUNDARIAS = 3;
+
+/**
+ * Links de bio/rede social achados num HTML, absolutos e sem repetição.
+ *
+ * Ordem por RENDIMENTO ESPERADO, não por ordem de aparição: agregador primeiro
+ * (página estática, o botão de Zap costuma estar lá), depois Instagram e
+ * Facebook — que na prática quase sempre devolvem muro de login, mas custam um
+ * fetch limitado e de vez em quando trazem o wa.me no og:description.
+ */
+export function extrairFontesSecundarias(html: string, base: string): string[] {
+  const peso: Record<string, number> = { agregador: 0, instagram: 1, facebook: 2 };
+  const achados: Array<{ url: string; ordem: number }> = [];
+  const vistos = new Set<string>();
+  for (const m of (html ?? '').matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
+    let abs: string;
+    try {
+      abs = new URL(m[1], base).href;
+    } catch {
+      continue;
+    }
+    const tipo = classificarFonte(abs);
+    if (tipo !== 'agregador' && tipo !== 'instagram' && tipo !== 'facebook') continue;
+    // Dedup pelo DESTINO, não pela string: "//linktr.ee/x" e
+    // "https://linktr.ee/x" são o mesmo fetch.
+    const chave = abs.replace(/^https?:\/\/(www\.|m\.)?/, '').replace(/\/$/, '').toLowerCase();
+    if (vistos.has(chave)) continue;
+    vistos.add(chave);
+    achados.push({ url: abs, ordem: peso[tipo] });
+  }
+  return achados.sort((a, b) => a.ordem - b.ordem).map((a) => a.url);
+}
+
+/**
+ * A cadeia inteira: site → subpáginas → bio-link/rede social.
+ *
+ * Substitui `enriquecerDoSite` nos chamadores (sourcing e backfill). Ela
+ * continua exportada e é a primeira perna desta cadeia — o que mudou é que
+ * agora existe uma segunda perna quando o negócio não tem site com Zap.
+ *
+ * Fail-soft do começo ao fim: qualquer perna que falhe devolve null e a
+ * próxima segue. Enriquecer é bônus, nunca bloqueio de sourcing.
+ */
+export async function enriquecerContato(
+  urlInicial: string
+): Promise<{ waPhone: string; fonte: string } | null> {
+  const tipo = classificarFonte(urlInicial);
+  if (tipo === 'invalida') return null;
+
+  // Agregador/rede social como ponto de partida: página única, sem subcaminhos
+  // que façam sentido (linktr.ee/x/contato não existe). Um fetch e pronto.
+  if (tipo !== 'site') {
+    const r = await buscarPagina(new URL(urlInicial));
+    if (!r.html) return null;
+    const waPhone = extrairWhatsAppDeHtml(r.html);
+    return waPhone ? { waPhone, fonte: urlInicial.slice(0, 300) } : null;
+  }
+
+  // Perna 1: o site (home + subcaminhos), exatamente como antes.
+  const site = await caminharSite(urlInicial);
+  if (site.achado) return site.achado;
+  // Host que não respondeu não ganha segunda perna: seria queimar mais timeout
+  // no mesmo silêncio. E a home já veio da perna 1 — nenhum fetch repetido.
+  if (site.hostMorto || !site.homeHtml) return null;
+
+  // Perna 2: o que a home dele aponta (Linktree da bio, Instagram, Facebook).
+  for (const fonte of extrairFontesSecundarias(site.homeHtml, urlInicial).slice(0, MAX_FONTES_SECUNDARIAS)) {
+    const r = await buscarPagina(new URL(fonte));
+    if (!r.html) continue;
+    const waPhone = extrairWhatsAppDeHtml(r.html);
+    // A citação aponta pra ONDE o link estava: quem for conferir precisa achar
+    // o Zap naquela página, não na home que só linkava pra ela.
+    if (waPhone) return { waPhone, fonte: fonte.slice(0, 300) };
+  }
+  return null;
+}
 
 /**
  * Uma página. `hostMorto` separa "site fora do ar" de "essa página não existe":
@@ -275,7 +418,7 @@ export async function runBackfill(limite = BACKFILL_POR_RODADA): Promise<Backfil
         const hit = (body.places ?? []).find((h) => mesmoNegocio(p.phone, h.nationalPhoneNumber ?? null));
         if (!hit?.websiteUri) return;
         comSite++;
-        const achado = await enriquecerDoSite(hit.websiteUri);
+        const achado = await enriquecerContato(hit.websiteUri);
         if (!achado) return;
         const upd = await db
           .from('prospects')

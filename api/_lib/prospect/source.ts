@@ -13,7 +13,7 @@
 import { normalizePhoneBR, isMobileBR } from './core';
 import { importProspects, type ProspectInput } from './db';
 import { motivoForaDoICP } from './icp';
-import { enriquecerDoSite } from './enrich';
+import { enriquecerContato } from './enrich';
 import { withRetry } from '../retry';
 import { createLogger } from '../logger';
 
@@ -320,7 +320,7 @@ export async function runSourcing(maxCities = 4): Promise<SourceReport> {
   let enriquecidos = 0;
   await Promise.all(
     paraEnriquecer.map(async (r) => {
-      const hit = await enriquecerDoSite(r.website as string);
+      const hit = await enriquecerContato(r.website as string);
       if (hit) {
         r.input.wa_phone = hit.waPhone;
         r.input.wa_phone_source = hit.fonte;
