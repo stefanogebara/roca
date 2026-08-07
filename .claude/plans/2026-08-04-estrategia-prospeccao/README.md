@@ -95,6 +95,41 @@ Ordem de disparo sugerida (leitura provável): 1 → 3 → 2 → 9 → 5 → 4 �
 só depois de achar celular (caça de 06/ago: NÃO existe celular público de
 nenhum dos dois — rota é testar WA no fixo ou primeira ligação).
 
+### 🔎 VERIFICAÇÃO DA CITAÇÃO (07/ago) — 1 de 9 passa
+
+A lista acima foi escrita com "número citado" como se fosse fato. Fui conferir
+um por um, com a régua do `sendablePhone`: só vale quando o **PRÓPRIO negócio**
+publica o número como WhatsApp (site, link wa.me/api.whatsapp.com, IG dele).
+Diretório de terceiros (econodata, cnpj.biz, clickdisk, solutudo, diariocidade)
+**NÃO vale** — é a classe de palpite que em 03/ago falhou 3 de 3 com `131026` e
+estourou o breaker.
+
+| # | Alvo | Veredito | Evidência |
+|---|------|----------|-----------|
+| 1 | **Gonzaga** | ✅ **CITAÇÃO CONFIRMADA — gravada na base** | `api.whatsapp.com/send?phone=+55 35 9943-2449` no rodapé do site oficial (gonzagaconsultoria.com). Normaliza para `+5535999432449`, idêntico ao `phone` da base. **É o único prospect enviável hoje.** |
+| 2 | SIMCafé | ⚠️ não confirmado | Sem site próprio. O celular (35) 99762-5040 aparece em matéria de imprensa como contato de inscrição — é imprensa, não o negócio publicando WhatsApp. ATENÇÃO: nome ambíguo — existe um "Simcafé" MUITO maior (Simpósio do Agronegócio Café, Alta Mogiana, simcafe.com.br, da Cocapec). Não confundir. |
+| 3 | MS Rural | ❌ **a marca "(WA publicado)" do doc NÃO se sustenta** | Número só em diariocidade (diretório). Nada do próprio negócio. |
+| 4 | GLPP | ❌ | Só diretórios (solutudo, clickdisk, casadosdados). Sem site. |
+| 5 | GBAGRO | ❌ | Só diretórios (solutudo, clickdisk). Sem site. |
+| 6 | Fernando Agrotec. | ❌ | econodata/cnpj.biz *afirmam* "WhatsApp (35) 3551-2055", mas é alegação de diretório, sobre um FIXO. |
+| 7 | Emerj | ❌ | econodata *afirma* "35 38512562 (com WhatsApp)" — mesma coisa: diretório, fixo. IG @emerjconsultoria existe mas o Instagram bloqueia leitura automática. |
+| 8 | Syagro | ❌ não localizada | Nenhum registro web em Boa Esperança MG (os "Syagro" achados são GO/TO). ME de dez/2025 sem presença — coerente com o doc. |
+| 9 | Vilela | ⚠️ identidade em dúvida | A busca acha outro Vilela (Formiga MG) e um Diêgo Vilela de direito/ambiental. Há indício de que o Diego Vilela de Boa Esperança seja **extensionista da EMATER-MG** — se for, é contato de extensão pública, categoria diferente de prospect. Confirmar antes de qualquer envio. |
+
+**A conclusão estrutural, que vale mais que a lista:** o ICP que o Places
+entrega (consultoria micro, 1-2 sócios) é exatamente o segmento que **não tem
+site**. Só 1 dos 9 tem. Como a regra do número citado é inegociável (e está
+certa — ela protege o número que atende produtor), a busca web não abastece
+esta máquina. Duas saídas que NÃO dependem de mudar a regra:
+
+1. **Instagram na mão.** @msrural.consultoria, @emerjconsultoria e
+   @simcafesolucoes existem e IG costuma ter botão de WhatsApp no perfil. O
+   Instagram bloqueia leitura automática — é tarefa de 2 min por perfil no
+   celular de um founder, e cada acerto vira um prospect enviável.
+2. **Canal de evento** (o que o próprio plano já defende): CBPC Caxambu 27-30/out
+   e Semana Internacional do Café 11-13/nov. Lá o contato nasce vouchado, sem
+   depender de citação na web.
+
 ### ⚠️ Borderline — decisão de founder
 
 - **Tellus Inteligência Agronômica** (Alfenas, +5514998550199) — consultoria de
