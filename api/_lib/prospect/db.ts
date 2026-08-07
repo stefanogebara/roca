@@ -394,6 +394,42 @@ export async function setProspectStatus(id: string, status: ProspectStatus): Pro
  * `.or()`/`.filter()` com string interpolada, e manter essa propriedade vale
  * mais que uma ida a menos ao banco.
  */
+/**
+ * Reivindica o DIREITO DE FALAR neste turno. Devolve se a agente pode responder.
+ *
+ * O freio de cadência (`podeFalarDeNovo`, MIN_GAP_MS) é puro e por isso não
+ * segura corrida: duas mensagens do prospect chegam com segundos de diferença,
+ * o webhook roda duas vezes em paralelo, e as DUAS leem a thread antes de
+ * qualquer uma gravar a saída. As duas concluem "a última fala nossa foi há 40
+ * minutos" e as duas falam. Aconteceu com a ACAFEG em 06/ago: a mesma pergunta
+ * mandada duas vezes, com 6s de intervalo, para quem tinha acabado de dizer sim.
+ *
+ * Nenhum cálculo local resolve isso — precisa de árbitro, e o único árbitro
+ * compartilhado entre invocações é o banco. Este é o mesmo padrão de
+ * `claimProspectForSend`: UPDATE condicional numa instrução só, quem consegue
+ * a linha é dono do turno e o outro cala.
+ *
+ * FAIL-SOFT ao contrário do resto: erro de banco devolve `true` (fala). Perder
+ * a resposta a um lead quente por hiccup de infraestrutura é pior que arriscar
+ * uma duplicata — a duplicata é constrangedora, o silêncio perde o lead.
+ */
+export async function claimAgentTurn(prospectId: string, gapMs: number): Promise<boolean> {
+  const db = getDb();
+  const agora = new Date();
+  const limite = new Date(agora.getTime() - gapMs).toISOString();
+  const { data, error } = await db
+    .from('prospects')
+    .update({ last_agent_out_at: agora.toISOString() })
+    .eq('id', prospectId)
+    .or(`last_agent_out_at.is.null,last_agent_out_at.lt.${limite}`)
+    .select('id');
+  if (error) {
+    log.error('claimAgentTurn failed (falando mesmo assim):', error.message);
+    return true;
+  }
+  return (data ?? []).length > 0;
+}
+
 /** Um prospect pelo id. Usado pela resposta manual (reply.ts). */
 export async function getProspectById(id: string): Promise<ProspectRow | null> {
   const db = getDb();

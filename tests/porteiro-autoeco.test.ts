@@ -40,6 +40,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const linhas: Array<{ direction: string; text: string; created_at: string }> = [];
 
 vi.mock('../api/_lib/prospect/db', () => ({
+  // Reivindicação atômica do turno (07/ago): sem o mock ela vem undefined e
+  // o fluxo quebra. Sempre `true` aqui — a corrida em si tem teste próprio
+  // em turno-atomico.test.ts, com um banco simulado de verdade.
+  claimAgentTurn: vi.fn(async () => true),
   logProspectMessage: vi.fn(async (_id: string, direction: string, _k: string, text: string) => {
     linhas.push({ direction, text, created_at: new Date().toISOString() });
   }),
