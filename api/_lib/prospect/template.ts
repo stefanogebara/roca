@@ -74,6 +74,27 @@ export const DESPEDIDA_NAME = 'stevi_despedida_v1';
 
 const FOOTER = 'Pra não receber mais mensagens, responda SAIR.';
 
+/**
+ * O rótulo corporativo que a Vitória não usa (decisão do fundador, 05/ago).
+ *
+ * "Assistente digital/virtual" lê como script de call center e mata a conversa
+ * antes de começar. A honestidade continua obrigatória e inegociável — ela
+ * NUNCA se passa por pessoa e confirma na hora se perguntarem (ver a REGRA ZERO
+ * em agent.ts) — mas declarar é resposta, não crachá de abertura.
+ *
+ * Isto não é cosmético: é o filtro que `templateForKind` usa para nunca colocar
+ * a frase na linha, mesmo que uma env aponte para um template que a carregue.
+ */
+const ROTULO_CORPORATIVO = /assistente\s+(digital|virtual)/i;
+
+/** Se o corpo APROVADO deste template carrega o rótulo proibido. Nome
+ * desconhecido devolve false: quem não está no registro é barrado pelo shape
+ * guard, não aqui. */
+export function temRotuloCorporativo(name: string): boolean {
+  const def = TEMPLATE_DEFS[name];
+  return !!def && ROTULO_CORPORATIVO.test(def.body);
+}
+
 interface TemplateDef {
   body: string;
   example: string[];

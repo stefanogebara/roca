@@ -424,14 +424,30 @@ describe('templates v3/coop_v2: env, params e render (pré-religada, 27/jul)', (
     vi.resetModules();
   });
 
-  it('templateForKind respeita PROSPECT_COOP_TEMPLATE_NAME — o canário vigiava a env e o envio ignorava', async () => {
+  // 06/ago: este teste fixava "a env manda, ponto". A regra mudou de propósito
+  // — template cujo corpo carrega "assistente digital" não sai, venha o nome de
+  // onde vier (ver tests/prospect-rotulo.test.ts e a guarda em templateForKind).
+  // A INTENÇÃO original do teste continua valendo e está preservada abaixo: o
+  // que o canário checa tem que ser o que o envio usa. O que mudou é que agora
+  // os dois seguem `templateForKind`, não a env crua.
+  it('a env escolhe o template — desde que ele não carregue o rótulo proibido', async () => {
     process.env.PROSPECT_COOP_TEMPLATE_NAME = 'stevi_parceria_coop_v2';
     process.env.PROSPECT_TEMPLATE_NAME = 'stevi_parceria_v3';
     vi.resetModules();
     const { templateForKind } = await import('../api/_lib/prospect/dispatch');
-    expect(templateForKind('cooperativa')).toBe('stevi_parceria_coop_v2');
-    expect(templateForKind('revenda')).toBe('stevi_parceria_coop_v2');
-    expect(templateForKind('agronomo')).toBe('stevi_parceria_v3');
+    // Os dois configurados carregam o rótulo → os dois caem no v4.
+    expect(templateForKind('cooperativa')).toBe('stevi_parceria_v4');
+    expect(templateForKind('revenda')).toBe('stevi_parceria_v4');
+    expect(templateForKind('agronomo')).toBe('stevi_parceria_v4');
+  });
+
+  it('env com template limpo continua mandando — a guarda não sequestra a escolha', async () => {
+    process.env.PROSPECT_COOP_TEMPLATE_NAME = 'stevi_parceria_coop_v1';
+    process.env.PROSPECT_TEMPLATE_NAME = 'stevi_parceria_v2';
+    vi.resetModules();
+    const { templateForKind } = await import('../api/_lib/prospect/dispatch');
+    expect(templateForKind('cooperativa')).toBe('stevi_parceria_coop_v1');
+    expect(templateForKind('agronomo')).toBe('stevi_parceria_v2');
   });
 
   it('coop_v2 recebe o NOME no slot 2 (o texto diz "pro time da {{2}}")', async () => {

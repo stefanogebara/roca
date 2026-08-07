@@ -110,7 +110,15 @@ function kindAllowed(kind: string): boolean {
   return kinds.includes('all') || kinds.includes(kind);
 }
 import { alertFounders } from '../alert';
-import { V2_NAME, COOP_NAME, COOP_V2_NAME, registryParamCount, templateShapeError } from './template';
+import {
+  V2_NAME,
+  V4_NAME,
+  COOP_NAME,
+  COOP_V2_NAME,
+  registryParamCount,
+  templateShapeError,
+  temRotuloCorporativo,
+} from './template';
 import { createLogger } from '../logger';
 
 const log = createLogger('prospect-dispatch');
@@ -119,19 +127,46 @@ const log = createLogger('prospect-dispatch');
 // personalized v2. Param COUNTS are derived from the template registry, never
 // from an env var: PROSPECT_TEMPLATE_PARAMS drifting from the approved shape
 // caused the Jul/13 outage (#132000 on every send → 0% delivery → latch).
-const TEMPLATE_NAME = process.env.PROSPECT_TEMPLATE_NAME || V2_NAME;
+//
+// Lido POR CHAMADA, não no import: além de testável, é o que faz uma correção
+// de env valer no próximo envio em vez de esperar o próximo cold start.
 const TEMPLATE_LANG = 'pt_BR';
-
-/** Which template a prospect kind receives. Pure; exported for tests. */
+const introConfigurado = (): string => process.env.PROSPECT_TEMPLATE_NAME || V2_NAME;
 // Distribution template, env-driven like the intro one. It used to be the
 // hardcoded constant while the canary read the env — so the canary could be
 // watching coop_v2's shape while every send still used coop_v1. Same family as
 // the Jul/13 outage: what we monitor must be what we send.
-const COOP_TEMPLATE_NAME = process.env.PROSPECT_COOP_TEMPLATE_NAME || COOP_NAME;
+const coopConfigurado = (): string => process.env.PROSPECT_COOP_TEMPLATE_NAME || COOP_NAME;
 
+/**
+ * Which template a prospect kind receives. Pure; exported for tests.
+ *
+ * A GUARDA DO RÓTULO (06/ago). Em 05/ago o fundador mandou tirar "assistente
+ * digital" da boca da Vitória, e o prompt, os dois juízes do gym e a voz foram
+ * alinhados no mesmo dia. O corpo dos templates APROVADOS ficou de fora — e a
+ * env de coop na Vercel seguia apontando pro `coop_v2`, que abre com "Sou a
+ * Vitória, assistente digital da Stevi". Resultado: cooperativa e revenda (212
+ * das 366 linhas da base) recebiam exatamente a frase que ele mandou tirar.
+ *
+ * Consertar a env resolveria hoje e deixaria a regra na mão de ninguém errar o
+ * dashboard de novo. A decisão mora aqui: template cujo corpo carrega o rótulo
+ * não é escolhido, venha o nome de onde vier. O fallback é o v4 — aprovado,
+ * type-agnostic ("Falo com a {{1}}? Aqui é a Vitória, da Stevi") e de UM
+ * parâmetro, que `usaParamsDeCoop` já roteia pelo caminho certo. Trocar a env
+ * continua sendo o conserto limpo; esta guarda é o que impede o estrago.
+ */
 export function templateForKind(kind: string | null): string {
   const k = (kind ?? '').toLowerCase();
-  return k === 'cooperativa' || k === 'coop' || k === 'revenda' ? COOP_TEMPLATE_NAME : TEMPLATE_NAME;
+  const ehDistribuicao = k === 'cooperativa' || k === 'coop' || k === 'revenda';
+  const escolhido = ehDistribuicao ? coopConfigurado() : introConfigurado();
+  if (temRotuloCorporativo(escolhido)) {
+    log.error(
+      `template ${escolhido} carrega "assistente digital" (proibido desde 05/ago) — ` +
+        `enviando ${V4_NAME} no lugar. Corrija ${ehDistribuicao ? 'PROSPECT_COOP_TEMPLATE_NAME' : 'PROSPECT_TEMPLATE_NAME'} na Vercel.`
+    );
+    return V4_NAME;
+  }
+  return escolhido;
 }
 
 /**
@@ -206,11 +241,19 @@ export async function runDispatch(opts: DispatchOptions = {}): Promise<DispatchR
   // pre-flight every send in the batch throws (#132000 and friends) and each
   // prospect gets burned as send_status='failed'. Both templates the round can
   // use are checked. FAILS CLOSED when a status can't be verified.
+  //
+  // Os nomes vêm de `templateForKind`, NUNCA da env crua: desde a guarda do
+  // rótulo (06/ago) os dois podem divergir, e checar a env enquanto outro
+  // template sai é exatamente o defeito que este arquivo já pagou duas vezes
+  // (13/jul e o canário vigiando coop_v2 com coop_v1 na linha). O que a gente
+  // monitora tem que ser o que a gente envia.
+  const introReal = templateForKind('consultoria');
+  const coopReal = templateForKind('cooperativa');
   if (!dryRun) {
     let error: string | null = null;
-    let badTemplate = TEMPLATE_NAME;
+    let badTemplate = introReal;
     try {
-      for (const name of [TEMPLATE_NAME, COOP_TEMPLATE_NAME]) {
+      for (const name of new Set([introReal, coopReal])) {
         const reason = await templateShapeError(name);
         if (reason) {
           badTemplate = name;
