@@ -54,6 +54,49 @@ describe('extrairWhatsAppDeHtml — só evidência positiva', () => {
     expect(extrairWhatsAppDeHtml('<html><body>Bem-vindo à loja</body></html>')).toBeNull();
     expect(extrairWhatsAppDeHtml('')).toBeNull();
   });
+
+  /**
+   * NÚMERO FORMATADO DENTRO DO LINK — o buraco que custou a Gonzaga (07/ago).
+   *
+   * O site dela (Wix) publica, literalmente:
+   *   href="https://api.whatsapp.com/send?phone=+55 35 9943-2449"
+   * Com espaços e traço DENTRO da URL. O regex antigo casava só `\d{10,15}`
+   * colado, então esse link era invisível — e Wix é o que negócio pequeno usa.
+   * Achei porque o smoke contra a web real voltou null num site que eu tinha
+   * conferido à mão minutos antes.
+   *
+   * Quem valida continua sendo o normalizePhoneBR (que já joga fora tudo que
+   * não é dígito). O extrator só precisa parar de descartar o link antes disso.
+   */
+  it('aceita o número FORMATADO dentro do link (caso real Gonzaga/Wix)', () => {
+    expect(
+      extrairWhatsAppDeHtml('<a href="https://api.whatsapp.com/send?phone=+55 35 9943-2449">Zap</a>')
+    ).toBe('+5535999432449');
+  });
+
+  it('aceita o mesmo link percent-encoded (%2B / %20)', () => {
+    expect(
+      extrairWhatsAppDeHtml('<a href="https://api.whatsapp.com/send?phone=%2B55%2035%209943-2449">Zap</a>')
+    ).toBe('+5535999432449');
+  });
+
+  it('aceita wa.me com o número formatado', () => {
+    expect(extrairWhatsAppDeHtml('<a href="https://wa.me/55 35 99988-7766">zap</a>')).toBe('+5535999887766');
+  });
+
+  it('NÃO engole o resto da URL — ?text= não entra no número', () => {
+    // O risco de afrouxar o regex: capturar "5535999887766?text=Ola" e virar
+    // lixo. O `?` corta, e a classe só aceita dígito/espaço/traço/ponto/parêntese.
+    expect(
+      extrairWhatsAppDeHtml('<a href="https://wa.me/5535999887766?text=Ola%20tudo%20bem">zap</a>')
+    ).toBe('+5535999887766');
+  });
+
+  it('NÃO inventa número a partir de texto solto depois do link', () => {
+    expect(
+      extrairWhatsAppDeHtml('<a href="https://wa.me/">vazio</a> ligue 35 3333-4444 das 8 às 18')
+    ).toBeNull();
+  });
 });
 
 /**

@@ -22,16 +22,32 @@ import { createLogger } from '../logger';
 const log = createLogger('prospect-enrich');
 
 // Links que o próprio negócio publica apontando pro WhatsApp dele.
+//
+// O número vem FORMATADO com frequência — o site da Gonzaga (Wix) publica
+// `phone=+55 35 9943-2449`, com espaços e traço dentro da própria URL, e Wix é
+// o que negócio pequeno usa. Enquanto isto casava só `\d{10,15}` colado, esses
+// links eram invisíveis: perdemos a Gonzaga até um smoke contra a web real
+// voltar null num site conferido à mão minutos antes (07/ago).
+//
+// A classe do captor é deliberadamente estreita — dígito, espaço, traço, ponto
+// e parêntese, começando em dígito ou '+'. Letras ficam de fora, então `?text=`
+// e o resto da URL cortam sozinhos em vez de virarem lixo no número. Quem
+// valida continua sendo o normalizePhoneBR, que já descarta o que não é dígito.
 const WA_LINK_RE =
-  /(?:https?:\/\/)?(?:wa\.me\/|api\.whatsapp\.com\/send\/?\?[^"'\s>]*?phone=|whatsapp:\/\/send\/?\?[^"'\s>]*?phone=)\+?(\d{10,15})/gi;
+  /(?:https?:\/\/)?(?:wa\.me\/|api\.whatsapp\.com\/send\/?\?[^"'\s>]*?phone=|whatsapp:\/\/send\/?\?[^"'\s>]*?phone=)([+\d][\d\s().+-]{9,24})/gi;
 
 /**
  * Extrai o WhatsApp citado num HTML. Vários links: prefere celular (entrega
  * medida maior), senão o primeiro válido. Null quando não há evidência.
  */
 export function extrairWhatsAppDeHtml(html: string): string | null {
+  // Encodings comuns do mesmo link resolvidos ANTES do match: '%2B55%2035...'
+  // é o mesmo '+55 35...' e não pode depender de o site ter escapado ou não.
+  // Só estes dois, e não decodeURIComponent no HTML inteiro: um '%' solto em
+  // página real derrubaria a decodificação e junto o enriquecimento da linha.
+  const texto = (html ?? '').replace(/%2B/gi, '+').replace(/%20/g, ' ');
   const achados: string[] = [];
-  for (const m of (html ?? '').matchAll(WA_LINK_RE)) {
+  for (const m of texto.matchAll(WA_LINK_RE)) {
     const norm = normalizePhoneBR(m[1]);
     if (norm && !achados.includes(norm)) achados.push(norm);
   }
