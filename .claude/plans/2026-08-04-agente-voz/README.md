@@ -237,3 +237,43 @@ OpenAI Realtime e EL lado a lado num A/B serio.
 
 **Decisao**: clonar a voz PRIMEIRO no setup atual. O clone e portavel — se um
 dia migrarmos, apontamos o LiveKit pra mesma voz.
+
+
+---
+
+## Adendo 5 (06/ago) — Onde mora a naturalidade: o cano vs o modelo
+
+Founder desconfiou: "a OpenAI usa o LiveKit e a voz deles e fantastica, a do
+ElevenLabs esta longe disso". Ele estava meio certo — e o adendo 4 simplificou.
+
+**Fatos verificados**:
+- A OpenAI USA a LiveKit no ChatGPT Advanced Voice (parceria 03/out/2024) —
+  mas como TRANSPORTE (WebRTC, roteamento global, resiliencia a perda de
+  pacote). A LiveKit levantou US$100M (jan/2026) sustentada nisso.
+- A naturalidade vem do MODELO: gpt-realtime e speech-to-speech nativo
+  (gpt-4o-realtime -> gpt-realtime -> gpt-realtime-2 em 07/mai/2026 ->
+  2.1 em 06/jul/2026, -25% de latencia p95). Sem gargalo de texto: tom,
+  hesitacao e riso do usuario chegam ao modelo; a prosodia da resposta e
+  gerada condicionada ao AUDIO de entrada; barge-in e turn-taking ficam
+  dentro do modelo. LiveKit e o cano; gpt-realtime e a voz.
+
+**Onde o adendo 4 errou**: "a voz soaria identica" vale pro TIMBRE, nao pra
+FLUIDEZ. Peso aproximado do que faz soar humano:
+  latencia ponta-a-ponta ~30% | fim de turno ~25% | barge-in ~20% |
+  prosodia consciente do contexto ~20% | TIMBRE ~5-10%
+Os tres primeiros sao do ORQUESTRADOR — a stack muda o resultado mesmo com o
+mesmo timbre. Nosso setup atual e cascata (ouve -> escreve -> le em voz alta),
+e e dai que nasce o "meio robotico": a voz le um texto sem o clima da conversa.
+
+**O porem do gpt-realtime em pt-BR (nao resolvido)**: thread oficial
+(mai-jun/2026, caso de pizzaria brasileira) reporta erro em nomes/numeros/
+enderecos, cortes de turno e limite G.711 8kHz no SIP. Vozes (Marin, Cedar,
+alloy...) falam portugues com prosodia "gringa". **Voz clonada/custom: NAO
+existe no Realtime.** E misturar gpt-realtime + voz EL nao funciona: forcar
+saida so-texto vira cascata de novo e joga fora a prosodia que se foi buscar.
+
+**Decisao (mantida, agora com base honesta)**: clonar amanha — reversivel,
+barato, e o UNICO caminho pra voz propria brasileira. Em paralelo, piloto
+real de gpt-realtime por telefone (SIP direto OpenAI+Twilio da menos trabalho
+que LiveKit) e comparacao de ouvido das gravacoes. O trade-off a testar:
+mais fluido porem menos brasileiro e sem voz da Vitoria.
