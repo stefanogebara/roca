@@ -200,3 +200,40 @@ Tom de CONVERSA, como no telefone com uma amiga. Pode errar, rir, pausar.
 Consentimento: voz da Vitoria, cofundadora, gravada por ela pra este fim.
 No PVC (30min+, qualidade maxima) o voice captcha tem que ser feito por ELA
 no dashboard — agendar 10 min juntos.
+
+
+---
+
+## Adendo 4 (06/ago) — LiveKit? Avaliado e adiado (nao resolve o problema)
+
+Pergunta do founder: "antes de clonar, nao dava pra usar o voice agent
+realtime do LiveKit?" (livekit/livekit + livekit/agents).
+
+**O erro de categoria**: LiveKit NAO e uma voz. E o encanamento — SFU WebRTC
++ framework de orquestracao onde VOCE pluga STT, LLM e TTS. O TTS que a
+maioria pluga ali e o proprio ElevenLabs (plugin oficial
+livekit-plugins-elevenlabs). Logo: a voz soaria IDENTICA dentro do LiveKit,
+porque e o mesmo motor gerando o audio. Naturalidade e questao de TTS/voz,
+nao de transporte.
+
+**O que o LiveKit tem de bom (confirmado, ago/2026)**: SIP inbound/outbound
+maduro com Twilio; turn-detector open-weight proprio que cobre portugues;
+Adaptive Interruption Handling (barge-in) desde a v1.5; Krisp para telefonia;
+OpenAI Realtime plugavel como speech-to-speech unico. Agora tambem tem Cloud
+Agent Platform + Inference (BYO-provider continua).
+
+**O que custaria**: SEMANAS, nao dias — recriar trunk SIP, webhook tools,
+webhook HMAC pos-chamada, dicionario de pronuncia, observabilidade, e
+recalibrar turn-taking/barge-in em pt-BR. Tudo isso ja funciona hoje.
+
+**Custo operacional**: LiveKit Cloud ~$0,01/min de orquestracao vs EL Agents
+~$0,08-0,12/min — MAS o LiveKit e so a orquestracao: STT+LLM+TTS sao pagos
+por fora (inclusive o EL TTS, se usarmos a mesma voz). Nao e comparacao
+maca-com-maca nesta escala.
+
+**Quando revisitar**: (a) evitar lock-in / trocar provedores livremente;
+(b) escala onde $0,07-0,11/min pesa; (c) video/multi-party; (d) rodar
+OpenAI Realtime e EL lado a lado num A/B serio.
+
+**Decisao**: clonar a voz PRIMEIRO no setup atual. O clone e portavel — se um
+dia migrarmos, apontamos o LiveKit pra mesma voz.
