@@ -17,6 +17,7 @@ import {
   mergeProspectQualification,
   setProspectAgentEnabled,
   bumpPorteiroTentativas,
+  claimAgentTurn,
   type ProspectRow,
 } from './db';
 import {
@@ -27,6 +28,7 @@ import {
   decidirTurno,
   pareceAutoAtendimento,
   PORTEIRO_MAX,
+  MIN_GAP_MS,
 } from './agent';
 import { alertFounders } from '../alert';
 import { sendProspectReplyNotification, sendLeadContactNotification } from '../notify';
@@ -234,6 +236,18 @@ export async function respondAsProspectAgent(
 
   if (decisao.acao === 'segurar-cadencia') {
     log.info(`agent held back on ${prospect.id} — falou há ${Math.round(decisao.desdeMs / 1000)}s`);
+    return null;
+  }
+
+  // O freio de cadência acima é PURO e por isso não segura corrida: duas
+  // mensagens do prospect chegando juntas viram duas invocações do webhook, e
+  // as duas leem a thread antes de qualquer uma gravar a saída. Aqui a decisão
+  // vira reivindicação atômica no banco — quem não pega a linha, cala.
+  //
+  // ANTES do buildAgentReply de propósito: a invocação perdedora nem gasta a
+  // chamada de LLM, que é o que custa.
+  if (!(await claimAgentTurn(prospect.id, MIN_GAP_MS))) {
+    log.info(`agent yielded turn on ${prospect.id} — outra invocação já está falando`);
     return null;
   }
 
