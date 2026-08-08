@@ -277,3 +277,37 @@ barato, e o UNICO caminho pra voz propria brasileira. Em paralelo, piloto
 real de gpt-realtime por telefone (SIP direto OpenAI+Twilio da menos trabalho
 que LiveKit) e comparacao de ouvido das gravacoes. O trade-off a testar:
 mais fluido porem menos brasileiro e sem voz da Vitoria.
+
+
+---
+
+## Adendo 6 (06/ago) — Speech Engine, v3 e vozes: o que foi TESTADO na conta
+
+Founder: "esquece o clone por enquanto, testa com outra voz".
+
+**Speech Engine da EL (descoberta via sonda na API)**: NAO e speech-to-speech.
+E o oposto — cascata STT -> (SEU LLM via WebSocket) -> TTS, ou seja
+"ElevenAgents sem o LLM deles". Texto continua no meio, entao nao ha prosodia
+condicionada ao audio de entrada. Nao e o atalho pro gpt-realtime.
+PORÉM confirma o argumento da voz propria: `voice_id` e um voice_id normal,
+logo **voz clonada IVC/PVC funciona** — o OpenAI Realtime e travado em preset.
+
+**eleven_v3_conversational — ARMADILHA**: o PATCH do agente ACEITA a string
+(nossa sonda gravou com sucesso), mas a geracao retorna 401
+`model_access_denied` — a conta Creator nao tem autorizacao. Config aceita ≠
+modelo funciona: se ficasse setado, a ligacao quebraria em producao.
+Restaurado pra eleven_flash_v2_5. **Licao: sondar geracao, nao so config.**
+
+**Medicoes de latencia (mesma frase, voz Jenifer)**:
+  flash_v2_5 -> 1.3s de geracao | multilingual_v2 -> 3.3s (2,5x)
+Em ligacao isso vira ~150ms a mais por resposta — aceitavel SE o ganho de
+naturalidade justificar (decisao de ouvido do founder).
+
+**Vozes brasileiras conversacionais candidatas** (biblioteca EL, amostras
+enviadas): Jenifer GOkMqfyKMLVUcYfO2WbB (interior de SP, sotaque — aposta
+pro publico rural), Roberta RGymW84CSmfVugnA5tvA (108k usos), Raquel
+GDzHdQOi6jjf8zaXhCYD, Ana Lu VNaz9wbhLsh3lLuHzAVP.
+
+**Pendencia pro piloto gpt-realtime**: OPENAI_API_KEY ausente no .env
+(credencial do founder). Escopo honesto: trunk SIP Twilio -> OpenAI +
+endpoint novo pra aceitar a chamada ~ meio dia de trabalho.
