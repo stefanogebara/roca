@@ -19,13 +19,22 @@ const cfg = montarConfigAgente({
 });
 
 describe('montarConfigAgente', () => {
-  it('fala português e usa o modelo de menor latência', () => {
+  it('fala português com o modelo escolhido de ouvido', () => {
     expect(cfg.conversation_config.agent.language).toBe('pt');
-    expect(cfg.conversation_config.tts.model_id).toMatch(/flash/);
+    // 08/ago: trocado de flash_v2_5 pra multilingual_v2 — decisão de ouvido do
+    // Stefano, aceitando ~150ms a mais por resposta em troca de naturalidade.
+    expect(cfg.conversation_config.tts.model_id).toBe('eleven_multilingual_v2');
     expect(cfg.conversation_config.tts.voice_id).toBe('voz_teste');
-    // Perfil "expressivo" escolhido de ouvido (04/ago): estabilidade baixa
-    // pra prosódia variada, sem trocar de modelo.
+    // Perfil "expressivo": estabilidade baixa dá prosódia variada, que tira o
+    // tom de leitura em voz alta.
     expect(cfg.conversation_config.tts.stability).toBeLessThan(0.5);
+  });
+
+  it('nunca usa um modelo que a conta não consegue gerar', () => {
+    // Armadilha real (08/ago): o PATCH do agente ACEITA 'eleven_v3_conversational',
+    // mas a geração devolve 401 model_access_denied no plano Creator — a ligação
+    // quebraria em produção sem nenhum aviso na configuração.
+    expect(cfg.conversation_config.tts.model_id).not.toMatch(/v3/);
   });
 
   it('latência: LLM rápido com teto de tokens, turno especulativo ligado', () => {

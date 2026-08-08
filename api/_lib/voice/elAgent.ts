@@ -16,6 +16,12 @@ export interface ParamsAgente {
   voiceId: string;
   toolsUrl: string;
   toolsSecret: string;
+  /**
+   * Modelo de TTS. Default eleven_multilingual_v2 (decisão de ouvido, 08/ago).
+   * Só troque por um modelo que a conta de fato consiga GERAR áudio — a API
+   * de config aceita nomes que a geração depois rejeita com 401.
+   */
+  modelId?: string;
   /** Dicionário de pronúncia pt-BR (criado pelo el-setup); opcional. */
   dicionario?: { pronunciation_dictionary_id: string; version_id: string };
 }
@@ -167,15 +173,17 @@ export function montarConfigAgente(p: ParamsAgente) {
         keywords: ['saca', 'arroba', 'café', 'lavoura', 'Stevi', 'Vitória'],
       },
       tts: {
-        // Flash: o modelo de menor latência — a escolha certa pra conversa
-        // (estudo 2026-08-04-agente-voz). A voz vem de fora porque escolher
-        // voz pt-BR é decisão de ouvido, não de código.
-        model_id: 'eleven_flash_v2_5',
+        // Multilingual v2: escolhido de ouvido (08/ago) sobre o Flash. Custa
+        // ~2s a mais na geração de uma frase longa; em ligação isso vira uns
+        // 150ms por resposta — trade aceito pela naturalidade em pt-BR.
+        // NÃO usar 'eleven_v3_conversational': o PATCH do agente ACEITA a
+        // string, mas a geração devolve 401 model_access_denied no plano
+        // Creator — ou seja, quebraria a ligação em produção sem avisar.
+        model_id: p.modelId ?? 'eleven_multilingual_v2',
         voice_id: p.voiceId,
-        // Ajuste "expressivo" escolhido de ouvido pelo Stefano (04/ago) entre
-        // três amostras: estabilidade baixa dá a variação de prosódia que
-        // tira o tom de leitura, sem sair do Flash (latência).
-        stability: 0.35,
+        // Estabilidade baixa dá a variação de prosódia que tira o tom de
+        // leitura. 0.4 no multilingual (o 0.35 era calibrado pro Flash).
+        stability: 0.4,
         similarity_boost: 0.8,
         optimize_streaming_latency: 3,
         agent_output_audio_format: 'ulaw_8000',

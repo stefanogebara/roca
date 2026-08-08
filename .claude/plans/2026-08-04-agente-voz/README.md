@@ -311,3 +311,30 @@ GDzHdQOi6jjf8zaXhCYD, Ana Lu VNaz9wbhLsh3lLuHzAVP.
 **Pendencia pro piloto gpt-realtime**: OPENAI_API_KEY ausente no .env
 (credencial do founder). Escopo honesto: trunk SIP Twilio -> OpenAI +
 endpoint novo pra aceitar a chamada ~ meio dia de trabalho.
+
+
+---
+
+## DECISAO APLICADA (08/ago) — voz Jenifer + Multilingual v2
+
+Founder: "ok ent faca" -> aplicada a recomendacao.
+
+**Agente em producao agora**:
+  voice_id = GOkMqfyKMLVUcYfO2WbB (Jenifer, interior de SP)
+  model_id = eleven_multilingual_v2
+  stability = 0.4 | similarity_boost = 0.8
+
+Trocado de: gX4eTo1XOTTALJXnDro4 (clone) + eleven_flash_v2_5 + stability 0.35.
+O clone fica guardado — a troca e por voz de biblioteca enquanto testamos
+naturalidade, nao um abandono da voz propria.
+
+**Corrigido na raiz**: `api/_lib/voice/elAgent.ts` tinha `eleven_flash_v2_5`
+hardcoded — re-rodar `el:setup` teria revertido a escolha silenciosamente.
+Agora `modelId` e parametro com default multilingual_v2, e o comentario
+registra a armadilha do v3 (config aceita / geracao 401).
+
+**O que AINDA nao foi verificado**: latencia real numa ligacao de verdade.
+Medi geracao de frase isolada (1.3s flash vs 3.3s multilingual), nao
+time-to-first-byte em streaming, que e o que o ouvido percebe no telefone.
+Se na primeira ligacao real houver pausa incomoda antes da resposta, o
+rollback e uma linha: voltar model_id pra eleven_flash_v2_5.
