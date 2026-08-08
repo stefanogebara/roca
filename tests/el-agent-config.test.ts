@@ -30,6 +30,25 @@ describe('montarConfigAgente', () => {
     expect(cfg.conversation_config.tts.stability).toBeLessThan(0.5);
   });
 
+  it('sabe o telefone da ligação e nunca pergunta', () => {
+    // Regressão da primeira ligação real (08/ago): a Vitória PEDIU o telefone
+    // que ela mesma acabou de discar. Além de bobo, soa como golpe.
+    // system__user_id é a única variável que aponta pra outra ponta nos DOIS
+    // sentidos — caller_id/called_number trocam de lado (verificado em 3
+    // conversas reais, 2 inbound + 1 outbound).
+    const p = cfg.conversation_config.agent.prompt.prompt;
+    expect(p).toContain('{{system__user_id}}');
+    expect(p).toMatch(/NUNCA pergunte o telefone/i);
+    expect(p).not.toContain('{{system__caller_id}}');
+    expect(p).not.toContain('{{system__called_number}}');
+  });
+
+  it('nunca narra erro técnico pra pessoa na ligação', () => {
+    // Ela disse "parece que deu um erro" em voz alta quando a ferramenta
+    // falhou. Quem ouve isso duvida de tudo que foi combinado antes.
+    expect(cfg.conversation_config.agent.prompt.prompt).toMatch(/NUNCA narre erro técnico/i);
+  });
+
   it('nunca usa um modelo que a conta não consegue gerar', () => {
     // Armadilha real (08/ago): o PATCH do agente ACEITA 'eleven_v3_conversational',
     // mas a geração devolve 401 model_access_denied no plano Creator — a ligação

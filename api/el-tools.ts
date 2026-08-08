@@ -76,12 +76,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return;
       }
       const { data: p } = await db.from('prospects').select('id').eq('phone', phone).maybeSingle();
-      if (!p) {
-        res.status(404).json({ success: false, error: 'prospect não encontrado' });
-        return;
+      // Número sem cadastro é o caso NORMAL numa ligação de prospecção, não um
+      // erro: criamos a ficha e seguimos. Antes isto devolvia 404 — e na
+      // primeira ligação real (08/ago, conv_8501kzgm...) isso jogou fora o
+      // desfecho de uma conversa de 99s E fez a Vitória dizer "deu um erro"
+      // no ouvido do prospect. O desfecho da ligação é o dado mais valioso
+      // que temos; ele nunca depende de cadastro prévio.
+      let prospectId = (p as { id: string } | null)?.id;
+      if (!prospectId) {
+        const { data: novo, error: errNovo } = await db
+          .from('prospects')
+          .insert({
+            phone,
+            // Nome é NOT NULL e ainda não sabemos o dele — o telefone
+            // identifica a ficha até alguém preencher no painel.
+            name: `Contato por voz ${phone}`,
+            source: 'voice',
+            status: 'contacted', // a ligação aconteceu: já passou de 'discovered'
+          })
+          .select('id')
+          .single();
+        if (errNovo || !novo) {
+          log.error('registrar: criar prospect falhou:', errNovo?.message ?? 'sem id');
+          res.status(500).json({ success: false, error: 'store failed' });
+          return;
+        }
+        prospectId = (novo as { id: string }).id;
       }
       const { error } = await db.from('prospect_messages').insert({
-        prospect_id: (p as { id: string }).id,
+        prospect_id: prospectId,
         direction: 'out',
         kind: 'voice-note',
         text: `📞 [ligação] ${nota.slice(0, 500)}`,

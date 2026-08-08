@@ -338,3 +338,42 @@ Medi geracao de frase isolada (1.3s flash vs 3.3s multilingual), nao
 time-to-first-byte em streaming, que e o que o ouvido percebe no telefone.
 Se na primeira ligacao real houver pausa incomoda antes da resposta, o
 rollback e uma linha: voltar model_id pra eleven_flash_v2_5.
+
+
+---
+
+## PRIMEIRA LIGACAO DE SAIDA REAL (08/ago) — conv_8501kzgm...
+
+Destino +5511999002121 (confirmado pelo founder antes de discar). 99s,
+avaliada `success` pela EL. A Vitoria conduziu a venda sozinha: apresentou-se
+como automatizada na 1a frase, mapeou canal de aquisicao (Instagram), ofereceu
+produtores triados, negociou formato ("contato direto") e fechou. Sem
+intervencao humana. O comportamento-alvo funciona.
+
+**DOIS BUGS ACHADOS — os dois corrigidos com teste antes:**
+
+1. **Ela pediu o telefone que ela mesma discou.** Nada no prompt informava o
+   numero e a tool exige `phone`, entao o modelo perguntou pra pessoa. Soa como
+   golpe. Fix: `{{system__user_id}}` no prompt + proibicao explicita de
+   perguntar. VERIFICADO EMPIRICAMENTE em 3 conversas (2 inbound + 1 outbound):
+   `system__user_id` e a UNICA variavel que aponta pra outra ponta nos dois
+   sentidos — `caller_id`/`called_number` TROCAM DE LADO com a direcao, usar
+   qualquer uma seria bug em metade dos casos.
+
+2. **O desfecho da ligacao foi perdido (grave).** `registrar_resultado` -> 404
+   porque o numero nao estava em `prospects`. Em prospeccao, numero novo e o
+   caso NORMAL. Perdeu-se "aceitou indicacoes, quer contato direto" — o dado
+   mais valioso da chamada — E o prospect ouviu "parece que deu um erro".
+   Fix: cria a ficha (source='voice', status='contacted') e grava a nota.
+   Somada regra dura: NUNCA narrar erro tecnico em voz alta.
+
+**tests/el-tools.test.ts CRIADO** — o endpoint que a Vitoria chama ao vivo
+estava sem nenhum teste. O teste do 404 foi escrito vermelho primeiro
+(expected 404 to be 200) antes do fix.
+
+**Latencia: AINDA SEM VEREDITO.** Unica fonte e o ouvido do founder; a
+pergunta foi feita e nao respondida ainda. Rollback pronto: model_id ->
+eleven_flash_v2_5.
+
+**Prompt JA sincronizado no agente ao vivo** (lido de volta da API). O fix do
+404 e codigo de endpoint — so vale em producao apos deploy.
