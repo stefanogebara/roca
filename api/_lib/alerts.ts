@@ -10,6 +10,7 @@
  */
 
 import type { CalendarTransition } from './tools/calendar';
+import { SAFRA_VAZIO } from './tools/calendar';
 import {
   fetchDailyMinTemps,
   classifyFrostRisk,
@@ -30,9 +31,15 @@ import { createLogger } from './logger';
 
 const log = createLogger('alerts');
 
-/** Stable per-transition identity — daysAway shrinks daily, the event doesn't. */
+/** Stable per-transition identity — daysAway shrinks daily, the event doesn't.
+ *
+ * Carrega a SAFRA porque a data sozinha não é identidade: até aqui o reenvio
+ * anual funcionava por acidente, só porque a portaria muda as datas todo ano.
+ * Uma portaria futura que repetisse data e UF colidiria com o
+ * `unique (user_id, dedup_key)` e o alerta sumiria em silêncio — o pior modo de
+ * falha possível num loop que já passou a vida inteira em zero. */
 export function alertDedupKey(t: CalendarTransition): string {
-  return `${t.kind}:${t.uf}:${t.date}`;
+  return `${t.kind}:${SAFRA_VAZIO}:${t.uf}:${t.date}`;
 }
 
 function dias(n: number): string {
