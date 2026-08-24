@@ -91,6 +91,8 @@ aparece na lista.**
 | Commits nos últimos 7 dias | **0** (master parado em 08/ago) |
 | Conversas com produtor externo registradas | **0**, em três medições |
 | Externos reais na vida do produto | **1** (Gaia Tech, 1 msg, 17/jul) |
+| `farmer_alerts` | **2 linhas** — medido em 24/08, não zero (ver abaixo) |
+| Alvos reais do loop proativo | **1** produtor com pin · **1** produtor com soja (SP) |
 | Dias restantes até 11/set | **18** |
 
 O silêncio de 16 dias tem duas leituras — founder em campo (o que os três memos
@@ -184,3 +186,57 @@ Nenhuma foi aplicada sozinha. `bets` e `settled` só o Stefano mexe.
    existe e é usada no prompt. O buraco é a **assinatura**: os 37 casos de
    `knowledge/goldenset/goldenset.jsonl` têm `verified_by: null`. O campo já
    existe — é o slot exato onde a assinatura do agrônomo entra. *Reformulado.*
+
+## Medição de 24/08 — o que o banco diz, e onde o registro estava errado
+
+Consulta somente-leitura no projeto `ruuflfeqcmxpziernaop`, sem PII.
+
+**`farmer_alerts` não está em zero.** Tem **2 linhas**, ambas `fire`, ambas de
+**2026-08-14 11:00 UTC** — o cron diário —, ambas para users com `kind = 'teste'`
+em MT. O loop proativo **já disparou**. O que nunca aconteceu foi disparar para
+produtor real.
+
+Os três memos de scorecard dizem zero porque **o último é de 10/08 e ninguém
+mediu depois**. Eu repeti o número deles no `known_gaps`, no config e no corpo do
+PR #7 sem medir. Corrigido nos três lugares.
+
+**Consequência para o PR #7:** eu declarei ali que a mudança de formato da chave
+de dedup não causaria reenvio, com a justificativa de que `farmer_alerts` estava
+vazia. A justificativa era falsa; **a conclusão continua verdadeira**, e por
+outro motivo — as duas linhas são `fire:2026-08-14`, e `fireDedupKey` não mudou.
+Só `alertDedupKey` (vazio) ganhou safra, e não há nenhuma linha `vazio_*`.
+
+**O denominador real, medido:**
+
+| | |
+|---|---|
+| users | 29 — 19 `empresa`, 8 `teste`, **2 `produtor`** |
+| farms com pin | 3 — **1 produtor**, 2 teste |
+| farms com soja | 2 — **1 produtor (SP)**, 1 teste (MT) |
+
+**Existe um alvo real, e ele tem data.** Um `produtor` em **SP**, canal `cloud`,
+com pin, culturas `['soja','milho']`, criado em 08/07. Isso significa:
+`listFarmsWithCoords` (geada e queimada) tem **1 alvo real**, e
+`listSojaFarmersByUf('SP')` tem **1 alvo real**.
+
+**O vazio de SP termina em 15/09**, então `upcomingTransitions(now, 7)` põe SP na
+janela em **08/09** — dentro do voo, que fecha em 11/09. Seria o **primeiro
+`farmer_alert` legítimo da vida do produto**.
+
+**E é aí que está o defeito novo.** `buildVazioAlertText` **não hedgeia UF
+regional**. Ele diria a esse produtor *"o vazio sanitário da soja em SP termina
+em 7 dias"* — mas SP é `regional: true`, com três regiões e datas diferentes, e
+15/09 é o fim da Região III, não necessariamente a dele. O caminho **reativo**
+(`vazioStatus`) já resolve isso corretamente: para UF regional ele diz *"varia
+por região... confirme a data exata da sua região"*. O caminho **proativo afirma
+o que o reativo se recusa a afirmar**.
+
+Não mexi nisso: mudar copy que vai para produtor real é decisão do Stefano, não
+consequência de uma auditoria. Mas a data é 08/09 e o alvo é o único produtor
+real que existe.
+
+**O que a correção de 24/08 evitou, concretamente.** A única farm com soja em MT
+é `kind = 'teste'`. Sem o filtro do PR #6, em 30/08 o cron teria mandado o alerta
+de vazio de MT para uma fixture, e `farmer_alerts` ganharia sua primeira linha
+`vazio_*` vinda de teste — contaminando o primeiro número não-zero da métrica que
+o scorecard mede em 11/09. Com o filtro, MT devolve conjunto vazio.
