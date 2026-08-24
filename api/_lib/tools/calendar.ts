@@ -65,7 +65,9 @@ export interface VazioStatus {
   line: string | null;
 }
 
-function fmt(iso: string): string {
+/** Data ISO em PT-BR por extenso ('15 de setembro de 2026'). Exportada porque
+ * o alerta proativo precisa hedgear UF regional com a mesma voz do reativo. */
+export function fmt(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   const months = [
     'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
