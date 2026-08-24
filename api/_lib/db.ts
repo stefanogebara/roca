@@ -815,12 +815,40 @@ export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
     .eq('users.state', uf.toUpperCase())
     .eq('users.kind', 'produtor')
     .contains('crop', ['soja']);
+
+  // Ordem de deploy: se o código subir antes da migration de farms.municipio,
+  // a coluna não existe e a query inteira falha. Sem este fallback, o fail-soft
+  // devolveria [] e o alerta PARARIA EM SILÊNCIO — o pior desfecho possível
+  // para um loop que já passou a vida em zero. Sem município, a região não
+  // resolve e o alerta hedgeia, que é o comportamento anterior.
+  if (error && /municipio/i.test(error.message)) {
+    log.error('listSojaFarmersByUf: farms.municipio ausente (migration pendente) — seguindo sem município');
+    const semColuna = await db
+      .from('farms')
+      .select('user_id, crop, users!inner(id, wa_id, state, channel)')
+      .eq('users.state', uf.toUpperCase())
+      .eq('users.kind', 'produtor')
+      .contains('crop', ['soja']);
+    if (semColuna.error) {
+      log.error('listSojaFarmersByUf failed:', semColuna.error.message);
+      return [];
+    }
+    return mapearAlvos(semColuna.data ?? []);
+  }
   if (error) {
     log.error('listSojaFarmersByUf failed:', error.message);
     return [];
   }
-  return (data ?? [])
-    .map((r) => {
+  return mapearAlvos(data ?? []);
+}
+
+/** Linhas de `farms` + `users` embutido → alvos de alerta. Município ausente
+ * (coluna nova ainda não aplicada, ou produtor que nunca disse) vira null, e o
+ * alerta hedgeia. */
+function mapearAlvos(linhas: unknown[]): AlertTarget[] {
+  return linhas
+    .map((linha) => {
+      const r = linha as { users?: unknown; municipio?: string | null };
       const u = r.users as unknown as {
         id: string; wa_id: string; state: string | null; channel: string | null;
       } | null;
@@ -830,7 +858,7 @@ export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
             waId: u.wa_id,
             channel: u.channel ?? null,
             uf: u.state ?? null,
-            municipio: (r as { municipio?: string | null }).municipio ?? null,
+            municipio: r.municipio ?? null,
           }
         : null;
     })
