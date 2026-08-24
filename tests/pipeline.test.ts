@@ -363,7 +363,10 @@ describe('stated location (naming the field instead of dropping a pin)', () => {
 
     await handleInbound(adapter, msgFixture({ text: 'minha lavoura fica em Patrocínio-MG' }));
 
-    expect(db.setFarmLocation).toHaveBeenCalledWith('u1', -18.94, -46.99, 'city');
+    // O município passou a ser persistido junto (24/ago): é ele que resolve a
+    // região do vazio sanitário nas 7 UFs que a portaria subdivide. Antes o
+    // geocoding devolvia `city` e o pipeline jogava fora.
+    expect(db.setFarmLocation).toHaveBeenCalledWith('u1', -18.94, -46.99, 'city', 'Patrocínio');
     expect(db.setUserState).toHaveBeenCalledWith('u1', 'MG');
     expect(db.setAwaiting).toHaveBeenCalledWith('u1', 'crop');
     expect(reason).not.toHaveBeenCalled(); // deterministic path, no model
