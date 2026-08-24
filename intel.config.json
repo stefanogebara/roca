@@ -1,0 +1,86 @@
+{
+  "project": "Stevi (repo: roca)",
+  "repo": "https://github.com/stefanogebara/roca",
+  "one_line": "Assistente agronômico brasileiro no WhatsApp. Triagem, não prescrição. Founders: Stefano e Vitória. Em voo de 60 dias (13/jul → 11/set/2026) contra um scorecard pré-registrado.",
+  "audience": "produtor rural brasileiro; WhatsApp como interface única; conectividade intermitente",
+  "stack": [
+    "WhatsApp por DOIS transportes coexistindo na mesma URL: Meta Cloud API é o ATIVO (api/_lib/transport/cloud.ts), Twilio é LEGADO mantido como rollback e captador de OTP de voz (api/_lib/transport/twilio.ts)",
+    "Supabase (project ruuflfeqcmxpziernaop) — 47 migrations; o ID só aparece em docs de agente, o runtime resolve por SUPABASE_URL",
+    "Vercel — functions, 3 crons e rewrites em vercel.json",
+    "OpenRouter como gateway único de LLM (api/_lib/llm.ts, fetch puro sem SDK): claude-haiku-4.5 no router, claude-sonnet-5 no raciocínio, gemini-2.5-flash na transcrição",
+    "ElevenLabs — agente de voz por ligação (api/el-webhook.ts, api/el-tools.ts, api/_lib/voice/elAgent.ts); é a Vitória prospectando empresas, não o produtor sendo atendido",
+    "web/ é HTML/CSS/JS estático puro, sem framework e sem build (scripts/build-web.mjs copia para public/)",
+    "dados externos: Open-Meteo (clima e geada), ISRIC SoilGrids (solo), Sentinel-2 via Earth Search AWS (NDVI), INPE Queimadas (fogo), Yahoo Finance (preço de saca)",
+    "Nodemailer — e-mail como degrau de escalada de alerta",
+    "Playwright (e2e/) e Vitest (~116 arquivos em tests/)"
+  ],
+  "bets": [
+    "WhatsApp é a única interface viável — não construir app",
+    "notificação proativa no momento certo vale mais que resposta boa sob demanda",
+    "conselho agronômico precisa ser local: cultura, região e janela de plantio específicas"
+  ],
+  "known_gaps": [
+    "tração externa real continua em 1 usuário (Gaia Tech, 1 mensagem em 17/jul, nunca voltou) — inalterado há cinco semanas. A instrumentação para separar identidade FECHOU (users.kind produtor/empresa/teste, migrations 20260805140000 e 20260805200000); o n não subiu",
+    "farmer_alerts continua em zero, mas NÃO por código morto — o loop está construído, testado e agendado: api/_lib/alerts.ts implementa runVazioAlerts, runFrostAlerts e runFireAlerts com dedup e retry, e api/cron/monitor.ts os chama diariamente às 11h por vercel.json. As causas reais são duas: não há a quem alertar (3 farms com pin, nenhuma de produtor externo ativo) e o canal de template esteve bloqueado por billing da Meta (#131042) — e, CORREÇÃO: a env WHATSAPP_TEMPLATE_ALERT NÃO é o bloqueio; .claude/plans/2026-07-30-virada-cloud-api/README.md:81 registra que ela está setada na Vercel em Preview e Production, conferido por vercel env ls. O bloqueio residual é billing",
+    "a fonte de verdade agronômica EXISTE e é usada — knowledge/SOURCES.txt com proveniência datada, a Portaria SDA/MAPA 1.579/2026 em texto, a fatia do Agrofit (850 KB) injetada no prompt por api/_lib/reason.ts, e o portão anti-prescrição em api/_lib/compliance.ts. O buraco é a ASSINATURA: os 37 casos de knowledge/goldenset/goldenset.jsonl têm verified_by=null, nenhum revisado por agrônomo. E o grounding cobre só cinco culturas (reason.ts:253)",
+    "wallet pass e push em lock screen: zero linhas de código, zero plano, zero menção em todo o repo. O análogo mais próximo é o cartão .vcf de api/vcard.ts. Item de intel sobre esse tema não tem onde aterrissar",
+    "operação offline do lado do PRODUTOR continua aberta. Do lado do servidor houve investimento real em degradação (api/_lib/orcamento.ts com prazo compartilhado nos 60s, api/_lib/fallbackReply.ts, api/_lib/retry.ts, canário monitorando taxa de fallback), mas não há fila de retentativa por destinatário nem detecção de celular sem sinal",
+    "branch órfã com 76 commits nunca mesclados (origin/claude/xenodochial-moore-9dc540), carregando correções que o próprio repo chama de críticas: a poda de farmer_alerts que nunca rodou (a642bb9), o alarme da empresa que estava morto (dfb9dbe), o vigia que caía junto com o vigiado (4f77bfa). Existe código de confiabilidade escrito e não deployado",
+    "deriva schema-vs-repo: a migration 20260803192238_founder_alerts_delivery_tracking.sql foi aplicada direto pelo MCP e reconstruída depois a partir do banco; a deriva já quebrou o provisionamento de um banco novo (8c88ea9)",
+    "preço de commodity depende de endpoint não-oficial e sem contrato (query1.finance.yahoo.com em api/_lib/tools/prices.ts)",
+    "messages.intent vem NULL nos caminhos recentes — a coluna que alimenta 'o que os produtores pedem' e o cálculo de hábito em api/_lib/cohort.ts não é carimbada em todos os ramos",
+    "listSojaFarmersByUf (api/_lib/db.ts:777-794) não filtra users.kind — a partir de 30/08 o cron tenta o alerta de vazio de MT e uma fazenda de teste contaminaria o primeiro farmer_alerts não-zero",
+    "api/_lib/tools/calendar.ts cobre 17 das 22 UFs da Portaria 1.579/2026; faltam PA, RR, AL, AP e CE — o PA tem peso real em soja e cairia dentro do voo; hoje vazioStatus() devolve {known:false} em silêncio",
+    "alertDedupKey não tem 'season' — o reenvio anual funciona só porque a portaria muda as datas; portaria futura que repita data e UF faz o alerta sumir em silêncio"
+  ],
+  "settled": [
+    "o gate é conversa com produtor, não commit — o tripwire existe pra isso",
+    "nenhuma métrica decide abaixo de coorte D7 ≥15 ou 100 envios por segmento",
+    "métrica sempre reportada em duas colunas: total e externos reais",
+    "triagem, não prescrição — nunca prescrever dose (README.md, api/_lib/prompts/system.ts, api/_lib/compliance.ts)",
+    "a Stevi nunca se apresenta como robô por rótulo; honestidade é reativa (593b041, ed832c7, 66c7db3 — ago/2026)",
+    "aceite não é entrega — o wamid é gravado e o callback da Meta carimba a entrega (migration 20260803192238)",
+    "produção é master + Vercel; o banco de produção é somente leitura para agentes (.claude/agents/stevi-guardiao.md)"
+  ],
+  "deprecated": [
+    "bump D+3 na prospecção — desligado após 23 envios com zero humanos respondendo (b8b05fa, 2026-08-05)",
+    "bloqueio de telefone fixo — implementado e revertido no mesmo dia; era erro de inferência, 9 das 14 entregas bem-sucedidas da história eram para fixo (f6c00f1, 2026-07-27)",
+    "Titiler — removido por completo, miniatura de satélite passa a ser encodada localmente (70bc1a5, 2026-07-29)",
+    "rótulo 'assistente digital' em todas as superfícies (ed832c7, 2026-08-06)",
+    "SDK do Twilio — o adapter virou fetch puro (33b1282, 2026-07-07)",
+    "LiveKit — avaliado e ADIADO, 'ortogonal à naturalidade' (ef5e41c, 2026-08-07)",
+    "cold call por IA — decidido fora na curadoria de pesquisa de voz (ea6cdc0, 2026-08-06)",
+    "recrutar agrônomo SP/MT para as 5 referrals — morto quando se descobriu que as 5 eram teste dos próprios founders (33e8e57, 2026-08-04)"
+  ],
+  "focus_areas": [
+    "agtech e IA no agronegócio",
+    "assistentes por WhatsApp",
+    "IA agronômica, modelos de safra e NDVI",
+    "dados climáticos e de solo abertos (Open-Meteo, SoilGrids, Sentinel-2, INPE Queimadas)",
+    "IA em português para baixo letramento digital",
+    "notificação proativa e engajamento mobile",
+    "WhatsApp Business API e templates",
+    "validação agronômica e responsabilidade por conselho errado"
+  ],
+  "scout_modalities": [
+    "concorrentes-diretos",
+    "papers",
+    "funding",
+    "brasil-latam",
+    "plataforma"
+  ],
+  "platform_deps": [
+    "Meta WhatsApp Cloud API (transporte ativo)",
+    "Twilio (legado / OTP de voz)",
+    "OpenRouter (gateway único de LLM)",
+    "ElevenLabs (voz por ligação)",
+    "Supabase",
+    "Vercel",
+    "Open-Meteo",
+    "ISRIC SoilGrids",
+    "Sentinel-2 / Earth Search AWS",
+    "INPE Queimadas"
+  ],
+  "verdict_note": "Este projeto está sob um flight plan com tripwire (commits > conversas com produtor = fora dos trilhos), disparado em três semanas consecutivas. A rubrica herda isso: PROTOTIPAR e IMPLEMENTAR exigem que o item ajude a CONVERSAR com produtor ou a DISPARAR ALERTA — as duas coisas que o scorecard mede. Item que só adiciona capacidade sobe no máximo para DISCUTIR. Restam 18 dias até 11/set/2026. Nota de precisão: INMET e NASA POWER NÃO estão integrados (Open-Meteo faz o papel dos dois); a Stevi apenas menciona o INMET no texto de alerta.",
+  "feed_url": "https://claude.ai/code/artifact/53796b2d-d805-48eb-85d9-6f0a7f086be5"
+}
