@@ -11,6 +11,7 @@
 
 import type { CalendarTransition } from './tools/calendar';
 import { SAFRA_VAZIO, VAZIO_SOJA_2026, fmt } from './tools/calendar';
+import { resolverRegiao } from './tools/vazioRegiao';
 import {
   fetchDailyMinTemps,
   classifyFrostRisk,
@@ -39,7 +40,10 @@ const log = createLogger('alerts');
  * `unique (user_id, dedup_key)` e o alerta sumiria em silêncio — o pior modo de
  * falha possível num loop que já passou a vida inteira em zero. */
 export function alertDedupKey(t: CalendarTransition): string {
-  return `${t.kind}:${SAFRA_VAZIO}:${t.uf}:${t.date}`;
+  // A região entra na chave: o envelope e a região da mesma UF são eventos
+  // diferentes, e um produtor recebe um OU outro, nunca os dois.
+  const escopo = t.regiao ? `${t.uf}:R${t.regiao}` : t.uf;
+  return `${t.kind}:${SAFRA_VAZIO}:${escopo}:${t.date}`;
 }
 
 function dias(n: number): string {
@@ -64,13 +68,32 @@ function ufRegional(uf: string): boolean {
  * O envelope é citado como envelope, com a data por extenso e a instrução de
  * confirmar. Triagem, não prescrição — a mesma disciplina das respostas. */
 export function buildVazioAlertText(t: CalendarTransition): string {
+  // Transição DE REGIÃO: a data é a daquele produtor, então crava — e nomeia a
+  // região para ele poder conferir na portaria.
+  if (t.regiao) {
+    const ondeEle = `na sua região de ${t.uf} (Região ${t.regiao} da portaria)`;
+    if (t.kind === 'vazio_start') {
+      return (
+        `⚠️ Atenção: o vazio sanitário da soja ${ondeEle} começa em ${dias(t.daysAway)} ` +
+        `(Portaria SDA/MAPA nº 1.579/2026). A partir daí, nada de soja viva no campo — nem guaxa. ` +
+        `Isso corta a ponte da ferrugem pra próxima safra.\n\n` +
+        `Se quiser, te explico o que checar na sua área, ou te conecto com um agrônomo. 🌱`
+      );
+    }
+    return (
+      `📅 Boa notícia: o vazio sanitário da soja ${ondeEle} termina em ${dias(t.daysAway)} ` +
+      `(Portaria SDA/MAPA nº 1.579/2026). Dá pra começar a planejar o plantio.\n\n` +
+      `Quer o veredito da janela de pulverização ou uma olhada de satélite na sua área antes? É só pedir. 🌱`
+    );
+  }
+
   if (ufRegional(t.uf)) {
     if (t.kind === 'vazio_start') {
       return (
         `⚠️ Atenção: o vazio sanitário da soja em ${t.uf} está começando. ` +
         `A janela geral abre em ${fmt(t.date)} (Portaria SDA/MAPA nº 1.579/2026), ` +
         `mas em ${t.uf} o período varia por região — a data da sua pode ser outra.\n\n` +
-        `Confirme com seu agrônomo ou na portaria antes de contar com ela. ` +
+        `Me diz o município da sua lavoura que eu te dou a data certa da sua região. ` +
         `Valendo o vazio, nada de soja viva no campo — nem guaxa: é o que corta a ponte da ferrugem ` +
         `pra próxima safra.\n\n` +
         `Se quiser, te explico o que checar na sua área, ou te conecto com um agrônomo. 🌱`
@@ -80,7 +103,7 @@ export function buildVazioAlertText(t: CalendarTransition): string {
       `📅 O vazio sanitário da soja em ${t.uf} está perto do fim. ` +
       `A janela geral vai até ${fmt(t.date)} (Portaria SDA/MAPA nº 1.579/2026), ` +
       `mas em ${t.uf} o período varia por região — a data da sua pode ser outra.\n\n` +
-      `Confirme com seu agrônomo ou na portaria antes de plantar.\n\n` +
+      `Me diz o município da sua lavoura que eu te dou a data certa da sua região.\n\n` +
       `Quer o veredito da janela de pulverização ou uma olhada de satélite na sua área antes? É só pedir. 🌱`
     );
   }
@@ -227,8 +250,16 @@ export async function runVazioAlerts(
 ): Promise<AlertRunResult> {
   const result: AlertRunResult = { transitions: transitions.length, candidates: 0, sent: 0, failed: 0 };
   for (const t of transitions) {
-    const farmers = await listSojaFarmersByUf(t.uf);
+    const todos = await listSojaFarmersByUf(t.uf);
+    // Cada produtor recebe a transição da SUA região, ou a do envelope se a
+    // região não resolve — nunca as duas. É isso que impede o produtor da
+    // Região I de SP de ser avisado na data da Região III.
+    const farmers = todos.filter((f) => {
+      const r = resolverRegiao(f.uf ?? t.uf, f.municipio);
+      return t.regiao ? r?.regiao === t.regiao : r === null;
+    });
     result.candidates += farmers.length;
+    if (farmers.length === 0) continue;
     const text = buildVazioAlertText(t);
     const key = alertDedupKey(t);
     for (const f of farmers) {

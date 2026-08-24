@@ -35,8 +35,12 @@ describe('UF regional recebe hedge, não data pessoal', () => {
     expect(buildVazioAlertText(sp)).toMatch(/varia por regi[ãa]o/i);
   });
 
-  it('manda confirmar antes de agir', () => {
-    expect(buildVazioAlertText(sp)).toMatch(/confirme/i);
+  it('pede o município — o hedge é também a captura', () => {
+    // Em vez de mandar o produtor conferir sozinho, a Stevi pede o dado que
+    // resolve a região. O caminho de texto livre já existente
+    // (isLocationSettingRequest → resolveStatedLocation) grava o município, e
+    // no próximo ciclo ele recebe a data exata em vez do envelope.
+    expect(buildVazioAlertText(sp)).toMatch(/me diz o munic[íi]pio/i);
   });
 
   it('cita o envelope como envelope, com a data por extenso', () => {

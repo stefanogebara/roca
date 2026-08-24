@@ -96,11 +96,22 @@ describe('upcomingTransitions (daily monitor)', () => {
   });
 
   it('returns nothing in a quiet stretch and sorts by proximity', () => {
-    expect(upcomingTransitions(new Date('2026-08-01T12:00:00Z'), 3)).toEqual([]);
+    // 2026-08-01 DEIXOU de ser quieta em 24/ago: com as transições por região,
+    // BA-IV, PA-II e PI-II começam exatamente nesse dia. Trocado por uma janela
+    // verificada como vazia contra o calendário completo.
+    expect(upcomingTransitions(new Date('2026-07-08T12:00:00Z'), 3)).toEqual([]);
     const list = upcomingTransitions(new Date('2026-09-18T12:00:00Z'), 14);
     for (let i = 1; i < list.length; i++) {
       expect(list[i].daysAway).toBeGreaterThanOrEqual(list[i - 1].daysAway);
     }
+  });
+
+  it('01/ago não é mais quieto — três regiões começam nesse dia', () => {
+    // Regressão do próprio conserto: se alguém remover as transições por
+    // região, isto volta a dar zero e o teste avisa.
+    const list = upcomingTransitions(new Date('2026-08-01T12:00:00Z'), 3);
+    const inicios = list.filter((t) => t.kind === 'vazio_start' && t.daysAway === 0);
+    expect(inicios.map((t) => `${t.uf}-${t.regiao}`).sort()).toEqual(['BA-IV', 'PA-II', 'PI-II']);
   });
 });
 

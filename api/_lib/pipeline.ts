@@ -601,7 +601,11 @@ const statedLocationResolvedRoute: Route = {
     const ruim = validarCoordenada(sl.lat, sl.lon);
     const salvo = ruim
       ? { ok: false as const, motivo: ruim }
-      : await persist('localização da lavoura', () => setFarmLocation(userId, sl.lat, sl.lon, 'city'));
+      : await persist('localização da lavoura', () =>
+          // O município vinha sendo descartado aqui. É ele que resolve a região
+          // do vazio sanitário nas 7 UFs que a portaria subdivide.
+          setFarmLocation(userId, sl.lat, sl.lon, 'city', sl.city)
+        );
     if (salvo.ok) {
       if (sl.uf) await setUserState(userId, sl.uf);
       await setAwaiting(userId, 'crop');

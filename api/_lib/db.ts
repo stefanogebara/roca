@@ -121,12 +121,18 @@ export async function setFarmLocation(
   userId: string,
   lat: number,
   lon: number,
-  precision: LocationPrecision = 'pin'
+  precision: LocationPrecision = 'pin',
+  /** Município, quando o geocoding o resolveu. Alimenta a região do vazio
+   * sanitário. Omitido não apaga o que já estava lá: pin refinando uma cidade
+   * não pode zerar o município que ela deu. */
+  municipio?: string | null
 ): Promise<string | null> {
   const db = getDb();
+  const linha: Record<string, unknown> = { user_id: userId, lat, lon, location_precision: precision };
+  if (municipio) linha.municipio = municipio;
   const { data, error } = await db
     .from('farms')
-    .upsert({ user_id: userId, lat, lon, location_precision: precision }, { onConflict: 'user_id' })
+    .upsert(linha, { onConflict: 'user_id' })
     .select('id')
     .single();
   if (error) {
@@ -134,6 +140,20 @@ export async function setFarmLocation(
     return null;
   }
   return (data as { id: string }).id;
+}
+
+/** Grava só o município — a resposta do produtor quando ele mandou pin e a UF
+ * dele é subdividida por região. Fail-soft: erro não derruba a conversa. */
+export async function setFarmMunicipio(userId: string, municipio: string): Promise<boolean> {
+  const db = getDb();
+  const { error } = await db
+    .from('farms')
+    .upsert({ user_id: userId, municipio }, { onConflict: 'user_id' });
+  if (error) {
+    log.error('setFarmMunicipio failed:', error.message);
+    return false;
+  }
+  return true;
 }
 
 /** Fetch a user's farm id + coordinates + precision (for NDVI/derivation). */
@@ -771,6 +791,10 @@ export interface AlertTarget {
   waId: string;
   /** Transport the farmer talks to Stevi on ('twilio' | 'cloud'; null = legacy → Twilio). */
   channel: string | null;
+  /** UF do produtor, para resolver a região do vazio. */
+  uf: string | null;
+  /** Município da lavoura. NULL = região desconhecida → o alerta hedgeia. */
+  municipio: string | null;
 }
 
 /** Soy growers with a farm in the given UF — targets for vazio alerts.
@@ -787,7 +811,7 @@ export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
   const db = getDb();
   const { data, error } = await db
     .from('farms')
-    .select('user_id, crop, users!inner(id, wa_id, state, channel)')
+    .select('user_id, crop, municipio, users!inner(id, wa_id, state, channel)')
     .eq('users.state', uf.toUpperCase())
     .eq('users.kind', 'produtor')
     .contains('crop', ['soja']);
@@ -797,8 +821,18 @@ export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
   }
   return (data ?? [])
     .map((r) => {
-      const u = r.users as unknown as { id: string; wa_id: string; channel: string | null } | null;
-      return u ? { userId: u.id, waId: u.wa_id, channel: u.channel ?? null } : null;
+      const u = r.users as unknown as {
+        id: string; wa_id: string; state: string | null; channel: string | null;
+      } | null;
+      return u
+        ? {
+            userId: u.id,
+            waId: u.wa_id,
+            channel: u.channel ?? null,
+            uf: u.state ?? null,
+            municipio: (r as { municipio?: string | null }).municipio ?? null,
+          }
+        : null;
     })
     .filter((x): x is AlertTarget => x !== null);
 }
@@ -828,7 +862,15 @@ export async function listFarmsWithCoords(): Promise<FarmPin[]> {
     .map((r) => {
       const u = r.users as unknown as { id: string; wa_id: string; channel: string | null } | null;
       return u && r.lat != null && r.lon != null
-        ? { userId: u.id, waId: u.wa_id, channel: u.channel ?? null, lat: r.lat as number, lon: r.lon as number }
+        ? {
+            userId: u.id,
+            waId: u.wa_id,
+            channel: u.channel ?? null,
+            uf: null as string | null,
+            municipio: null as string | null,
+            lat: r.lat as number,
+            lon: r.lon as number,
+          }
         : null;
     })
     .filter((x): x is FarmPin => x !== null);

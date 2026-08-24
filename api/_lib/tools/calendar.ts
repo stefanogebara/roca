@@ -13,6 +13,8 @@
  * hedge and point at the portaria rather than assert one date.
  */
 
+import { janelasPorRegiao } from './vazioRegiao';
+
 export interface VazioWindow {
   /** ISO dates, inclusive. */
   start: string;
@@ -55,6 +57,12 @@ export const VAZIO_SOJA_2026: Record<string, VazioWindow> = {
  * `tests/calendario-safra.test.ts` deriva os anos da própria tabela e falha se
  * os dois saírem de sincronia — esquecer não é uma opção silenciosa. */
 export const SAFRA_VAZIO = '2026/27';
+
+/** Janelas por região da UF, do mapa extraído da portaria. Vazio quando a UF
+ * não é subdividida. */
+function regioesDaUf(uf: string): Record<string, { start: string; end: string }> {
+  return janelasPorRegiao(uf);
+}
 
 const SOURCE_LINE = 'Portaria SDA/MAPA nº 1.579/2026';
 
@@ -105,6 +113,10 @@ export interface CalendarTransition {
   kind: 'vazio_start' | 'vazio_end';
   date: string;
   daysAway: number;
+  /** Região da portaria, quando a transição é de uma região específica.
+   * Ausente = transição do ENVELOPE da UF, que só serve a produtor cuja região
+   * não conseguimos resolver — e cujo texto hedgeia. */
+  regiao?: string;
 }
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -121,15 +133,26 @@ function daysBetween(fromIso: string, toIso: string): number {
 export function upcomingTransitions(date: Date, withinDays = 7): CalendarTransition[] {
   const today = date.toISOString().slice(0, 10);
   const out: CalendarTransition[] = [];
+
+  const empurra = (uf: string, kind: 'vazio_start' | 'vazio_end', d: string, regiao?: string) => {
+    const daysAway = daysBetween(today, d);
+    if (daysAway >= 0 && daysAway <= withinDays) {
+      out.push(regiao ? { uf, kind, date: d, daysAway, regiao } : { uf, kind, date: d, daysAway });
+    }
+  };
+
   for (const [uf, w] of Object.entries(VAZIO_SOJA_2026)) {
-    for (const [kind, d] of [
-      ['vazio_start', w.start],
-      ['vazio_end', w.end],
-    ] as const) {
-      const daysAway = daysBetween(today, d);
-      if (daysAway >= 0 && daysAway <= withinDays) {
-        out.push({ uf, kind, date: d, daysAway });
-      }
+    // O envelope sempre entra: é o que serve produtor cuja região não resolve,
+    // e o texto dele hedgeia.
+    empurra(uf, 'vazio_start', w.start);
+    empurra(uf, 'vazio_end', w.end);
+
+    // UF subdividida emite TAMBÉM uma transição por região. Sem isto, quem está
+    // numa região que fecha antes do envelope só seria avisado depois do fato:
+    // a Região I de SP termina em 31/ago e o envelope, em 15/set.
+    for (const [regiao, janela] of Object.entries(regioesDaUf(uf))) {
+      empurra(uf, 'vazio_start', janela.start, regiao);
+      empurra(uf, 'vazio_end', janela.end, regiao);
     }
   }
   return out.sort((a, b) => a.daysAway - b.daysAway);
