@@ -773,13 +773,23 @@ export interface AlertTarget {
   channel: string | null;
 }
 
-/** Soy growers with a farm in the given UF — targets for vazio alerts. */
+/** Soy growers with a farm in the given UF — targets for vazio alerts.
+ *
+ * Só `kind = 'produtor'`. O alvo de alerta é a mesma população que o scorecard
+ * mede, e `farmer_alerts` está em zero na vida do produto: a primeira linha que
+ * entrar ali é o primeiro número não-zero da métrica. Se ela vier de fixture ou
+ * de empresa, o número nasce mentindo — a mesma classe de erro das "5 referrals"
+ * de 25/jul e dos "8 novos usuários" de 03/ago, que eram teste e bot de revenda.
+ *
+ * Filtro POSITIVO de propósito, não `neq`: `kind` novo sai por padrão em vez de
+ * entrar. Falha fechado. */
 export async function listSojaFarmersByUf(uf: string): Promise<AlertTarget[]> {
   const db = getDb();
   const { data, error } = await db
     .from('farms')
     .select('user_id, crop, users!inner(id, wa_id, state, channel)')
     .eq('users.state', uf.toUpperCase())
+    .eq('users.kind', 'produtor')
     .contains('crop', ['soja']);
   if (error) {
     log.error('listSojaFarmersByUf failed:', error.message);
@@ -798,12 +808,16 @@ export interface FarmPin extends AlertTarget {
   lon: number;
 }
 
-/** Every farm with a location pin — targets for weather-driven alerts. */
+/** Every farm with a location pin — targets for weather-driven alerts.
+ *
+ * Alimenta geada E queimada, os outros dois loops proativos. Mesmo filtro e
+ * mesma razão de `listSojaFarmersByUf`: só `kind = 'produtor'`, positivo. */
 export async function listFarmsWithCoords(): Promise<FarmPin[]> {
   const db = getDb();
   const { data, error } = await db
     .from('farms')
     .select('lat, lon, users!inner(id, wa_id, channel)')
+    .eq('users.kind', 'produtor')
     .not('lat', 'is', null)
     .not('lon', 'is', null);
   if (error) {
