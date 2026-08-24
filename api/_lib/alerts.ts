@@ -10,7 +10,7 @@
  */
 
 import type { CalendarTransition } from './tools/calendar';
-import { SAFRA_VAZIO } from './tools/calendar';
+import { SAFRA_VAZIO, VAZIO_SOJA_2026, fmt } from './tools/calendar';
 import {
   fetchDailyMinTemps,
   classifyFrostRisk,
@@ -46,8 +46,45 @@ function dias(n: number): string {
   return n === 1 ? '1 dia' : `${n} dias`;
 }
 
-/** WhatsApp-ready PT-BR alert for a vazio transition. Pure — unit-tested. */
+/** Verdadeiro quando a portaria subdivide a UF por região — a data da tabela é
+ * envelope, não a data daquele produtor. Desconhecida conta como regional: o
+ * hedge é a leitura conservadora. */
+function ufRegional(uf: string): boolean {
+  return VAZIO_SOJA_2026[uf.toUpperCase()]?.regional ?? true;
+}
+
+/** WhatsApp-ready PT-BR alert for a vazio transition. Pure — unit-tested.
+ *
+ * UF regional recebe HEDGE, não data. O caminho reativo (`vazioStatus`) já se
+ * recusa a cravar data onde a portaria subdivide por região; até 24/08 o
+ * proativo afirmava o que o reativo recusava — e o único produtor real com soja
+ * está em SP, que é regional e entra na janela de 7 dias em 08/09. Dizer a ele
+ * "termina em 7 dias" seria a data da Região III, não necessariamente a dele.
+ *
+ * O envelope é citado como envelope, com a data por extenso e a instrução de
+ * confirmar. Triagem, não prescrição — a mesma disciplina das respostas. */
 export function buildVazioAlertText(t: CalendarTransition): string {
+  if (ufRegional(t.uf)) {
+    if (t.kind === 'vazio_start') {
+      return (
+        `⚠️ Atenção: o vazio sanitário da soja em ${t.uf} está começando. ` +
+        `A janela geral abre em ${fmt(t.date)} (Portaria SDA/MAPA nº 1.579/2026), ` +
+        `mas em ${t.uf} o período varia por região — a data da sua pode ser outra.\n\n` +
+        `Confirme com seu agrônomo ou na portaria antes de contar com ela. ` +
+        `Valendo o vazio, nada de soja viva no campo — nem guaxa: é o que corta a ponte da ferrugem ` +
+        `pra próxima safra.\n\n` +
+        `Se quiser, te explico o que checar na sua área, ou te conecto com um agrônomo. 🌱`
+      );
+    }
+    return (
+      `📅 O vazio sanitário da soja em ${t.uf} está perto do fim. ` +
+      `A janela geral vai até ${fmt(t.date)} (Portaria SDA/MAPA nº 1.579/2026), ` +
+      `mas em ${t.uf} o período varia por região — a data da sua pode ser outra.\n\n` +
+      `Confirme com seu agrônomo ou na portaria antes de plantar.\n\n` +
+      `Quer o veredito da janela de pulverização ou uma olhada de satélite na sua área antes? É só pedir. 🌱`
+    );
+  }
+
   if (t.kind === 'vazio_start') {
     return (
       `⚠️ Atenção: o vazio sanitário da soja em ${t.uf} começa em ${dias(t.daysAway)} ` +
