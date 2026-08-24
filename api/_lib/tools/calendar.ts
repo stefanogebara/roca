@@ -5,6 +5,9 @@
  * kept at knowledge/portaria-sda-mapa-1579-2026.txt). Dates change EVERY season
  * by portaria — this table must be refreshed yearly (Stage 2 daily monitor).
  *
+ * As 22 UFs da portaria estão aqui. UF fora dela não tem vazio definido, e
+ * `vazioStatus` devolve `known: false` — silêncio honesto, não erro.
+ *
  * States where the portaria subdivides by region carry `regional: true` and an
  * envelope window (earliest start → latest end across regions); replies must
  * hedge and point at the portaria rather than assert one date.
@@ -20,23 +23,38 @@ export interface VazioWindow {
 
 export const VAZIO_SOJA_2026: Record<string, VazioWindow> = {
   AC: { start: '2026-06-22', end: '2026-09-20', regional: false },
+  AL: { start: '2027-01-01', end: '2027-04-01', regional: false },
+  AP: { start: '2026-12-01', end: '2027-02-28', regional: false },
   AM: { start: '2026-06-10', end: '2026-09-10', regional: false },
   BA: { start: '2026-06-14', end: '2027-03-14', regional: true }, // Região III: 14 dez → 14 mar 2027
+  CE: { start: '2026-11-03', end: '2027-01-31', regional: false },
   DF: { start: '2026-07-01', end: '2026-09-30', regional: false },
   GO: { start: '2026-06-27', end: '2026-09-24', regional: false },
   MA: { start: '2026-07-03', end: '2026-11-30', regional: true }, // Região III: 02 set → 30 nov 2026
   MG: { start: '2026-07-01', end: '2026-09-30', regional: false },
   MT: { start: '2026-06-08', end: '2026-09-06', regional: false },
   MS: { start: '2026-06-15', end: '2026-09-15', regional: false },
+  PA: { start: '2026-06-15', end: '2026-11-15', regional: true }, // RI 15 jun → RIII 15 nov 2026
   PR: { start: '2026-06-02', end: '2026-09-19', regional: true },
   PI: { start: '2026-07-01', end: '2026-11-30', regional: true }, // Região I: 01 set → 30 nov 2026
   RJ: { start: '2026-06-15', end: '2026-09-28', regional: false },
   RS: { start: '2026-07-03', end: '2026-09-30', regional: false },
   RO: { start: '2026-06-10', end: '2026-09-10', regional: false },
+  RR: { start: '2026-12-19', end: '2027-03-18', regional: false },
   SC: { start: '2026-06-13', end: '2026-10-12', regional: true }, // RII 13 jun → RI 12 out 2026
   SP: { start: '2026-06-01', end: '2026-09-15', regional: true }, // RI 01 jun → RIII 15 set 2026
   TO: { start: '2026-07-01', end: '2026-09-30', regional: false },
 };
+
+/**
+ * Safra que a tabela acima descreve. Entra na chave de dedup de
+ * `farmer_alerts`, para que a mesma data repetida numa portaria futura não faça
+ * o alerta sumir em silêncio.
+ *
+ * ATUALIZE JUNTO COM `VAZIO_SOJA_2026`. O teste
+ * `tests/calendario-safra.test.ts` deriva os anos da própria tabela e falha se
+ * os dois saírem de sincronia — esquecer não é uma opção silenciosa. */
+export const SAFRA_VAZIO = '2026/27';
 
 const SOURCE_LINE = 'Portaria SDA/MAPA nº 1.579/2026';
 
