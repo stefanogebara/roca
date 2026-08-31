@@ -11,8 +11,122 @@
 > **Nada virou spike.** Zero PROTOTIPAR, zero IMPLEMENTAR. Isso não é falha da varredura —
 > é a `verdict_note` funcionando: este projeto está sob flight plan com tripwire, e item
 > que só adiciona capacidade tem teto em DISCUTIR. Restam **18 dias** até 11/set.
+>
+> **Segunda passada (2026-08-31).** Feed veio vazio de novo (`roca: candidates: []`,
+> gerado em 22/08 — mais um sinal de que o feed republicado não está atualizado pra este
+> projeto); cinco scouts, oito candidatos lidos a fundo. **De novo zero PROTOTIPAR/IMPLEMENTAR**
+> — quatro DISCUTIR, quatro REGISTRAR. O achado mais forte não veio da busca: a **CNA lançou
+> nacionalmente um concorrente direto (JoIA)** em 25/08. E o `STATE.md` desta rodada registra
+> que os 15 commits da semana inteira nasceram do `/intel` anterior — achado virou PR no
+> mesmo dia, inclusive um recurso de 2.552 linhas que ninguém pediu. Restam **11 dias**.
 
 ## Em aberto — precisa de decisão do Stefano
+
+### [DISCUTIR 10/15] A OpenRouter virou parte da Stripe — vale um fallback de gateway?
+**Data:** 2026-08-31 · **Eixos:** P3 A2 D2 E2 L1
+**Fontes:** [OpenRouter — "OpenRouter is joining Stripe"](https://openrouter.ai/blog/announcements/openrouter-is-joining-stripe/) · [TechCrunch](https://techcrunch.com/2026/08/16/stripe-will-reportedly-acquire-ai-gateway-startup-openrouter-for-7b/)
+
+**O que é:** a Stripe adquire a OpenRouter por, segundo imprensa (não confirmado pela Stripe),
+mais de US$ 7 bilhões — anunciado em 16/08. O post oficial da OpenRouter garante "same
+mission, same name, same product, same roadmap" e diz que nada muda na integração, mas não
+fala uma palavra sobre pricing futuro.
+
+**Por que toca este projeto:** `api/_lib/llm.ts` usa a OpenRouter como **gateway único de
+LLM** — todo modelo que a Stevi chama (haiku-4.5, sonnet-5, gemini-2.5-flash) passa por uma
+única URL fixa e uma única env var, sem abstração de provedor alternativo. Não existe
+fallback hoje; trocar de gateway exigiria reescrever `chatOnce()` e o tratamento de erro de
+crédito (`isCreditError`), não é troca de config.
+
+**O que a fonte não prova:** o valor de US$ 7 bi segue "reportedly", sem confirmação da
+Stripe; a garantia de continuidade é texto de RI genérico, sem compromisso de pricing. Não
+há nenhum sinal datado de ruptura de preço, uptime ou termos — hoje é só consolidação de
+mercado em torno do único fornecedor de infraestrutura de LLM da Stevi.
+
+**A pergunta:** vale abrir uma spike de diversificação de gateway agora — por exemplo,
+chamada direta à API da Anthropic como fallback para claude-haiku-4.5/sonnet-5 — como
+seguro de infraestrutura com os 11 dias que restam, ou isso só se justifica quando (e se) a
+Stripe anunciar uma mudança concreta de termos, pricing ou uptime da OpenRouter, o que não
+aconteceu ainda?
+
+---
+
+### [DISCUTIR 10/15] O Google já tem data pra desligar o modelo de transcrição — só não é oficial pra todo canal
+**Data:** 2026-08-31 · **Eixos:** P3 A2 D1 E2 L2
+**Fontes:** [Gemini API — deprecations](https://ai.google.dev/gemini-api/docs/deprecations) · [Vertex AI — release notes](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/release-notes)
+
+**O que é:** a página oficial da Gemini API (atualizada 27/08) mostra `gemini-2.5-flash` e
+`gemini-2.5-pro` como "no shutdown date announced" pro canal developer/consumidor. Mas uma
+release note do Vertex AI, também first-party Google, tem entrada de 02/04/2026 dizendo
+textualmente que o retirement desses mesmos modelos "foi atualizado para 16 de outubro de
+2026" — e uma outra página do próprio Vertex mostra 20/10. O Google discorda de si mesmo
+sobre a própria data.
+
+**Por que toca este projeto:** `api/_lib/env.ts:19` fixa `MODELS.transcribe =
+'google/gemini-2.5-flash'` — é o modelo que transcreve toda mensagem de voz de produtor
+(baixo letramento digital). A página de modelo do OpenRouter confirma que esse slug é
+servido por **dois provedores ao mesmo tempo** — Vertex e Google AI Studio — sem a Stevi
+pinar qual usar hoje.
+
+**O que a fonte não prova:** não dá pra saber, sem telemetria própria, que fração do
+tráfego de transcrição da Stevi passa por Vertex (que tem data) vs. AI Studio (que não tem).
+A cobertura de terceiro que estende a data de 16/10 pra API pública inteira não bate com a
+própria página oficial do canal developer — é extrapolação, não fato confirmado.
+
+**A pergunta:** vale forçar `provider=google-ai-studio` na configuração do OpenRouter pro
+slug de transcrição agora — mudança de baixo custo que não quebra nada hoje — ou prefere
+esperar a Gemini Developer API anunciar data oficial antes de mexer em algo que funciona?
+
+---
+
+### [DISCUTIR 8/15] A CNA lançou um concorrente direto e gratuito — e ele reforça a aposta da Stevi, não ameaça
+**Data:** 2026-08-31 · **Eixos:** P2 A1 D2 E1 L2
+**Fontes:** [Money Times](https://www.moneytimes.com.br/cna-lanca-ia-personalizada-para-produtor-rural-no-whatsapp-pads/) · [Jornal do Comércio](https://www.jornaldocomercio.com/agro/2026/08/1260310-cna-lancara-ia-gratuita-para-produtores-rurais.html)
+
+**O que é:** a CNA lançou nacionalmente, em 25/08 na Expointer, o **JoIA** — assistente
+gratuito no WhatsApp (61 9 9844-8367) alimentado pela base Campo Futuro (17+ anos de preço
+de insumo e custo de produção) mais conteúdo do Senar. A CNN Brasil confirma que ele é
+puramente **reativo** — responde pergunta, não manda alerta.
+
+**Por que toca este projeto:** ocupa o espaço "assistente de IA grátis no WhatsApp pro
+produtor" com marca institucional e CAC zero — mas em custo/financiamento, não em triagem
+agronômica nem alerta. `api/_lib/tools/prices.ts` tem um comentário registrando que a Stevi
+evitou indicador regional de custo (CEPEA) por licenciamento; a CNA agora oferece exatamente
+esse dado de graça. E o fato de o JoIA não ter alerta proativo **reforça** a aposta 2 do
+config em vez de ameaçá-la — o território que ele não ocupa é o que a Stevi mais precisa
+provar até 11/09.
+
+**A pergunta:** você quer que a Stevi cite a base CNA/Campo Futuro como fonte pública numa
+resposta rasa de custo (sem reconstruir a base), ou é pra deixar esse território inteiro pro
+JoIA e manter a Stevi 100% em triagem agronômica + alerta proativo?
+
+---
+
+### [DISCUTIR 8/15] Um estudo da FDC nomeia, com dirigente e faturamento, a objeção exata que a Stevi ataca — e também a que ela pode sofrer
+**Data:** 2026-08-31 · **Eixos:** P2 A1 D2 E2 L1
+**Fonte primária:** [Velasco & Wegner, FDC 2025 — "Plataformas digitais no agronegócio", Zenodo](https://zenodo.org/records/17604355) · [cobertura](https://www.issoesaopaulo.com.br/2026/08/entre-o-cafe-mineiro-e-tecnologia.html)
+
+**O que é:** pesquisa qualitativa da Fundação Dom Cabral — 15 entrevistas com dirigentes de
+cooperativas de café/leite de MG (faturamento de R$70 milhões a R$14 bilhões) mais três
+grupos focais, publicada com DOI. Mapeia 22 barreiras à digitalização em 8 categorias e
+recomenda, entre as estratégias, "interfaces simples" e "assistentes via IA" — literalmente
+o pitch da Stevi para o dirigente de cooperativa, não só para o produtor.
+
+**Por que toca este projeto:** `api/_lib/prospect/template.ts` tem o template
+`stevi_parceria_coop_v1` PENDING na Meta desde 13/jul, mirado exatamente nesses dirigentes.
+O estudo é munição formal e citável (autor, instituição, DOI) pro pitch. Mas o mesmo estudo
+lista "propriedade e segurança de dados" como uma das 8 categorias de barreira — o que pode
+virar a objeção oposta: por que a cooperativa usaria um terceiro em vez de construir e
+controlar sua própria plataforma?
+
+**O que a fonte não prova:** são 15 dirigentes autoselecionados via rede FDC, nenhum
+produtor entrevistado diretamente, sem quantificação de peso de cada barreira, e "IA
+conversacional" aparece só como recomendação genérica — não como algo testado.
+
+**A pergunta:** vale citar formalmente o estudo (Velasco & Wegner, FDC 2025) no pitch do
+`stevi_parceria_coop_v1` pra Cocatrel ou outra cooperativa parceira, sabendo que o mesmo
+estudo também nomeia a objeção de propriedade de dados que pode ser usada contra a Stevi?
+
+---
 
 ### [DISCUTIR 10/15] Você vai à Fecon, de 1 a 3 de setembro?
 **Data:** 2026-08-24 · **Eixos:** P3 A2 D1 E1 L3
@@ -127,41 +241,24 @@ dos 18 dias que restam. *(Rebaixado de PROTOTIPAR pela `verdict_note`: 01/10 cai
 
 ---
 
-### [DISCUTIR 9/15] Em 30/08 o cron tenta o alerta de vazio de MT sozinho
-**Data:** 2026-08-24 · **Eixos:** P3 A2 D1 E2 L1
-**Fonte:** [Embrapa — calendário do vazio sanitário](https://www.embrapa.br/soja/ferrugem/vaziosanitariocalendarizacaosemeadura) (Portaria SDA/MAPA 1.579/2026)
-
-**O que é:** não é notícia — é o **gatilho vencendo**. O vazio de MT termina em 06/09 e a
-semeadura abre em 07/09. `upcomingTransitions(now, 7)` em `api/_lib/tools/calendar.ts`
-emite a transição quando faltam ≤7 dias, o cron das 11h passa isso a `runVazioAlerts`, e
-**nada muda no código**: a partir de 30/08 o loop dispara sozinho, quatro dias antes do fim
-do flight plan.
-
-**Por que o veredito é baixo mesmo assim:** é capacidade apontando para um público que a
-base não tem. `listSojaFarmersByUf` exige `users.state = 'MT'` **e** `farms.crop` contendo
-soja. O beachhead é café, são 3 farms com pin e nenhuma de produtor externo ativo. Se o
-funil para antes, o bloqueio de billing nem chega a ser testado.
-
-**A pergunta, e ela tem prazo de seis dias:** existe hoje alguma linha em `farms` com
-cultura soja cujo `users.state` seja MT ou MS? Se o único candidato for fazenda de teste de
-vocês — e `listSojaFarmersByUf` **não filtra `users.kind`** — você quer que dispare e entre
-em `farmer_alerts` como envio, ou prefere um filtro `kind='produtor'` antes de 30/08 para
-não contaminar o primeiro número não-zero da métrica que o scorecard mede?
-
 ## Fila de trabalho
 
-_vazio — nada passou de DISCUTIR nesta rodada, e isso é o esperado._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada, pela segunda semana seguida._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
-produtor** ou a **disparar alerta**. Dos seis itens lidos a fundo, os que tocavam essas duas
-coisas não precisavam de código (a Fecon), ou não tinham destinatário na base (o vazio de
-MT), ou exigiam um n que não existe (o timing de push). O resto era capacidade.
+produtor** ou a **disparar alerta**. Dos oito itens lidos a fundo em 31/08, os quatro que
+tocavam de perto o produto eram observação de mercado ou risco de plataforma sem ação de
+código exigida agora — nenhum virou spike. O resto era capacidade ou contexto.
 
 ## Radar
 
+- `2026-08-31` **CooperRita já tem vendor de IA (Crawly) — e é prospect nomeado do ICP do Stevi.** O iUai, lançado em jan/2026, é chatbot de marca sobre café e queijo regional, não conselho agronômico — mas mostra que uma cooperativa de café do Sul de Minas, dentro do beachhead, já assinou com um fornecedor de IA. Gancho de prospecção, não ameaça de produto. [Itatiaia](https://www.itatiaia.com.br/agro/ia-mineira-cooperativa-lanca-ferramenta-que-entende-de-queijo-e-cafe) · 6/15
+- `2026-08-31` **Preço do Claude Sonnet 5 não sobe.** A Anthropic tornou permanente o preço introdutório ($2/$10 por MTok) e cancelou o aumento pra $3/$15 que estava marcado pra 01/09 — custo do modelo de raciocínio da Stevi via OpenRouter fica igual. [Anthropic](https://platform.claude.com/docs/en/about-claude/pricing) · 6/15
+- `2026-08-31` **AgriRegion confirma a tese, mas o Stevi já resolveu melhor.** Paper de RAG geoespacial (Carolina do Norte, sem código liberado) valida "conselho agrícola precisa ser regional" — mas o vazio sanitário de SP, o bug real da semana, foi fechado com lookup determinístico de município (`vazioRegiao.ts`), não com retrieval. Generalizar pro método do paper seria trocar solução exata por probabilística sem necessidade. [arXiv](https://arxiv.org/abs/2512.10114) · 5/15
+- `2026-08-31` **Farmtech contrata crédito agrícola dentro do WhatsApp da revenda.** "Jornada ao Produtor" formaliza CPR-f digital na mesma conversa que já existe entre revenda e produtor; projeção de R$500-700mi na safra 26/27. Categoria diferente (crédito, não conselho), mas valida de leve a aposta de canal. [AgFeed](https://agfeed.com.br/grande-slam-do-agro/andav/farmtech-aposta-no-whatsapp-para-destravar-a-ultima-milha-do-credito-agro/) · 5/15
 - `2026-08-24` **RAG denso desaba em fala de produtor — e a Stevi não usa RAG denso.** Recuperação densa cai a R@10 = 0,093 em pergunta coloquial contra 0,970 em pergunta formal (bengali, 1.000 consultas, 2.882 nós de 284 publicações oficiais); BM25 híbrido lidera com 0,539. A Stevi já busca por **chave**: `extractPestTarget` normaliza a fala em `{cultura, praga}` canônico com o tier barato antes da busca, e `lookupPest` casa por token — zero embeddings no repo inteiro. Fica registrado como razão documentada para **não** trocar o grounding por embeddings. E o goldenset já está em linguagem de roça ("manchas alaranjadas na parte de baixo, tipo um pó"), então não há o que reescrever. [arXiv](https://arxiv.org/abs/2608.14886) · 7/15
 - `2026-08-24` **RAImundo (Embrapa/MAPA/MDA/AZap.AI) segue sem sinal público desde out/2025.** Versão definitiva prometida para o 2º semestre de 2025 nunca teve lançamento evidenciado, nenhum número além de 2.900 interações em beta, nenhuma página oficial em embrapa.br ou gov.br. **Descartado pelo gate G3** — o repo já registrou a mesma leitura em 25/jul (`.claude/plans/2026-07-25-curadoria-loop/README.md`), com a ação já decidida (monitorar trimestralmente, não tratar como bloqueador de GTM). A varredura de hoje reforça a conclusão sem alterá-la. · 8/15, descartado por dedup
 
 ## Arquivo
 
-_vazio_
+- `2026-08-31` **[era DISCUTIR 9/15] Em 30/08 o cron tenta o alerta de vazio de MT sozinho — resolvido por código, não por decisão do Stefano.** No mesmo dia em que o item foi aberto (24/08), `def021c` filtrou `listSojaFarmersByUf`/`listFarmsWithCoords` por `kind='produtor'`, e `7e891f5` completou a cobertura de UF. Medição de 31/08 no banco confirma: a única farm com soja em MT é `kind='teste'` e o filtro a exclui — o cron de 30/08 não vai contaminar `farmer_alerts`. Movido pra cá porque a pergunta original (disparar pra teste ou filtrar antes?) já tem resposta no código, não porque o Stefano decidiu.
