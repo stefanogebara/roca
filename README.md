@@ -67,7 +67,9 @@ por mensagem; o estado vive no Supabase.
 
 **LLM via OpenRouter** (uma chave, tiers por env): `anthropic/claude-haiku-4.5`
 (roteador), `anthropic/claude-sonnet-5` (raciocínio/visão), `google/gemini-2.5-flash`
-(transcrição).
+(transcrição, com pin de provider `google-ai-studio`). Se `ANTHROPIC_API_KEY` /
+`GEMINI_API_KEY` existirem no env, uma falha do gateway tenta a API direta do
+provedor (`api/_lib/llmDirect.ts`) antes de degradar.
 
 ## Site
 

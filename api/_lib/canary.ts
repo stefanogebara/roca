@@ -16,7 +16,7 @@ import { createHmac } from 'node:crypto';
 import { getDb } from './db';
 import { withRetry } from './retry';
 import { chat } from './llm';
-import { MODELS } from './env';
+import { MODELS, transcribeProviderPin } from './env';
 import { FALLBACK_REPLY } from './fallbackReply';
 import { agrofitAgeDays, AGROFIT_MAX_AGE_DAYS, AGROFIT_GENERATED_AT } from './tools/agrofit';
 import { alertFounders } from './alert';
@@ -289,17 +289,20 @@ async function templateChecks(): Promise<CanaryCheck[]> {
 
 function modelChecks(): Array<Promise<CanaryCheck>> {
   if (!process.env.OPENROUTER_API_KEY) return [];
-  const tiers: Array<[string, string]> = [
-    ['modelo router', MODELS.router()],
-    ['modelo reasoning', MODELS.reasoning()],
-    ['modelo transcribe', MODELS.transcribe()],
+  // O ping do transcribe leva o MESMO pin de provider da produção
+  // (transcribe.ts): sem ele o canário validaria um caminho que o produtor
+  // não usa — verde no Vertex não prova nada sobre o google-ai-studio.
+  const tiers: Array<[string, string, ReturnType<typeof transcribeProviderPin>]> = [
+    ['modelo router', MODELS.router(), undefined],
+    ['modelo reasoning', MODELS.reasoning(), undefined],
+    ['modelo transcribe', MODELS.transcribe(), transcribeProviderPin()],
   ];
-  return tiers.map(async ([label, slug]): Promise<CanaryCheck> => {
+  return tiers.map(async ([label, slug, provider]): Promise<CanaryCheck> => {
     try {
       // chat() has no deadline of its own — race it so one hung provider
       // can't stall the whole canary inside the cron budget.
       const reply = await Promise.race([
-        chat({ model: slug, maxTokens: 8, system: 'Responda apenas: ok', user: 'ping' }),
+        chat({ model: slug, provider, maxTokens: 8, system: 'Responda apenas: ok', user: 'ping' }),
         new Promise<never>((_, rej) =>
           setTimeout(() => rej(new Error('ping timeout')), LLM_PING_TIMEOUT_MS)
         ),
