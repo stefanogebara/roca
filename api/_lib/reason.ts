@@ -24,6 +24,7 @@ import {
 import { chat, type ChatImage } from './llm';
 import { MODELS } from './env';
 import { groundingBlock, chemicalGroups, groundedHit, normalizeCrop, type CropKey } from './tools/agrofit';
+import { isCostQuestion, custosGroundingBlock } from './tools/custos';
 import type { PestCardData } from './cards/pest';
 
 /** Quem observa uma triagem de foto: o que mostrar e o que registrar. */
@@ -445,6 +446,10 @@ async function handleText(
     );
   }
   if (grounding) blocks.push(`[Registro Agrofit — use isto como base, não invente]\n${grounding}`);
+  // Pergunta de custo de produção: ancorar no Campo Futuro (CNA/Senar) em vez
+  // de responder de memória — ver tools/custos.ts. Independe do intent: o
+  // router manda custo para 'general', mas a régua é o TEXTO perguntar custo.
+  if (msg.text && isCostQuestion(msg.text)) blocks.push(custosGroundingBlock());
   if (context) blocks.push(`[Dados derivados da lavoura]\n${context}`);
   const ctx = blocks.length ? '\n\n' + blocks.join('\n\n') : '';
 
