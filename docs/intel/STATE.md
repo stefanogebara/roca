@@ -1,242 +1,107 @@
 # Estado do repositório — Stevi (roca)
 
-> Escrito pela primeira passada do `/intel` em 2026-08-24. Janela: 30 dias.
-> HEAD `467ee137`, branch `master`, último commit **08/ago**.
-> Reescrito a cada `/intel`. Fonte: o git, não o config.
+> Escrito pela segunda passada do `/intel` em 2026-08-31. Janela: desde 24/08.
+> HEAD `0a6b76d`, branch `master`.
+> Reescrito a cada `/intel`. Fonte: o git e o banco, não o config.
 
 ## O parágrafo
 
-**190 commits em 30 dias, zero conversas de produtor externo registradas.** O
-tripwire do flight plan foi declarado disparado em três semanas consecutivas
-(51×0 em 27/jul, 50×0 em 03/ago, 54×0 em 10/ago), e o memo de 10/ago escreve
-que *"não é mais pico, é regime confirmado"*. O que se construiu no período foi
-real e bem feito: agente de voz por ligação de ponta a ponta em quatro dias,
-motor de sourcing de prospects, separação de identidade que finalmente torna a
-tração mensurável, e confiabilidade sob prazo. Mas nenhum desses commits tocou
-o loop proativo ao produtor — `api/_lib/alerts.ts` não aparece entre os 25
-arquivos mais tocados, e `farmer_alerts` segue em zero na vida do produto. O
-sinal novo, que nenhum memo interpretou, é o **silêncio de 16 dias**: o master
-parou em 08/ago e não há memo de scorecard nem em 17/ago nem em 24/ago,
-contrariando a rotina de segunda-feira. Restam **18 dias** até 11/set.
+**Rajada de 15 commits nas primeiras 27 horas depois da passada anterior, depois
+silêncio total por seis dias.** As sete PRs (#5–#11) mescladas em 24–25/08 saíram
+inteiras do próprio `/intel` de 24/08: ele achou três bugs com prazo no caminho
+do alerta de vazio sanitário e uma linha do config desatualizada, e as sessões
+seguintes consertaram tudo — inclusive um recurso novo de 2.552 linhas (mapa de
+município → região da portaria) que ninguém pediu. Zero commits de 26 a 31/08.
+Zero conversa de produtor externo registrada, de novo. E o achado mais forte da
+semana não veio do git: a **CNA lançou nacionalmente, em 25/08, um concorrente
+direto** — JoIA, assistente de IA gratuito para produtor rural no WhatsApp,
+alimentado por 17 anos de dados do Campo Futuro. Restam **11 dias** até 11/set.
 
-## O que shipou
+## O que shipou (24–25/08, todo em um único dia de trabalho)
 
-- **Agente de voz por ligação (ElevenLabs), estudo a produção em 4 dias** —
-  `c39e18b` (estudo com latência real), `40462c3` (integração completa),
-  `37a7d9a` (turn_v3, barge-in, fillers), `dd64a84` (clone da voz da Vitória),
-  `467ee13` (o desfecho da ligação nunca se perde). **É a Vitória prospectando
-  empresa, não o produtor sendo atendido.**
-- **Motor de sourcing e enriquecimento de prospects** — `7de1d78` ("atacar onde
-  o funil morre"), `12b15ad` (lê bio-link, Instagram e Facebook, não só site),
-  `cf1b76a` (rotação de cidades: a grade inteira nunca tinha sido varrida).
-- **A tração vira mensurável** — `42e5e33` (`users.kind` + digest filtrado),
-  `42ca4ce` (Simulador Roca vira `kind='teste'`), `a33a0c3` (**o bug do nono
-  dígito** — a Meta devolve o remetente sem ele; era a causa raiz das 11
-  empresas contaminando WAU/D7/caderno).
-- **Confiabilidade sob prazo** — `dc79963` (todo fetch do transporte com
-  prazo), `aaf4ea5` (prazo compartilhado fecha o caminho da foto nos 60s),
-  `212adb1` ("a resposta ao produtor não pode depender de satélites").
-- **Honestidade do conselho endurecida** — `9dbb1b9` (cultura fora de domínio
-  para de sair com cara de diagnóstico firme), `0da1083` (mamão por texto sai
-  honesto **e o goldenset passa a vigiar isso**).
-- **Post-mortem do dispatch fechado** — a causa raiz era **billing** (#131042),
-  não limite de engajamento da Meta.
+- **`def021c` — o alvo proativo passa a ser só produtor.** `listSojaFarmersByUf`
+  e `listFarmsWithCoords` não filtravam `users.kind`; filtro positivo
+  (`kind = 'produtor'`), falha fechado. Motivado por prazo real: o vazio de MT
+  fechava a janela de 7 dias em 30/08.
+- **`7e891f5` — calendário completo (17→22 UFs) e safra no `alertDedupKey`.**
+  PA, RR, AL, AP, CE deixam de devolver `{known:false}` em silêncio. Chave de
+  dedup ganha `SAFRA_VAZIO` — sem isso, uma portaria futura que repetisse UF+data
+  faria o alerta sumir sem erro.
+- **`b9487ed` — corrige o próprio registro anterior** sobre `farmer_alerts` com
+  a medição de banco de 24/08 (2 linhas, ambas teste, ambas 14/08).
+- **`9de441d` — UF regional recebe hedge, não data pessoal.** `buildVazioAlertText`
+  parou de cravar a data do envelope para UF com múltiplas regiões (SP incluída)
+  — o caminho reativo já fazia isso, o proativo não.
+- **`d86a8a2` — o recurso grande da semana: município resolve a região.**
+  `scripts/extrair-regioes-vazio.mjs` + `knowledge/vazio-regioes-2026.json`
+  (1.836 municípios, 7 UFs) permitem saber a data exata por região em vez do
+  envelope — para SP isso é a diferença entre avisar no dia certo e avisar 15
+  dias tarde. 2.552 linhas em 12 arquivos. **Não foi pedido; nasceu do achado do
+  `/intel` anterior.**
+- **`a4391a1` + `fb2eca5` — confiabilidade da migration.** Tolerância a
+  `farms.municipio` ainda não aplicada, seguida da correção da deriva
+  schema-vs-repo que já tinha voltado uma vez em 04/ago (10 arquivos renomeados
+  para bater com o histórico real do banco).
 
 ## O que está em voo
 
-- **PR #4 — `claude/pm-scorecard-memo-10-ago`, DRAFT desde 10/ago.** A leitura
-  de scorecard mais recente que existe **não está no master**.
-- **`claude/xenodochial-moore-9dc540` — 76 commits à frente, sem PR jamais
-  aberto.** Carrega `a642bb9` (a poda de `farmer_alerts` que nunca rodou),
-  `dfb9dbe` (o alarme da empresa estava morto), `4f77bfa` (o vigia não pode
-  cair junto com o vigiado). O memo de 10/ago classifica como *"achado crítico
-  de infraestrutura"* e registra que não tentou mesclar por ser decisão de
-  engenharia. **Existe código de confiabilidade escrito e não deployado.**
-- **Decisões de founder paradas ≥16 dias:** CNPJ; acordo escrito e assinatura
-  dos 36 casos golden com o Michel; envs `FOUNDER_NOTIFY_TO` e
-  `WHATSAPP_TEMPLATE_ALERT` na Vercel ("não medido"); follow-up humano no Gaia
-  Tech.
+- Nada novo além do que já estava: PR #4 (scorecard 10/ago) segue DRAFT; a
+  branch órfã de 76 commits (`claude/xenodochial-moore-9dc540`) segue sem PR.
 
 ## O que morreu
 
-- **Bump D+3 na prospecção** (`b8b05fa`) — 23 envios, zero humanos.
-- **Bloqueio de telefone fixo** (`f6c00f1`) — nascido e revertido no mesmo dia:
-  9 das 14 entregas bem-sucedidas da história eram para fixo.
-- **Titiler** (`70bc1a5`) — removido por completo.
-- **LiveKit** (`ef5e41c`) — avaliado e **adiado**, "ortogonal à naturalidade".
-- **Cold call por IA** (`ea6cdc0`) — decidido fora.
-- **"Recrutar agrônomo SP/MT para as 5 referrals"** (`33e8e57`) — morto quando
-  se descobriu que as 5 eram teste dos próprios founders.
+Nada novo nesta janela.
 
-> **Trava de estado:** item que proponha bump automático de cadência, cold call
-> por IA, bloqueio de fixo ou LiveKit perde o eixo Alavanca. Foram testados ou
-> avaliados e recusados aqui, com motivo escrito.
+## Medição de 31/08 — o que o banco diz agora
 
-## Áreas quentes
+Consulta somente-leitura no projeto `ruuflfeqcmxpziernaop`, sem PII.
 
-`tasks/lessons.md` (21) · `api/_lib/prospect/agent.ts` (19) ·
-`api/_lib/pipeline.ts` (19) · `web/painel.html` (12) ·
-`tests/prospect-agent.test.ts` (12) · `api/_lib/prospect/inbound.ts` (11) ·
-`api/_lib/prospect/gym.ts` (11) · `api/_lib/prospect/dispatch.ts` (10).
-
-Nove dos 25 arquivos mais tocados são `api/_lib/prospect/*` ou seus testes.
-**`api/_lib/alerts.ts` — o loop que a `bets[1]` diz valer mais que tudo — não
-aparece na lista.**
+- **`farmer_alerts` continua com exatamente 2 linhas** — as mesmas de 14/08,
+  ambas `fire`, ambas de teste. **Nenhum alerta novo disparou desde a última
+  medição.** O loop proativo para produtor real segue em zero na vida do produto.
+- **`farms.municipio` existe fisicamente na tabela — mas não está na tabela de
+  migrations do Supabase** (`supabase_migrations.schema_migrations` para no
+  `20260807160654`; `20260824180000_farms_municipio` não aparece). **A mesma
+  deriva que `fb2eca5` acabou de consertar para outras 10 migrations já
+  reapareceu numa 11ª**, um dia depois — a coluna foi criada fora do fluxo de
+  migration outra vez.
+- **E o produtor real de SP — o único alvo do recurso de município que acabou
+  de ser construído — tem `farms.municipio = null`.** O mapa de 1.836
+  municípios não tem, hoje, nenhum município seu para resolver. Sem isso, o
+  código cai no hedge seguro (correto, não é bug), mas o ganho de precisão que
+  motivou 2.552 linhas de código ainda não se aplica a ninguém de verdade.
+- Denominador sem mudança desde 24/08: 3 farms com pin, 1 produtor com soja
+  (SP).
 
 ## Estado do tripwire
 
 | Lado | Número |
 |---|---|
-| Commits nos últimos 30 dias | **190** |
-| Commits nos últimos 7 dias | **0** (master parado em 08/ago) |
-| Conversas com produtor externo registradas | **0**, em três medições |
-| Externos reais na vida do produto | **1** (Gaia Tech, 1 msg, 17/jul) |
-| `farmer_alerts` | **2 linhas** — medido em 24/08, não zero (ver abaixo) |
-| Alvos reais do loop proativo | **1** produtor com pin · **1** produtor com soja (SP) |
-| Dias restantes até 11/set | **18** |
+| Commits nos últimos 7 dias | **15** |
+| Commits nos últimos 6 dias (26–31/08) | **0** |
+| Conversas com produtor externo registradas | **não medido** — vive no banco de produção/WhatsApp pessoal, fora do alcance deste repositório |
+| `farmer_alerts` | **2 linhas, sem mudança desde 14/08** |
+| Alvos reais do loop proativo | **1** produtor com pin · **1** produtor com soja (SP), município ainda não capturado |
+| Dias restantes até 11/set | **11** |
 
-O silêncio de 16 dias tem duas leituras — founder em campo (o que os três memos
-pediram como prioridade 1) ou campanha parada — e **não são distinguíveis a
-partir deste repositório**: a evidência de conversa vive no banco de produção e
-no WhatsApp pessoal. Registrado como **não medido**, conforme o guard-rail da
-casa.
+**Leitura qualitativa, mesmo sem o lado direito medido: os 15 commits inteiros
+foram gerados pelo próprio `/intel` anterior — achado de bug vira PR no mesmo
+dia, inclusive um recurso de 2.552 linhas que ninguém pediu.** Isso é o padrão
+que o tripwire nomeia — "o conserto nunca é mais código" — acontecendo dentro
+do próprio processo de intel. Vale nomear no PR sem meia-palavra.
 
 ## Divergências com o config
 
 Nenhuma foi aplicada sozinha. `bets` e `settled` só o Stefano mexe.
 
-1. **`settled[2]` — "métrica sempre reportada em duas colunas: total e externos
-   reais" — ESTÁ SENDO VIOLADO PELO CÓDIGO.** A regra vale nos memos escritos
-   por agente e **não vale em nenhuma superfície automatizada do produto**.
-   - `api/_lib/digest.ts:76-90` busca `users` com `.neq('kind','produtor')`,
-     monta um `Set` de `empresaIds` e aplica `soProdutor()` a **todas** as
-     linhas. O comentário admite: *"Filtra AQUI, num ponto só, porque tudo
-     abaixo deriva de `rows`"*.
-   - `api/_lib/digest.ts:253` `formatDigest()` — a linha que os founders leem no
-     WhatsApp é `👥 {inboundTotal} mensagens de {uniqueUsers} produtor(es)`.
-     **Um número por métrica.** A interface `DigestStats` não tem um único campo
-     `*Total` versus `*Externo` — o dado para exibir duas colunas **não
-     existe**, mesmo que se quisesse.
-   - `web/painel.html:310` — `['Msgs recebidas', d.inbound, '', 'Tudo que
-     produtores já mandaram pra Stevi']`. Coluna única, e o tooltip afirma
-     "produtores" sobre um número que não distingue.
-
-   Este `settled` existe **exatamente porque** a decomposição por identidade
-   salvou o repo duas vezes: as "5 referrals orgânicas" que eram teste do
-   próprio Stefano (25/jul) e os "8 novos usuários" que eram bots de
-   atendimento de revenda (03/ago). Nos dois casos a leitura errada veio de uma
-   superfície de coluna única e foi corrigida à mão, depois. O commit
-   `42e5e33` implementou **esconder** quando o `settled` pedia **mostrar os
-   dois** — e esconder é mais frágil que a regra: qualquer `kind` novo some em
-   silêncio, e o founder nunca vê o denominador que ele mesmo pré-comprometeu a
-   olhar.
-
-   **Decisão pendente do Stefano:** corrigir `digest.ts` e `painel.html` para
-   duas colunas é a coisa mais barata desta lista e a mais alinhada ao
-   scorecard — mas é código, e o tripwire diz que o conserto nunca é mais
-   código. Sua chamada.
-
-2. **`bets[1]` — "notificação proativa vale mais que resposta sob demanda" —
-   contradita pelo comportamento, corroborada pela intenção.** Os três loops
-   proativos estão construídos, testados e agendados (`api/_lib/alerts.ts` +
-   cron diário às 11h em `vercel.json`). Mas nos 190 commits do período,
-   **nenhum** foi para o loop proativo ao produtor. `farmer_alerts` = 0 não é
-   código morto: é ausência de produtor com pin (3 farms, nenhuma externa
-   ativa) somada ao canal de template bloqueado por billing e a uma env não
-   confirmada. *`known_gaps[1]` reformulado com essa causa real.*
-
-3. **`stack` dizia "WhatsApp Business API" como se fosse um transporte; são
-   dois.** Meta Cloud API é o ativo, Twilio é legado mantido como rollback e
-   captador do OTP de voz. E faltava **ElevenLabs** — o maior tema de
-   engenharia do mês inteiro. *Corrigido.*
-
-4. **INMET e NASA POWER estavam em `focus_areas` e `platform_deps` e não estão
-   integrados.** NASA POWER: zero ocorrências no repo. INMET: as duas únicas
-   ocorrências são texto de mensagem em `api/_lib/alerts.ts` — a Stevi manda o
-   produtor conferir no INMET, não consome API do INMET. Quem faz clima é
-   **Open-Meteo**; solo é SoilGrids; NDVI é Sentinel-2 via Earth Search.
-   *Corrigido, com nota na `verdict_note`.*
-
-5. **Correção da própria primeira passada — a env `WHATSAPP_TEMPLATE_ALERT` não é o
-   bloqueio.** Escrevi acima, seguindo o memo de 10/ago, que ela estava "não medida" há
-   16 dias. O repositório contradiz:
-   `.claude/plans/2026-07-30-virada-cloud-api/README.md:81` registra
-   `[x] ~~Janela de 24h~~ — WHATSAPP_TEMPLATE_ALERT está setado na Vercel (Preview +
-   Production, conferido em vercel env ls)`. O template `stevi_alerta_v1` está no registry
-   (`api/_lib/prospect/template.ts`) com 1 param de corpo, `cloud.sendTemplate` monta
-   exatamente 1 param, e `api/_lib/canary.ts` já vigia a forma dele. **O bloqueio residual
-   do loop proativo é billing, não configuração.** O memo estava desatualizado, e o config
-   foi corrigido.
-
-6. **Três defeitos pequenos e reais no caminho do alerta, achados ao aterrar um item:**
-   - `listSojaFarmersByUf` (`api/_lib/db.ts:777-794`) **não filtra `users.kind`**. A partir
-     de **30/08** o `upcomingTransitions(now, 7)` põe o vazio de MT na janela e o cron das
-     11h tenta disparar. Se o único candidato for fazenda de teste, o primeiro número
-     não-zero de `farmer_alerts` — a métrica que o scorecard mede — nasce contaminado.
-     **Isso tem prazo: seis dias.**
-   - `api/_lib/tools/calendar.ts` cobre **17 das 22 UFs** da portaria. Faltam PA, RR, AL,
-     AP e CE. O PA é o único com peso real em soja (vazio 15/06→15/09/2026) e cairia dentro
-     do voo; hoje um produtor do PA recebe `vazioStatus()` devolvendo
-     `{known:false, line:null}` — silêncio, não erro.
-   - `alertDedupKey` é `${kind}:${uf}:${date}` com a data ISO completa. Como a portaria muda
-     as datas todo ano, o reenvio anual funciona — **por acidente**. Se uma portaria futura
-     repetir a data exata da mesma UF, o alerta some em silêncio; não há `season` na chave.
-
-7. **`known_gaps[2]` estava desatualizado.** A fonte de verdade agronômica
-   existe e é usada no prompt. O buraco é a **assinatura**: os 37 casos de
-   `knowledge/goldenset/goldenset.jsonl` têm `verified_by: null`. O campo já
-   existe — é o slot exato onde a assinatura do agrônomo entra. *Reformulado.*
-
-## Medição de 24/08 — o que o banco diz, e onde o registro estava errado
-
-Consulta somente-leitura no projeto `ruuflfeqcmxpziernaop`, sem PII.
-
-**`farmer_alerts` não está em zero.** Tem **2 linhas**, ambas `fire`, ambas de
-**2026-08-14 11:00 UTC** — o cron diário —, ambas para users com `kind = 'teste'`
-em MT. O loop proativo **já disparou**. O que nunca aconteceu foi disparar para
-produtor real.
-
-Os três memos de scorecard dizem zero porque **o último é de 10/08 e ninguém
-mediu depois**. Eu repeti o número deles no `known_gaps`, no config e no corpo do
-PR #7 sem medir. Corrigido nos três lugares.
-
-**Consequência para o PR #7:** eu declarei ali que a mudança de formato da chave
-de dedup não causaria reenvio, com a justificativa de que `farmer_alerts` estava
-vazia. A justificativa era falsa; **a conclusão continua verdadeira**, e por
-outro motivo — as duas linhas são `fire:2026-08-14`, e `fireDedupKey` não mudou.
-Só `alertDedupKey` (vazio) ganhou safra, e não há nenhuma linha `vazio_*`.
-
-**O denominador real, medido:**
-
-| | |
-|---|---|
-| users | 29 — 19 `empresa`, 8 `teste`, **2 `produtor`** |
-| farms com pin | 3 — **1 produtor**, 2 teste |
-| farms com soja | 2 — **1 produtor (SP)**, 1 teste (MT) |
-
-**Existe um alvo real, e ele tem data.** Um `produtor` em **SP**, canal `cloud`,
-com pin, culturas `['soja','milho']`, criado em 08/07. Isso significa:
-`listFarmsWithCoords` (geada e queimada) tem **1 alvo real**, e
-`listSojaFarmersByUf('SP')` tem **1 alvo real**.
-
-**O vazio de SP termina em 15/09**, então `upcomingTransitions(now, 7)` põe SP na
-janela em **08/09** — dentro do voo, que fecha em 11/09. Seria o **primeiro
-`farmer_alert` legítimo da vida do produto**.
-
-**E é aí que está o defeito novo.** `buildVazioAlertText` **não hedgeia UF
-regional**. Ele diria a esse produtor *"o vazio sanitário da soja em SP termina
-em 7 dias"* — mas SP é `regional: true`, com três regiões e datas diferentes, e
-15/09 é o fim da Região III, não necessariamente a dele. O caminho **reativo**
-(`vazioStatus`) já resolve isso corretamente: para UF regional ele diz *"varia
-por região... confirme a data exata da sua região"*. O caminho **proativo afirma
-o que o reativo se recusa a afirmar**.
-
-Não mexi nisso: mudar copy que vai para produtor real é decisão do Stefano, não
-consequência de uma auditoria. Mas a data é 08/09 e o alvo é o único produtor
-real que existe.
-
-**O que a correção de 24/08 evitou, concretamente.** A única farm com soja em MT
-é `kind = 'teste'`. Sem o filtro do PR #6, em 30/08 o cron teria mandado o alerta
-de vazio de MT para uma fixture, e `farmer_alerts` ganharia sua primeira linha
-`vazio_*` vinda de teste — contaminando o primeiro número não-zero da métrica que
-o scorecard mede em 11/09. Com o filtro, MT devolve conjunto vazio.
+1. **Concorrente direto novo, ausente do `intel.config.json` e de `known_gaps`.**
+   A CNA lançou o **JoIA** em 25/08 — assistente de IA gratuito no WhatsApp para
+   produtor rural, nacional, apoiado em 17 anos de dados do Campo Futuro e
+   conteúdo do Senar. Ficou como item DISCUTIR nesta rodada (ver `INTEL.md`);
+   registrado aqui porque muda a leitura competitiva que o config ainda não tem.
+2. **A deriva de migration (`known_gaps`) não está resolvida — reapareceu.**
+   `fb2eca5` consertou 10 migrations e classificou `farms_municipio` como "só
+   rodar depois, idempotente". Ela não rodou pelo fluxo de migration; a coluna
+   está em produção sem estar no histórico. O texto do `known_gaps` sobre deriva
+   schema-vs-repo deveria refletir que o problema é recorrente, não um incidente
+   fechado em 04/ago.
