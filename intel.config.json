@@ -7,7 +7,7 @@
     "WhatsApp por DOIS transportes coexistindo na mesma URL: Meta Cloud API é o ATIVO (api/_lib/transport/cloud.ts), Twilio é LEGADO mantido como rollback e captador de OTP de voz (api/_lib/transport/twilio.ts)",
     "Supabase (project ruuflfeqcmxpziernaop) — 47 migrations; o ID só aparece em docs de agente, o runtime resolve por SUPABASE_URL",
     "Vercel — functions, 3 crons e rewrites em vercel.json",
-    "OpenRouter como gateway único de LLM (api/_lib/llm.ts, fetch puro sem SDK): claude-haiku-4.5 no router, claude-sonnet-5 no raciocínio, gemini-2.5-flash na transcrição",
+    "OpenRouter como gateway PRINCIPAL de LLM (api/_lib/llm.ts, fetch puro sem SDK): claude-haiku-4.5 no router, claude-sonnet-5 no raciocínio, gemini-2.5-flash na transcrição (pin de provider google-ai-studio — o Vertex aposenta o 2.5 em 16/10/2026, a API pública não tem data). Desde 31/08 há fallback direto opcional por chave (api/_lib/llmDirect.ts): ANTHROPIC_API_KEY → Messages API, GEMINI_API_KEY → endpoint OpenAI-compat do AI Studio — resposta à aquisição da OpenRouter pela Stripe (anunciada 19/08/2026, closing pendente)",
     "ElevenLabs — agente de voz por ligação (api/el-webhook.ts, api/el-tools.ts, api/_lib/voice/elAgent.ts); é a Vitória prospectando empresas, não o produtor sendo atendido",
     "web/ é HTML/CSS/JS estático puro, sem framework e sem build (scripts/build-web.mjs copia para public/)",
     "dados externos: Open-Meteo (clima e geada), ISRIC SoilGrids (solo), Sentinel-2 via Earth Search AWS (NDVI), INPE Queimadas (fogo), Yahoo Finance (preço de saca)",
@@ -74,7 +74,7 @@
   "platform_deps": [
     "Meta WhatsApp Cloud API (transporte ativo)",
     "Twilio (legado / OTP de voz)",
-    "OpenRouter (gateway único de LLM)",
+    "OpenRouter (gateway principal de LLM; fallback direto opcional Anthropic/Google AI Studio)",
     "ElevenLabs (voz por ligação)",
     "Supabase",
     "Vercel",

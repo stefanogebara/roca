@@ -256,10 +256,12 @@ Surfaced during documentation; **not fixed here** (docs-only task):
    copy. Consider having the script write both paths, or a `postbuild` copy.
 2. **Root `README.md` setup steps are stale.** It tells you to run
    `supabase/migrations/0001_init.sql` (the real files are
-   `20260707000001_init.sql` and `20260707000002_monitor.sql`) and to generate an
-   `ANTHROPIC_API_KEY` — but the app authenticates to OpenRouter via
-   `OPENROUTER_API_KEY`; `ANTHROPIC_API_KEY` is not used anywhere in the app. Trust
-   this runbook and `.env.example` over the root README.
+   `20260707000001_init.sql` and `20260707000002_monitor.sql`). Trust this runbook
+   and `.env.example` over the root README. Note `ANTHROPIC_API_KEY` changed
+   meaning in Aug/2026: it is no longer dead config — when present it enables the
+   direct-API gateway fallback (`api/_lib/llmDirect.ts`), alongside
+   `GEMINI_API_KEY`. The primary auth is still `OPENROUTER_API_KEY`.
 3. **`scripts/check-key.mjs` validates `ANTHROPIC_API_KEY`** directly against the
-   Anthropic API — a leftover diagnostic from before the OpenRouter migration. Use
-   `scripts/check-openrouter.mjs` to validate the key the app actually uses.
+   Anthropic API — originally a leftover from before the OpenRouter migration; now
+   doubles as a validity check for the fallback key. Use
+   `scripts/check-openrouter.mjs` to validate the key the app primarily uses.

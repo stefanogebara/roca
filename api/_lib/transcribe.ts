@@ -5,7 +5,7 @@
  */
 
 import { chat } from './llm';
-import { MODELS } from './env';
+import { MODELS, transcribeProviderPin } from './env';
 import { createLogger } from './logger';
 
 const log = createLogger('transcribe');
@@ -27,6 +27,7 @@ export async function transcribeVoice(
   try {
     const text = await chat({
       model: MODELS.transcribe(),
+      provider: transcribeProviderPin(),
       maxTokens: 500,
       audio: { base64, format: formatFromMime(mime) },
       user: 'Transcreva este áudio em português brasileiro, exatamente como falado, sem comentários. Responda somente a transcrição.',

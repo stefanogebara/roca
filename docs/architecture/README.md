@@ -370,6 +370,23 @@ code changes:
 (`input_audio`). It throws on API failure or empty completion; callers decide whether
 to degrade (router → `general`; transcription → ask for text) or surface a fallback.
 
+Two diversification layers exist since the Stripe acquisition of OpenRouter was
+announced (Aug/2026):
+
+- **Provider pin for transcription.** Google retired Gemini 2.5 on **Vertex**
+  (Oct 16, 2026) but announced no shutdown for the public API — so the transcribe
+  call pins OpenRouter's routing to `google-ai-studio`
+  (`ROCA_TRANSCRIBE_PROVIDER`, `transcribeProviderPin()` in `env.ts`; `any`
+  disables the pin). The daily canary pings the transcribe tier with the same
+  pin, so a paused/broken provider surfaces before a farmer's voice note does.
+- **Direct-API fallback** (`api/_lib/llmDirect.ts`). When the gateway fails with
+  the retry exhausted and a direct key exists for the model's provider
+  (`ANTHROPIC_API_KEY` → Anthropic Messages API; `GEMINI_API_KEY` → Google AI
+  Studio's OpenAI-compatible endpoint), `chat()` makes one direct attempt inside
+  the same shared time budget. No keys = single-gateway behavior, unchanged. The
+  failover is deliberately unconditional on error class: an acquisition-shaped
+  failure would be account/terms (401/402/403), not a 5xx.
+
 ## Data model
 
 Supabase/Postgres, defined in `supabase/migrations/`. Minimal and LGPD-conscious:

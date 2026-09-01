@@ -24,6 +24,18 @@ export interface ChatAudio {
   format: string;
 }
 
+/**
+ * OpenRouter provider routing (docs: guides/routing/provider-selection).
+ * `only` restringe aos slugs listados; `order` prioriza sem excluir. Existe por
+ * causa do Gemini 2.5: o Google marcou aposentadoria no VERTEX (16/10/2026) mas
+ * não na API pública — e sem pin o OpenRouter roteia transcrição pros dois.
+ */
+export interface ProviderPrefs {
+  only?: string[];
+  order?: string[];
+  allow_fallbacks?: boolean;
+}
+
 export interface ChatOptions {
   model: string;
   system?: string;
@@ -53,6 +65,8 @@ export interface ChatOptions {
    * de UMA tentativa — útil para dizer "esta extração é barata, 10s bastam".
    */
   timeoutMs?: number;
+  /** Pin de provider no OpenRouter (ver ProviderPrefs). Omitido = roteamento livre. */
+  provider?: ProviderPrefs;
   /**
    * Prazo final da requisição (epoch ms), compartilhado por todas as chamadas
    * do mesmo webhook. Com ele, cada tentativa gasta no máximo o que sobrou e a
@@ -114,10 +128,47 @@ export async function chat(opts: ChatOptions): Promise<string> {
   } catch (e) {
     // Saldo zero é incidente de negócio, não erro técnico: sem alerta a Vitória
     // fica muda e ninguém sabe. O alerta NUNCA altera o resultado da chamada —
-    // o erro segue subindo para quem chamou decidir.
+    // o erro segue subindo para quem chamou decidir. Dispara MESMO quando o
+    // fallback direto abaixo salvar a resposta: saldo zero não se paga sozinho.
     const msg = (e as Error).message ?? '';
     if (isCreditError(msg)) fireAndForget(() => alertarCredito(msg), 'alerta de crédito');
+
+    // Gateway esgotado (retry incluso) ≠ fim da linha: se existe chave da API
+    // direta do provedor deste modelo, vale uma tentativa antes do fallback
+    // burro. Sem condição sobre a CLASSE do erro, de propósito — o cenário que
+    // motivou isto (aquisição da OpenRouter pela Stripe, 19/08/2026) falharia
+    // por conta/termos (401/402/403), não por 5xx, e a chave direta é outra
+    // conta. O orçamento de tempo é quem limita o custo de tentar.
+    const salvo = await tentarFallbackDireto(opts);
+    if (salvo != null) return salvo;
     throw e;
+  }
+}
+
+/**
+ * Uma tentativa pela API direta do provedor (Anthropic/Google), quando
+ * configurada. Devolve null quando não dá (sem rota, sem chave, sem tempo) ou
+ * quando também falhou — quem chamou rethrowa o erro ORIGINAL do gateway, que
+ * é o incidente real. Import dinâmico para não criar ciclo (llmDirect importa
+ * buildMessages daqui).
+ */
+async function tentarFallbackDireto(opts: ChatOptions): Promise<string | null> {
+  try {
+    const { directRouteFor, chatDirect } = await import('./llmDirect');
+    const route = directRouteFor(opts.model);
+    if (!route || !process.env[route.envKey]) return null;
+    const restante = restanteMs(opts.deadlineAt ?? prazoAtual(), Date.now());
+    if (!cabeOutraTentativa(restante)) return null;
+    const timeoutMs = prazoDaTentativa(opts.timeoutMs ?? 25_000, restante);
+    const r = await chatDirect(opts, route, timeoutMs);
+    lastFinishReason = r.finishReason;
+    // error, não info, de propósito: cada linha destas é o gateway falhando em
+    // produção — em série, é hora de olhar o OpenRouter (status, saldo, termos).
+    log.error(`OpenRouter falhou; API direta (${route.provider}) respondeu por ${opts.model}`);
+    return r.text;
+  } catch (e) {
+    log.error('fallback direto também falhou:', (e as Error).message);
+    return null;
   }
 }
 
@@ -161,10 +212,22 @@ export function buildMessages(opts: ChatOptions): ChatMessage[] {
   return messages;
 }
 
+/**
+ * The OpenRouter request body. Pure — extracted so the provider pin (and the
+ * rest of the wire shape) is unit testable without a live call.
+ */
+export function buildRequestBody(opts: ChatOptions): Record<string, unknown> {
+  return {
+    model: opts.model,
+    max_tokens: opts.maxTokens ?? 600,
+    ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+    ...(opts.provider ? { provider: opts.provider } : {}),
+    messages: buildMessages(opts),
+  };
+}
+
 async function chatOnce(opts: ChatOptions): Promise<string> {
   const apiKey = requireEnv('OPENROUTER_API_KEY');
-
-  const messages = buildMessages(opts);
 
   const timeoutMs = opts.timeoutMs ?? 25_000;
   // Sem orçamento não se abre conexão: um AbortSignal.timeout(0) faria a
@@ -182,12 +245,7 @@ async function chatOnce(opts: ChatOptions): Promise<string> {
         'HTTP-Referer': 'https://roca-black.vercel.app',
         'X-Title': 'Stevi',
       },
-      body: JSON.stringify({
-        model: opts.model,
-        max_tokens: opts.maxTokens ?? 600,
-        ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
-        messages,
-      }),
+      body: JSON.stringify(buildRequestBody(opts)),
     });
   } catch (e) {
     const name = (e as Error).name;
