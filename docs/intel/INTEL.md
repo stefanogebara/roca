@@ -19,117 +19,22 @@
 > nacionalmente um concorrente direto (JoIA)** em 25/08. E o `STATE.md` desta rodada registra
 > que os 15 commits da semana inteira nasceram do `/intel` anterior — achado virou PR no
 > mesmo dia, inclusive um recurso de 2.552 linhas que ninguém pediu. Restam **11 dias**.
+>
+> **Fechamento de ciclo (2026-09-01).** Não é varredura nova: zero scout, zero candidato
+> novo. O Stefano decidiu os QUATRO itens de 31/08 no mesmo dia e todos viraram código
+> mesclado (#13, #14, #15) — foram movidos para o Arquivo com o que aconteceu em cada um.
+> Um deles saiu com **correção factual**: o registro de 31/08 dizia que o estudo da FDC
+> "nomeia, com dirigente e faturamento", e o PDF mostra que ele anonimiza — a diferença
+> mudava o que a Vitória pode dizer, então virou trava no prompt. Restam **10 dias**.
 
 ## Em aberto — precisa de decisão do Stefano
 
-### [DISCUTIR 10/15] A OpenRouter virou parte da Stripe — vale um fallback de gateway?
-**Data:** 2026-08-31 · **Eixos:** P3 A2 D2 E2 L1
-**Fontes:** [OpenRouter — "OpenRouter is joining Stripe"](https://openrouter.ai/blog/announcements/openrouter-is-joining-stripe/) · [TechCrunch](https://techcrunch.com/2026/08/16/stripe-will-reportedly-acquire-ai-gateway-startup-openrouter-for-7b/)
-
-**O que é:** a Stripe adquire a OpenRouter por, segundo imprensa (não confirmado pela Stripe),
-mais de US$ 7 bilhões — anunciado em 16/08. O post oficial da OpenRouter garante "same
-mission, same name, same product, same roadmap" e diz que nada muda na integração, mas não
-fala uma palavra sobre pricing futuro.
-
-**Por que toca este projeto:** `api/_lib/llm.ts` usa a OpenRouter como **gateway único de
-LLM** — todo modelo que a Stevi chama (haiku-4.5, sonnet-5, gemini-2.5-flash) passa por uma
-única URL fixa e uma única env var, sem abstração de provedor alternativo. Não existe
-fallback hoje; trocar de gateway exigiria reescrever `chatOnce()` e o tratamento de erro de
-crédito (`isCreditError`), não é troca de config.
-
-**O que a fonte não prova:** o valor de US$ 7 bi segue "reportedly", sem confirmação da
-Stripe; a garantia de continuidade é texto de RI genérico, sem compromisso de pricing. Não
-há nenhum sinal datado de ruptura de preço, uptime ou termos — hoje é só consolidação de
-mercado em torno do único fornecedor de infraestrutura de LLM da Stevi.
-
-**A pergunta:** vale abrir uma spike de diversificação de gateway agora — por exemplo,
-chamada direta à API da Anthropic como fallback para claude-haiku-4.5/sonnet-5 — como
-seguro de infraestrutura com os 11 dias que restam, ou isso só se justifica quando (e se) a
-Stripe anunciar uma mudança concreta de termos, pricing ou uptime da OpenRouter, o que não
-aconteceu ainda?
-
----
-
-### [DISCUTIR 10/15] O Google já tem data pra desligar o modelo de transcrição — só não é oficial pra todo canal
-**Data:** 2026-08-31 · **Eixos:** P3 A2 D1 E2 L2
-**Fontes:** [Gemini API — deprecations](https://ai.google.dev/gemini-api/docs/deprecations) · [Vertex AI — release notes](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/release-notes)
-
-**O que é:** a página oficial da Gemini API (atualizada 27/08) mostra `gemini-2.5-flash` e
-`gemini-2.5-pro` como "no shutdown date announced" pro canal developer/consumidor. Mas uma
-release note do Vertex AI, também first-party Google, tem entrada de 02/04/2026 dizendo
-textualmente que o retirement desses mesmos modelos "foi atualizado para 16 de outubro de
-2026" — e uma outra página do próprio Vertex mostra 20/10. O Google discorda de si mesmo
-sobre a própria data.
-
-**Por que toca este projeto:** `api/_lib/env.ts:19` fixa `MODELS.transcribe =
-'google/gemini-2.5-flash'` — é o modelo que transcreve toda mensagem de voz de produtor
-(baixo letramento digital). A página de modelo do OpenRouter confirma que esse slug é
-servido por **dois provedores ao mesmo tempo** — Vertex e Google AI Studio — sem a Stevi
-pinar qual usar hoje.
-
-**O que a fonte não prova:** não dá pra saber, sem telemetria própria, que fração do
-tráfego de transcrição da Stevi passa por Vertex (que tem data) vs. AI Studio (que não tem).
-A cobertura de terceiro que estende a data de 16/10 pra API pública inteira não bate com a
-própria página oficial do canal developer — é extrapolação, não fato confirmado.
-
-**A pergunta:** vale forçar `provider=google-ai-studio` na configuração do OpenRouter pro
-slug de transcrição agora — mudança de baixo custo que não quebra nada hoje — ou prefere
-esperar a Gemini Developer API anunciar data oficial antes de mexer em algo que funciona?
-
----
-
-### [DISCUTIR 8/15] A CNA lançou um concorrente direto e gratuito — e ele reforça a aposta da Stevi, não ameaça
-**Data:** 2026-08-31 · **Eixos:** P2 A1 D2 E1 L2
-**Fontes:** [Money Times](https://www.moneytimes.com.br/cna-lanca-ia-personalizada-para-produtor-rural-no-whatsapp-pads/) · [Jornal do Comércio](https://www.jornaldocomercio.com/agro/2026/08/1260310-cna-lancara-ia-gratuita-para-produtores-rurais.html)
-
-**O que é:** a CNA lançou nacionalmente, em 25/08 na Expointer, o **JoIA** — assistente
-gratuito no WhatsApp (61 9 9844-8367) alimentado pela base Campo Futuro (17+ anos de preço
-de insumo e custo de produção) mais conteúdo do Senar. A CNN Brasil confirma que ele é
-puramente **reativo** — responde pergunta, não manda alerta.
-
-**Por que toca este projeto:** ocupa o espaço "assistente de IA grátis no WhatsApp pro
-produtor" com marca institucional e CAC zero — mas em custo/financiamento, não em triagem
-agronômica nem alerta. `api/_lib/tools/prices.ts` tem um comentário registrando que a Stevi
-evitou indicador regional de custo (CEPEA) por licenciamento; a CNA agora oferece exatamente
-esse dado de graça. E o fato de o JoIA não ter alerta proativo **reforça** a aposta 2 do
-config em vez de ameaçá-la — o território que ele não ocupa é o que a Stevi mais precisa
-provar até 11/09.
-
-**A pergunta:** você quer que a Stevi cite a base CNA/Campo Futuro como fonte pública numa
-resposta rasa de custo (sem reconstruir a base), ou é pra deixar esse território inteiro pro
-JoIA e manter a Stevi 100% em triagem agronômica + alerta proativo?
-
----
-
-### [DISCUTIR 8/15] Um estudo da FDC nomeia, com dirigente e faturamento, a objeção exata que a Stevi ataca — e também a que ela pode sofrer
-**Data:** 2026-08-31 · **Eixos:** P2 A1 D2 E2 L1
-**Fonte primária:** [Velasco & Wegner, FDC 2025 — "Plataformas digitais no agronegócio", Zenodo](https://zenodo.org/records/17604355) · [cobertura](https://www.issoesaopaulo.com.br/2026/08/entre-o-cafe-mineiro-e-tecnologia.html)
-
-**O que é:** pesquisa qualitativa da Fundação Dom Cabral — 15 entrevistas com dirigentes de
-cooperativas de café/leite de MG (faturamento de R$70 milhões a R$14 bilhões) mais três
-grupos focais, publicada com DOI. Mapeia 22 barreiras à digitalização em 8 categorias e
-recomenda, entre as estratégias, "interfaces simples" e "assistentes via IA" — literalmente
-o pitch da Stevi para o dirigente de cooperativa, não só para o produtor.
-
-**Por que toca este projeto:** `api/_lib/prospect/template.ts` tem o template
-`stevi_parceria_coop_v1` PENDING na Meta desde 13/jul, mirado exatamente nesses dirigentes.
-O estudo é munição formal e citável (autor, instituição, DOI) pro pitch. Mas o mesmo estudo
-lista "propriedade e segurança de dados" como uma das 8 categorias de barreira — o que pode
-virar a objeção oposta: por que a cooperativa usaria um terceiro em vez de construir e
-controlar sua própria plataforma?
-
-**O que a fonte não prova:** são 15 dirigentes autoselecionados via rede FDC, nenhum
-produtor entrevistado diretamente, sem quantificação de peso de cada barreira, e "IA
-conversacional" aparece só como recomendação genérica — não como algo testado.
-
-**A pergunta:** vale citar formalmente o estudo (Velasco & Wegner, FDC 2025) no pitch do
-`stevi_parceria_coop_v1` pra Cocatrel ou outra cooperativa parceira, sabendo que o mesmo
-estudo também nomeia a objeção de propriedade de dados que pode ser usada contra a Stevi?
-
----
 
 ### [DISCUTIR 10/15] Você vai à Fecon, de 1 a 3 de setembro?
 **Data:** 2026-08-24 · **Eixos:** P3 A2 D1 E1 L3
+> **01/09:** a feira começou HOJE e fecha em 03/09. Esta pergunta expira em dois dias — e
+> era a única do Arquivo inteiro capaz de gerar coorte com leitura D7 dentro do voo.
+> Continua sem decisão registrada.
 **Fonte:** [21ª Feira Cocatrel de Negócios](https://equipepositiva.com/21a-feira-cocatrel-de-negocios-sera-de-1o-a-3-de-setembro/)
 
 **O que é:** a Cocatrel — 2ª maior cooperativa de café do Brasil, atendendo cafeicultores
@@ -250,6 +155,14 @@ produtor** ou a **disparar alerta**. Dos oito itens lidos a fundo em 31/08, os q
 tocavam de perto o produto eram observação de mercado ou risco de plataforma sem ação de
 código exigida agora — nenhum virou spike. O resto era capacidade ou contexto.
 
+**Adendo de 01/09:** os quatro itens de 31/08 foram decididos pelo Stefano no mesmo dia e
+viraram código — três PRs mesclados (#13, #14, #15). Estão no Arquivo, cada um com o que
+aconteceu. Isso NÃO contradiz a `verdict_note`: ela trava a PROMOÇÃO automática de item que
+só adiciona capacidade; nenhum destes subiu sozinho de DISCUTIR. Quem decidiu foi o
+fundador, que é exatamente o que a seção "Em aberto" existe para provocar. O registro fica
+aqui porque a alternativa — apagar a pergunta depois de respondida — perderia o rastro de
+por que o código existe.
+
 ## Radar
 
 - `2026-08-31` **CooperRita já tem vendor de IA (Crawly) — e é prospect nomeado do ICP do Stevi.** O iUai, lançado em jan/2026, é chatbot de marca sobre café e queijo regional, não conselho agronômico — mas mostra que uma cooperativa de café do Sul de Minas, dentro do beachhead, já assinou com um fornecedor de IA. Gancho de prospecção, não ameaça de produto. [Itatiaia](https://www.itatiaia.com.br/agro/ia-mineira-cooperativa-lanca-ferramenta-que-entende-de-queijo-e-cafe) · 6/15
@@ -261,4 +174,9 @@ código exigida agora — nenhum virou spike. O resto era capacidade ou contexto
 
 ## Arquivo
 
+- `2026-09-01` **[era DISCUTIR 10/15] A OpenRouter virou parte da Stripe — decidido: diversificar em duas camadas, sem esperar mudança de termos.** O Stefano mandou ir fundo e liberou trocar modelo. Confirmado com as fontes primárias que a aquisição foi anunciada pelas DUAS partes em 19/08 ("same product, same roadmap", closing pendente) — promessa, não contrato. Entraram: fallback direto por chave (`api/_lib/llmDirect.ts`, Anthropic Messages API e endpoint OpenAI-compat do Google AI Studio) em #13, e chave RESERVA do OpenRouter — conta separada, a do projeto twin-me — como camada 1 em #14, já configurada em produção (`OPENROUTER_FALLBACK_API_KEY`) com redeploy feito. O gateway deixou de ser ponto único. [Stripe](https://stripe.com/newsroom/news/stripe-agrees-to-acquire-openrouter) · [OpenRouter](https://openrouter.ai/blog/announcements/openrouter-is-joining-stripe/)
+- `2026-09-01` **[era DISCUTIR 10/15] O Google já tem data pra desligar o Gemini 2.5 — decidido: pinar `google-ai-studio` agora, sem esperar a data oficial.** A checagem nas páginas do Google fechou a dúvida das duas datas: 16/10/2026 está confirmado nos release notes do **Vertex**; a página de model-versions cita 20/10 e o Google não resolveu a contradição (planejamos pelo 16). O que decide é outra coisa: a **API pública segue "no shutdown date announced"**, então o pin desacopla a transcrição do prazo do Vertex inteiro. Implementado em #13 (`ROCA_TRANSCRIBE_PROVIDER`, default `google-ai-studio`, `any` desliga), com o canário pingando o tier de transcrição pelo MESMO pin — senão validaria caminho que o produtor não usa. Modelo mantido: `gemini-2.5-flash-lite` seria mais barato em áudio (US$0,30/M vs 1,00) mas ninguém mediu transcrição PT-BR de voz de roça nele; trocar default sem golden de transcrição fica em aberto. [Vertex release notes](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/release-notes) · [deprecations da API pública](https://ai.google.dev/gemini-api/docs/deprecations)
+- `2026-09-01` **[era DISCUTIR 8/15] O JoIA da CNA — decidido: citar a base pública, e ela ancora uma resposta que saía rasa.** A leitura a fundo confirmou o desenho do concorrente (WhatsApp, gratuito, número (61) 99844-8367, lançado 25/08, rollout na Expointer) e, mais útil, o **status legal da base**: os boletins mensais do Campo Futuro (CNA/Senar; café elaborado pelo CIM/UFLA) trazem impresso "Reprodução permitida desde que citada a fonte". Não é território deles — é fonte pública. Implementado em #13: `api/_lib/tools/custos.ts` detecta pergunta de custo (que não é cotação e caía no caminho `general` sem base nenhuma) e injeta estrutura COE/COT, a citação, e a honestidade de que o número público é da propriedade MODAL da região, não da lavoura dele — com o gancho pro caderno, que é o dado que só a Stevi tem. Nenhum número embutido no código: boletim é mensal. Caso novo no goldenset (`custo-producao-cafe`). Confirmado também que o JoIA é **só reativo** — nenhuma fonte menciona alerta proativo, o que mantém a `bets[1]` de pé. [CNA](https://cnabrasil.org.br/noticias/sistema-cna-senar-leva-joia-projeto-comprador-e-produtos-artesanais-a-expointer) · [boletim Ativos Café](https://www.cnabrasil.org.br/storage/arquivos/icones/Ativos-Cafe-Campo-futuro-Agosto-2024-CNA.pdf)
+- `2026-09-01` **[era DISCUTIR 8/15] O estudo da FDC — decidido: citar na CONVERSA, não no template. E o registro de 31/08 estava errado num ponto que mudava a ação.** O título daquele item dizia que o estudo "nomeia, com dirigente e faturamento". Abrindo o PDF: ele **anonimiza** — a Tabela 1 traz perfis (fundação, cidade, nº de associados, faturamento 2024) e o cargo do entrevistado, sem nome de cooperativa nem de dirigente. Dá pra inferir que o perfil de Guaxupé com R$10,7 bi é a Cooxupé, mas isso é inferência nossa, não citação; atribuir número do estudo a uma cooperativa nominal seria inventar fonte. Implementado em #13 com essa trava explícita no prompt da Vitória (`prospect/agent.ts`), junto da munição citável (15 dirigentes de MG, 22 barreiras, recomendação de parceria com startups e IA na interação com o cooperado) e da resposta pronta à objeção de propriedade de dados, que o estudo documenta na voz do cooperado ("eu não vou passar não, porque eu não sei para onde que vai isso"): consentimento LGPD + exclusão a pedido, caso técnico devolvido aos agrônomos da cooperativa, sem venda de dados, contrato escala pro Stefano. O template aprovado `stevi_parceria_coop_v1` **não muda** — bloco de texto em template frio morre no porteiro-robô (medição de 05/ago) e corpo aprovado exige re-submissão à Meta; a citação vive onde há humano lendo. [Zenodo (DOI 10.5281/zenodo.17604355)](https://zenodo.org/records/17604355)
+- `2026-09-01` **[achado colateral, virou #15] A rede de resgate era silenciosa — e o alerta de crédito não cobria o caso.** Simulando a queda da chave principal contra a API real (não mock), o OpenRouter devolveu `401 "User not found"`, que **não** é `isCreditError`: a reserva seguraria todo o tráfego sem nenhum alerta, só `log.error` na Vercel, enquanto o saldo do outro projeto escoava. Chave revogada é justamente o cenário de aquisição que motivou a reserva existir. #15 faz as duas camadas de resgate avisarem os fundadores (cooldown de 10 min, `fireAndForget`, texto nomeando camada/modelo/motivo). Não é item de intel — é o que a verificação achou, e fica aqui porque nasceu desta rodada.
 - `2026-08-31` **[era DISCUTIR 9/15] Em 30/08 o cron tenta o alerta de vazio de MT sozinho — resolvido por código, não por decisão do Stefano.** No mesmo dia em que o item foi aberto (24/08), `def021c` filtrou `listSojaFarmersByUf`/`listFarmsWithCoords` por `kind='produtor'`, e `7e891f5` completou a cobertura de UF. Medição de 31/08 no banco confirma: a única farm com soja em MT é `kind='teste'` e o filtro a exclui — o cron de 30/08 não vai contaminar `farmer_alerts`. Movido pra cá porque a pergunta original (disparar pra teste ou filtrar antes?) já tem resposta no código, não porque o Stefano decidiu.
