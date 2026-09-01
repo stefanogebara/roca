@@ -93,6 +93,66 @@ describe('chat com fallback direto', () => {
     vi.unstubAllGlobals();
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.OPENROUTER_FALLBACK_API_KEY;
+  });
+
+  it('chave principal 402 + chave reserva presente = a reserva responde, no MESMO gateway', async () => {
+    process.env.OPENROUTER_FALLBACK_API_KEY = 'reserve-key';
+    const fetchMock = vi.fn(async (url: unknown, init?: { headers?: Record<string, string> }) => {
+      const auth = init?.headers?.Authorization ?? '';
+      if (auth.includes('reserve-key')) {
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: 'salvo pela reserva' } }] }),
+          { status: 200 }
+        );
+      }
+      return new Response('Insufficient credits', { status: 402 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await chat({ model: 'test/model', user: 'oi', timeoutMs: 50 });
+    expect(out).toBe('salvo pela reserva');
+    // Tudo aconteceu no OpenRouter: a reserva é conta, não provedor.
+    for (const c of fetchMock.mock.calls) {
+      expect(String(c[0])).toContain('openrouter.ai');
+    }
+  });
+
+  it('a reserva vem ANTES do direto — mesmo dialeto atende qualquer chamada', async () => {
+    process.env.OPENROUTER_FALLBACK_API_KEY = 'reserve-key';
+    process.env.ANTHROPIC_API_KEY = 'direct-key';
+    const fetchMock = vi.fn(async (url: unknown, init?: { headers?: Record<string, string> }) => {
+      const auth = init?.headers?.Authorization ?? '';
+      if (String(url).includes('openrouter.ai') && auth.includes('reserve-key')) {
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: 'reserva primeiro' } }] }),
+          { status: 200 }
+        );
+      }
+      return new Response('conta principal morta', { status: 403 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await chat({ model: 'anthropic/claude-sonnet-5', user: 'oi', timeoutMs: 50 });
+    expect(out).toBe('reserva primeiro');
+    expect(fetchMock.mock.calls.every((c) => String(c[0]).includes('openrouter.ai'))).toBe(true);
+  });
+
+  it('reserva também morta, o direto ainda assume', async () => {
+    process.env.OPENROUTER_FALLBACK_API_KEY = 'reserve-key';
+    process.env.ANTHROPIC_API_KEY = 'direct-key';
+    const fetchMock = vi.fn(async (url: unknown) =>
+      String(url).includes('openrouter.ai')
+        ? new Response('plataforma fora', { status: 500 })
+        : new Response(
+            JSON.stringify({ content: [{ type: 'text', text: 'direto salvou' }], stop_reason: 'end_turn' }),
+            { status: 200 }
+          )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await chat({ model: 'anthropic/claude-sonnet-5', user: 'oi', timeoutMs: 50 });
+    expect(out).toBe('direto salvou');
   });
 
   it('gateway 500 + chave direta presente = a resposta vem da API direta', async () => {

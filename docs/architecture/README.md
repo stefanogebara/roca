@@ -379,6 +379,11 @@ announced (Aug/2026):
   (`ROCA_TRANSCRIBE_PROVIDER`, `transcribeProviderPin()` in `env.ts`; `any`
   disables the pin). The daily canary pings the transcribe tier with the same
   pin, so a paused/broken provider surfaces before a farmer's voice note does.
+- **Reserve OpenRouter key** (`OPENROUTER_FALLBACK_API_KEY`, a separate
+  account). When the primary key fails with the retry exhausted, `chat()` makes
+  one attempt with the reserve key before anything else — it speaks the same
+  dialect (audio and prompt-cache included), and account-level death (zero
+  credit, billing, terms) is the historically observed failure mode (Jul 29).
 - **Direct-API fallback** (`api/_lib/llmDirect.ts`). When the gateway fails with
   the retry exhausted and a direct key exists for the model's provider
   (`ANTHROPIC_API_KEY` → Anthropic Messages API; `GEMINI_API_KEY` → Google AI

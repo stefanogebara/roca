@@ -133,15 +133,46 @@ export async function chat(opts: ChatOptions): Promise<string> {
     const msg = (e as Error).message ?? '';
     if (isCreditError(msg)) fireAndForget(() => alertarCredito(msg), 'alerta de crédito');
 
-    // Gateway esgotado (retry incluso) ≠ fim da linha: se existe chave da API
-    // direta do provedor deste modelo, vale uma tentativa antes do fallback
-    // burro. Sem condição sobre a CLASSE do erro, de propósito — o cenário que
-    // motivou isto (aquisição da OpenRouter pela Stripe, 19/08/2026) falharia
-    // por conta/termos (401/402/403), não por 5xx, e a chave direta é outra
-    // conta. O orçamento de tempo é quem limita o custo de tentar.
+    // Camada 1 do resgate: a CHAVE RESERVA do OpenRouter (outra conta, mesmo
+    // gateway). Cobre exatamente o incidente de 29/jul — saldo zero é da
+    // CONTA, não da plataforma — e vem antes do direto porque fala o mesmo
+    // dialeto (áudio e prompt-cache inclusos), então nenhuma chamada fica de
+    // fora. Se a plataforma inteira caiu, ela falha rápido e a camada 2 assume.
+    const salvoReserva = await tentarChaveReserva(opts);
+    if (salvoReserva != null) return salvoReserva;
+
+    // Camada 2: se existe chave da API direta do provedor deste modelo, vale
+    // uma tentativa antes do fallback burro. Sem condição sobre a CLASSE do
+    // erro, de propósito — o cenário que motivou isto (aquisição da OpenRouter
+    // pela Stripe, 19/08/2026) falharia por conta/termos (401/402/403), não
+    // por 5xx, e a chave direta é outra conta. O orçamento de tempo é quem
+    // limita o custo de tentar.
     const salvo = await tentarFallbackDireto(opts);
     if (salvo != null) return salvo;
     throw e;
+  }
+}
+
+/**
+ * Uma tentativa com a chave reserva do OpenRouter (OPENROUTER_FALLBACK_API_KEY,
+ * uma conta separada). Devolve null quando não configurada, sem tempo, ou
+ * quando também falhou — o erro ORIGINAL da chave principal é o que sobe.
+ */
+async function tentarChaveReserva(opts: ChatOptions): Promise<string | null> {
+  const reserva = process.env.OPENROUTER_FALLBACK_API_KEY;
+  if (!reserva) return null;
+  try {
+    const restante = restanteMs(opts.deadlineAt ?? prazoAtual(), Date.now());
+    if (!cabeOutraTentativa(restante)) return null;
+    const timeoutMs = prazoDaTentativa(opts.timeoutMs ?? 25_000, restante);
+    const texto = await chatOnce({ ...opts, timeoutMs }, reserva);
+    // error, não info: a conta principal falhando é incidente mesmo com a
+    // reserva segurando — a reserva tem o saldo de OUTRO projeto.
+    log.error(`chave principal do OpenRouter falhou; a reserva respondeu por ${opts.model}`);
+    return texto;
+  } catch (e) {
+    log.error('chave reserva do OpenRouter também falhou:', (e as Error).message);
+    return null;
   }
 }
 
@@ -226,8 +257,8 @@ export function buildRequestBody(opts: ChatOptions): Record<string, unknown> {
   };
 }
 
-async function chatOnce(opts: ChatOptions): Promise<string> {
-  const apiKey = requireEnv('OPENROUTER_API_KEY');
+async function chatOnce(opts: ChatOptions, apiKeyOverride?: string): Promise<string> {
+  const apiKey = apiKeyOverride ?? requireEnv('OPENROUTER_API_KEY');
 
   const timeoutMs = opts.timeoutMs ?? 25_000;
   // Sem orçamento não se abre conexão: um AbortSignal.timeout(0) faria a
