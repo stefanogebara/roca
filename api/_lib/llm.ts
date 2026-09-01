@@ -138,7 +138,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     // CONTA, não da plataforma — e vem antes do direto porque fala o mesmo
     // dialeto (áudio e prompt-cache inclusos), então nenhuma chamada fica de
     // fora. Se a plataforma inteira caiu, ela falha rápido e a camada 2 assume.
-    const salvoReserva = await tentarChaveReserva(opts);
+    const salvoReserva = await tentarChaveReserva(opts, msg);
     if (salvoReserva != null) return salvoReserva;
 
     // Camada 2: se existe chave da API direta do provedor deste modelo, vale
@@ -147,7 +147,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     // pela Stripe, 19/08/2026) falharia por conta/termos (401/402/403), não
     // por 5xx, e a chave direta é outra conta. O orçamento de tempo é quem
     // limita o custo de tentar.
-    const salvo = await tentarFallbackDireto(opts);
+    const salvo = await tentarFallbackDireto(opts, msg);
     if (salvo != null) return salvo;
     throw e;
   }
@@ -158,7 +158,10 @@ export async function chat(opts: ChatOptions): Promise<string> {
  * uma conta separada). Devolve null quando não configurada, sem tempo, ou
  * quando também falhou — o erro ORIGINAL da chave principal é o que sobe.
  */
-async function tentarChaveReserva(opts: ChatOptions): Promise<string | null> {
+async function tentarChaveReserva(
+  opts: ChatOptions,
+  motivoOriginal: string
+): Promise<string | null> {
   const reserva = process.env.OPENROUTER_FALLBACK_API_KEY;
   if (!reserva) return null;
   try {
@@ -167,8 +170,13 @@ async function tentarChaveReserva(opts: ChatOptions): Promise<string | null> {
     const timeoutMs = prazoDaTentativa(opts.timeoutMs ?? 25_000, restante);
     const texto = await chatOnce({ ...opts, timeoutMs }, reserva);
     // error, não info: a conta principal falhando é incidente mesmo com a
-    // reserva segurando — a reserva tem o saldo de OUTRO projeto.
+    // reserva segurando — a reserva tem o saldo de OUTRO projeto. E log não
+    // acorda ninguém: o alerta é o que transforma isto em algo que alguém vê.
     log.error(`chave principal do OpenRouter falhou; a reserva respondeu por ${opts.model}`);
+    fireAndForget(
+      () => alertarResgate('reserva', opts.model, motivoOriginal),
+      'alerta de resgate'
+    );
     return texto;
   } catch (e) {
     log.error('chave reserva do OpenRouter também falhou:', (e as Error).message);
@@ -183,7 +191,10 @@ async function tentarChaveReserva(opts: ChatOptions): Promise<string | null> {
  * é o incidente real. Import dinâmico para não criar ciclo (llmDirect importa
  * buildMessages daqui).
  */
-async function tentarFallbackDireto(opts: ChatOptions): Promise<string | null> {
+async function tentarFallbackDireto(
+  opts: ChatOptions,
+  motivoOriginal: string
+): Promise<string | null> {
   try {
     const { directRouteFor, chatDirect } = await import('./llmDirect');
     const route = directRouteFor(opts.model);
@@ -196,6 +207,10 @@ async function tentarFallbackDireto(opts: ChatOptions): Promise<string | null> {
     // error, não info, de propósito: cada linha destas é o gateway falhando em
     // produção — em série, é hora de olhar o OpenRouter (status, saldo, termos).
     log.error(`OpenRouter falhou; API direta (${route.provider}) respondeu por ${opts.model}`);
+    fireAndForget(
+      () => alertarResgate('direto', opts.model, motivoOriginal),
+      'alerta de resgate'
+    );
     return r.text;
   } catch (e) {
     log.error('fallback direto também falhou:', (e as Error).message);
@@ -348,12 +363,21 @@ export const CREDIT_ALERT_COOLDOWN_MS = 10 * 60_000;
 
 /**
  * Se vale alertar agora. Uma rajada de falhas é UM problema, não vinte — mas
- * passado o cooldown alerta de novo, porque saldo zero não se resolve sozinho e
- * cada minuto parado custa lead.
+ * passado o cooldown alerta de novo, porque incidente de conta não se resolve
+ * sozinho e cada minuto parado custa lead.
  */
-export function deveAlertarCredito(ultimoAlertaMs: number | null, agoraMs: number): boolean {
+export function deveAlertar(
+  ultimoAlertaMs: number | null,
+  agoraMs: number,
+  cooldownMs: number
+): boolean {
   if (ultimoAlertaMs == null) return true;
-  return agoraMs - ultimoAlertaMs >= CREDIT_ALERT_COOLDOWN_MS;
+  return agoraMs - ultimoAlertaMs >= cooldownMs;
+}
+
+/** Idem, para o alerta de crédito. */
+export function deveAlertarCredito(ultimoAlertaMs: number | null, agoraMs: number): boolean {
+  return deveAlertar(ultimoAlertaMs, agoraMs, CREDIT_ALERT_COOLDOWN_MS);
 }
 
 // Por instância de função (serverless). Instância nova pode alertar de novo, e
@@ -366,6 +390,63 @@ let ultimoAlertaCredito: number | null = null;
  * que segura qualquer erro: um alerta que derruba a chamada de LLM seria pior
  * que o problema que ele reporta.
  */
+// ── Resgate acionado: a reserva ou a API direta seguraram a resposta ────────
+
+/** Qual camada salvou a chamada — muda a instrução que o fundador recebe. */
+export type CamadaDeResgate = 'reserva' | 'direto';
+
+/** Intervalo mínimo entre dois alertas de resgate. */
+export const RESCUE_ALERT_COOLDOWN_MS = 10 * 60_000;
+
+let ultimoAlertaResgate: number | null = null;
+
+/**
+ * O texto do alerta. Puro e exportado para o teste fixar o que o fundador lê —
+ * um alerta que não diz o que fazer é barulho.
+ */
+export function textoAlertaResgate(
+  camada: CamadaDeResgate,
+  modelo: string,
+  motivo: string
+): string {
+  const cabeca =
+    camada === 'reserva'
+      ? `🛟 A CHAVE RESERVA do OpenRouter está atendendo a Stevi (modelo ${modelo}). ` +
+        `A conta principal falhou e o tráfego está saindo pelo saldo do OUTRO projeto.`
+      : `🛟 A API DIRETA do provedor está atendendo a Stevi (modelo ${modelo}). ` +
+        `O OpenRouter falhou nas DUAS chaves — principal e reserva.`;
+  return (
+    `${cabeca} A resposta do produtor saiu normalmente, então NADA parece quebrado ` +
+    `de fora: é por isso que este aviso existe. Veja a conta em openrouter.ai ` +
+    `(saldo, chave revogada, termos). (${motivo.slice(0, 90)})`
+  );
+}
+
+/**
+ * Avisa os fundadores que o resgate entrou em ação.
+ *
+ * Existe porque o alerta de crédito NÃO cobre este caso: uma chave revogada
+ * devolve 401 "User not found", que não é `isCreditError` — e aí a reserva
+ * seguraria todo o tráfego EM SILÊNCIO, com registro só no log da Vercel. O
+ * modo de falha é justamente o mais difícil de notar: por fora tudo funciona,
+ * enquanto o saldo de outro projeto escoa até acabar também.
+ *
+ * Mesmo desenho do alerta de crédito: cooldown por instância, import dinâmico
+ * (evita ciclo) e sempre via fireAndForget — alertar nunca pode derrubar a
+ * chamada que ele reporta.
+ */
+async function alertarResgate(
+  camada: CamadaDeResgate,
+  modelo: string,
+  motivo: string
+): Promise<void> {
+  const agora = Date.now();
+  if (!deveAlertar(ultimoAlertaResgate, agora, RESCUE_ALERT_COOLDOWN_MS)) return;
+  ultimoAlertaResgate = agora;
+  const { alertFounders } = await import('./alert');
+  await alertFounders(textoAlertaResgate(camada, modelo, motivo));
+}
+
 async function alertarCredito(msg: string): Promise<void> {
   const agora = Date.now();
   if (!deveAlertarCredito(ultimoAlertaCredito, agora)) return;

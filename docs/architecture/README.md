@@ -384,6 +384,10 @@ announced (Aug/2026):
   one attempt with the reserve key before anything else — it speaks the same
   dialect (audio and prompt-cache included), and account-level death (zero
   credit, billing, terms) is the historically observed failure mode (Jul 29).
+  A rescue that fires is **alerted to the founders** (10-min cooldown), because
+  the credit alert does not cover it: a revoked key returns 401 "User not
+  found", which is not `isCreditError` — so without this the reserve would carry
+  all traffic silently while another project's balance drained.
 - **Direct-API fallback** (`api/_lib/llmDirect.ts`). When the gateway fails with
   the retry exhausted and a direct key exists for the model's provider
   (`ANTHROPIC_API_KEY` → Anthropic Messages API; `GEMINI_API_KEY` → Google AI
