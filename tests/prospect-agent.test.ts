@@ -76,6 +76,27 @@ describe('agentSystemPrompt', () => {
   it('forbids stating prices', () => {
     expect(p).toMatch(/pre[çc]o|valor/i);
   });
+
+  // O estudo FDC (Velasco & Wegner 2025) entrou como munição citável para
+  // cooperativas — mas ele é ANÔNIMO: quem cita nome de cooperativa com número
+  // do estudo está inventando atribuição, e isso o prompt tem que proibir.
+  it('arma o estudo FDC para coops sem permitir atribuição nominal', () => {
+    expect(p).toContain('FDC');
+    expect(p).toMatch(/Velasco/);
+    expect(p).toMatch(/N[ÃA]O nomeia as cooperativas/i);
+    expect(p).toMatch(/nunca atribua/i);
+  });
+
+  // A objeção de propriedade de dados é a mais séria de cooperativa (o mesmo
+  // estudo documenta o cooperado: "não sei para onde que vai isso"). A resposta
+  // precisa existir no prompt E terminar no Stefano para termos contratuais —
+  // a Vitória não pode prometer contrato.
+  it('responde a objeção de dados com o concreto e escala contrato pro Stefano', () => {
+    expect(p).toMatch(/OBJE[ÇC][ÃA]O DE DADOS/i);
+    expect(p).toMatch(/DEVOLVIDO/);
+    expect(p).toMatch(/n[ãa]o vende dados/i);
+    expect(p).toMatch(/contrato s[ãa]o conversa do Stefano/i);
+  });
 });
 
 describe('formatThreadBlock', () => {

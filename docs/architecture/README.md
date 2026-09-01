@@ -370,6 +370,32 @@ code changes:
 (`input_audio`). It throws on API failure or empty completion; callers decide whether
 to degrade (router → `general`; transcription → ask for text) or surface a fallback.
 
+Two diversification layers exist since the Stripe acquisition of OpenRouter was
+announced (Aug/2026):
+
+- **Provider pin for transcription.** Google retired Gemini 2.5 on **Vertex**
+  (Oct 16, 2026) but announced no shutdown for the public API — so the transcribe
+  call pins OpenRouter's routing to `google-ai-studio`
+  (`ROCA_TRANSCRIBE_PROVIDER`, `transcribeProviderPin()` in `env.ts`; `any`
+  disables the pin). The daily canary pings the transcribe tier with the same
+  pin, so a paused/broken provider surfaces before a farmer's voice note does.
+- **Reserve OpenRouter key** (`OPENROUTER_FALLBACK_API_KEY`, a separate
+  account). When the primary key fails with the retry exhausted, `chat()` makes
+  one attempt with the reserve key before anything else — it speaks the same
+  dialect (audio and prompt-cache included), and account-level death (zero
+  credit, billing, terms) is the historically observed failure mode (Jul 29).
+  A rescue that fires is **alerted to the founders** (10-min cooldown), because
+  the credit alert does not cover it: a revoked key returns 401 "User not
+  found", which is not `isCreditError` — so without this the reserve would carry
+  all traffic silently while another project's balance drained.
+- **Direct-API fallback** (`api/_lib/llmDirect.ts`). When the gateway fails with
+  the retry exhausted and a direct key exists for the model's provider
+  (`ANTHROPIC_API_KEY` → Anthropic Messages API; `GEMINI_API_KEY` → Google AI
+  Studio's OpenAI-compatible endpoint), `chat()` makes one direct attempt inside
+  the same shared time budget. No keys = single-gateway behavior, unchanged. The
+  failover is deliberately unconditional on error class: an acquisition-shaped
+  failure would be account/terms (401/402/403), not a 5xx.
+
 ## Data model
 
 Supabase/Postgres, defined in `supabase/migrations/`. Minimal and LGPD-conscious:
