@@ -86,6 +86,20 @@ function nomeDaOrigem(source: string): string {
 const ORIGEM_SEM_NOME = /^(indica[çc][ãa]o|organico|org[âa]nico|whatsapp|instagram|site)$/i;
 
 /**
+ * Origens que são EVENTO, não pessoa nem canal.
+ *
+ * Quem chega por elas não foi indicado por alguém: encontrou a gente
+ * PESSOALMENTE, minutos antes, num estande. Sem isto, `#fecon` cairia no ramo
+ * de indicação nominal e a Stevi diria "que bom que o Fecon te mandou aqui" —
+ * tratando a feira como se fosse um sujeito. Some-se que a saudação de
+ * indicação empresta a confiança de um terceiro que aqui não existe.
+ *
+ * O caso tem data: a Fecon da Cocatrel (1–3/09/2026) é o primeiro balcão onde
+ * o QR impresso encontra cafeicultor de verdade.
+ */
+const ORIGEM_EVENTO = /^(fecon\d*|feira[a-z0-9-]*|expo[a-z0-9-]*|agrishow\d*)$/i;
+
+/**
  * A primeira resposta a quem chega. Quando veio indicado, cita quem indicou e
  * pergunta da lavoura DELE — em vez do panfleto de funcionalidades.
  *
@@ -104,6 +118,16 @@ const ORIGEM_SEM_NOME = /^(indica[çc][ãa]o|organico|org[âa]nico|whatsapp|inst
  */
 export function saudacaoDeEntrada(source: string | null | undefined): string {
   const s = (source ?? '').trim();
+  // Evento vem ANTES da indicação nominal: quem escaneou o QR no estande
+  // acabou de conversar com a gente e não precisa ser apresentado ao produto —
+  // precisa de uma pergunta sobre a lavoura dele enquanto ainda está ali.
+  if (s && ORIGEM_EVENTO.test(s)) {
+    return (
+      `Opa! Que bom te encontrar na ${nomeDaOrigem(s)}. 🌱 Sou a Stevi, a ajudante de lavoura que ` +
+      `te mostraram ali — funciona por aqui mesmo, no WhatsApp. Me manda uma foto de folha ou praga ` +
+      `que eu já dou uma olhada, ou me conta o que tá te preocupando na sua lavoura agora.`
+    );
+  }
   if (s && !ORIGEM_SEM_NOME.test(s)) {
     return (
       `Opa! Que bom que o ${nomeDaOrigem(s)} te mandou aqui. 🌱 Sou a Stevi — ajudo a entender o que ` +

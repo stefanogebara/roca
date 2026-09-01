@@ -224,6 +224,41 @@ describe('templates de continuação (retomada / entrega / despedida)', () => {
 // o Michel. A conversa morreu em 4 segundos e ficou 11 dias em silêncio.
 // users.source existia só para métrica (cohort.ts e digest) — nunca virava
 // conversa.
+describe('saudacaoDeEntrada — quem chega de FEIRA encontrou a gente, não foi indicado', () => {
+  // A Fecon (1–3/09/2026) é o primeiro balcão onde o QR impresso encontra
+  // cafeicultor de verdade. Sem o ramo de evento, `#fecon` cairia na indicação
+  // nominal e a Stevi diria "que bom que o Fecon te mandou aqui".
+  it('cita o ENCONTRO na feira, nunca "o Fecon te mandou"', () => {
+    const t = saudacaoDeEntrada('fecon');
+    expect(t).toMatch(/te encontrar na Fecon/i);
+    expect(t).not.toMatch(/te mandou/i);
+  });
+
+  it('convida pra foto ou problema — quem está no estande responde na hora', () => {
+    const t = saudacaoDeEntrada('fecon');
+    expect(t).toMatch(/foto/i);
+    expect(t).toMatch(/lavoura/i);
+  });
+
+  it('mantém a honestidade do produto sem virar panfleto de features', () => {
+    const t = saudacaoDeEntrada('fecon');
+    expect(t).toMatch(/WhatsApp/);
+    // O cardápio genérico ("soja, milho, pasto, café e citros… Como posso
+    // ajudar?") é justamente o que matou a conversa do Michel em 17/jul.
+    expect(t).not.toMatch(/Como posso ajudar/i);
+  });
+
+  it('pega outras feiras pelo mesmo caminho, não só a Fecon', () => {
+    for (const origem of ['feira-cocatrel', 'expocafe', 'agrishow']) {
+      expect(saudacaoDeEntrada(origem), origem).toMatch(/te encontrar na/i);
+    }
+  });
+
+  it('NÃO rouba a saudação de quem foi indicado por pessoa', () => {
+    expect(saudacaoDeEntrada('michel')).toMatch(/te mandou aqui/i);
+  });
+});
+
 describe('saudacaoDeEntrada — quem chega indicado não recebe panfleto', () => {
   it('cita quem indicou, com a inicial maiúscula', () => {
     const t = saudacaoDeEntrada('michel');
