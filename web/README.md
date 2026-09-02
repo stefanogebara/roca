@@ -116,7 +116,11 @@ O inline no `<head>` seta `.js` e, se `app.js` não sinalizar
 
 `web/media/`: `hero-desktop.{mp4,webm}` (1600px, 1,5 MB), `hero-mobile.mp4`
 (720px, 0,5 MB), `rows-desktop.mp4`, posters `.jpg`, fotos `.jpg` + `.webp`
-(1920px). Vídeos são `autoplay muted loop playsinline` com `poster`; o mobile
+(1920px; 720px nas verticais do telefone). **Cada imagem aparece uma vez só
+na página** — ferrugem, geada e fileiras na seção "ela vê"; mão com celular,
+áudio e drone nos painéis do telefone; noite estrelada na faixa; agrônoma,
+retrato e aérea na lente; terreiro nos números; armazém nas cooperativas.
+Repetir foto entre seções é regra quebrada (Stefano, 02/09). Vídeos são `autoplay muted loop playsinline` com `poster`; o mobile
 recebe a versão 9:16. Gerados no Higgsfield (Kling 3.0 pro / Nano Banana Pro /
 Soul v2) em 02/09/2026 e transcodificados com libx264 crf 27 / VP9 crf 34.
 
