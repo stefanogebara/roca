@@ -91,6 +91,18 @@ honestamente. Por isso o próximo passo é campo, não código.
   ≥15; reply-rate: ≥100 envios por segmento; golden: ±5pp é ruído). Coortes de
   cartão/armazém são população separada das vouchadas. Covariável sazonal vai no
   primeiro parágrafo do memo.
+  - **Adendo 01/09 (Stefano):** produtor que escaneia o QR na Fecon **conta como
+    vouchado**. A feira não é "cartão/armazém": ali existe a voz de quem voucha
+    (regra operacional 4) — o fundador conversa, mostra e o produtor escaneia na
+    frente dele, que é vouch mais forte que indicação por WhatsApp. O que o
+    pré-registro separa é material FRIO, e isso continua valendo: o cartaz
+    deixado de pé, escaneado sem conversa nenhuma, é população separada. Como
+    `cohortStats` conta como vouchado qualquer `source` não-nulo, a separação
+    passa a ser feita no TOKEN: `#fecon` = houve conversa; `#fecon-cartaz` =
+    cartaz sozinho. O memo do dia 60 declara a decisão, a data e as duas
+    populações em colunas separadas — se o número do gate depender de qual
+    critério se usa, isso é a informação mais importante do memo, não uma nota
+    de rodapé.
 - **Tripwire semanal:** commits > conversas-com-produtores = campanha fora dos
   trilhos; o conserto nunca é mais código.
 
