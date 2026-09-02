@@ -96,8 +96,18 @@ const ORIGEM_SEM_NOME = /^(indica[çc][ãa]o|organico|org[âa]nico|whatsapp|inst
  *
  * O caso tem data: a Fecon da Cocatrel (1–3/09/2026) é o primeiro balcão onde
  * o QR impresso encontra cafeicultor de verdade.
+ *
+ * O SUFIXO do token carrega peso de MEDIÇÃO, não de saudação. O flight plan
+ * (13/jul) pré-registrou "coortes de cartão/armazém são população separada das
+ * vouchadas", e `cohortStats` conta como vouchado QUALQUER user com `source`
+ * não-nulo — então um cartaz escaneado sozinho entraria no número do gate junto
+ * com quem o fundador vouchou na frente. Daí dois tokens na Fecon: `#fecon`
+ * (houve conversa antes do scan) e `#fecon-cartaz` (cartaz sem ninguém do
+ * lado). Os dois recebem a MESMA saudação — a distinção existe para
+ * `newSources` separar as populações no memo, sem depender da memória de quem
+ * estava no balcão.
  */
-const ORIGEM_EVENTO = /^(fecon\d*|feira[a-z0-9-]*|expo[a-z0-9-]*|agrishow\d*)$/i;
+const ORIGEM_EVENTO = /^(fecon[a-z0-9-]*|feira[a-z0-9-]*|expo[a-z0-9-]*|agrishow[a-z0-9-]*)$/i;
 
 /**
  * A primeira resposta a quem chega. Quando veio indicado, cita quem indicou e

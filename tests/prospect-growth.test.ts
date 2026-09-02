@@ -248,6 +248,14 @@ describe('saudacaoDeEntrada — quem chega de FEIRA encontrou a gente, não foi 
     expect(t).not.toMatch(/Como posso ajudar/i);
   });
 
+  // O sufixo separa populações no memo (vouch do fundador x cartaz frio), mas a
+  // SAUDAÇÃO é a mesma: quem chega não tem nada a ver com nossa contabilidade.
+  it('trata #fecon-cartaz como feira, não como pessoa chamada "Fecon Cartaz"', () => {
+    const t = saudacaoDeEntrada('fecon-cartaz');
+    expect(t).toMatch(/te encontrar na/i);
+    expect(t).not.toMatch(/te mandou/i);
+  });
+
   it('pega outras feiras pelo mesmo caminho, não só a Fecon', () => {
     for (const origem of ['feira-cocatrel', 'expocafe', 'agrishow']) {
       expect(saudacaoDeEntrada(origem), origem).toMatch(/te encontrar na/i);
