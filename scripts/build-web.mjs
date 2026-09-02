@@ -6,13 +6,15 @@
  *
  * Run after any change under web/:  node scripts/build-web.mjs
  */
-import { mkdirSync, copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, copyFileSync, existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const SRC = 'web';
 const OUT = 'public';
 const ASSETS = ['index.html', 'styles.css', 'app.js', 'favicon.svg', 'og-image.png', 'painel.html'];
+/** Pastas copiadas inteiras (vídeos e fotos do hero e das seções). */
+const DIRS = ['media'];
 
 /**
  * Número embutido no HTML de origem. Tem que ser o mesmo
@@ -61,7 +63,26 @@ function build() {
     }
     copied++;
   }
-  console.log(`build-web: copied ${copied}/${ASSETS.length} assets to ${OUT}/`);
+  let midia = 0;
+  for (const d of DIRS) {
+    const from = join(SRC, d);
+    if (!existsSync(from)) continue;
+    midia += copyDir(from, join(OUT, d));
+  }
+  console.log(`build-web: copied ${copied}/${ASSETS.length} assets + ${midia} media files to ${OUT}/`);
+}
+
+/** Cópia recursiva simples; devolve quantos arquivos copiou. */
+function copyDir(from, to) {
+  mkdirSync(to, { recursive: true });
+  let n = 0;
+  for (const name of readdirSync(from)) {
+    const src = join(from, name);
+    const dst = join(to, name);
+    if (statSync(src).isDirectory()) n += copyDir(src, dst);
+    else { copyFileSync(src, dst); n++; }
+  }
+  return n;
 }
 
 // Só constrói quando EXECUTADO. Importar (o teste importa injectWaNumber) não
