@@ -7,6 +7,7 @@
 import type { TransportAdapter, InboundMessage } from './transport/types';
 import { appendCardSig, roundCoord, cardSecretConfigured } from './cardSign';
 import { isIdentityQuestion } from './verifyAsk';
+import { asksForPin, CROP_BUTTONS } from './onboarding';
 import { routeIntent, type Intent } from './router';
 import { reason, type VisionId } from './reason';
 import { buildFarmCard, isFarmConfirmYes } from './farmcard';
@@ -376,6 +377,7 @@ async function sendOrRecord(
     mediaUrl?: string;
     mediaType?: 'image' | 'document';
     filename?: string;
+    locationRequest?: boolean;
   },
   userId: string | null,
   intent: string
@@ -389,6 +391,7 @@ async function sendOrRecord(
         mediaUrl: out.mediaUrl,
         mediaType: out.mediaType,
         filename: out.filename,
+        locationRequest: out.locationRequest,
       })
     );
     return true;
@@ -458,6 +461,8 @@ interface RouteResult {
   extraDocCaption?: string;
   extraDocFilename?: string;
   suppressCard?: boolean;
+  /** Botões desta resposta, quando a rota sabe melhor que buttonsForIntent (ex.: culturas pós-pin). */
+  buttons?: string[];
 }
 
 /**
@@ -907,7 +912,8 @@ const locationPinRoute: Route = {
     const fc = await buildFarmCard(userId, effective.location!.lat, effective.location!.lon);
     // No vegetation → the reply is an honest question; never attach a "SUA
     // LAVOURA" card over a rooftop/water.
-    return { replyText: fc.text, suppressCard: !fc.card };
+    // Cartão entregue → a pergunta de cultura vira três toques (café primeiro).
+    return { replyText: fc.text, suppressCard: !fc.card, buttons: fc.card ? [...CROP_BUTTONS] : undefined };
   },
 };
 
@@ -1284,7 +1290,7 @@ async function respondAsProspectIfApplicable(
  */
 async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<void> {
   const { adapter, msg, effective, user, userId, firstContact } = ctx;
-  const { intent, replyText, pestCard, extraCardUrl, extraDocUrl, extraDocCaption, extraDocFilename, suppressCard } =
+  const { intent, replyText, pestCard, extraCardUrl, extraDocUrl, extraDocCaption, extraDocFilename, suppressCard, buttons } =
     result;
 
   const gate = checkOutbound(replyText);
@@ -1338,10 +1344,18 @@ async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<
   // seconds instead of waiting for the card raster + provider fetch, and a
   // slow or broken card can no longer delay or drop the words. (Bonus: the
   // buttons survive — media messages can't carry them on either provider.)
+  // Resposta que pede o pin sai com o botão NATIVO de localização (um toque
+  // abre o mapa) no lugar dos botões de texto — o pin é o próximo passo, e o
+  // "Ver satélite" antes do pin só devolvia outro pedido de pin.
+  const pedePin = asksForPin(finalText);
   const sent = await sendOrRecord(
     adapter,
     msg.from,
-    { text: finalText, buttons: buttonsForIntent(intent) },
+    {
+      text: finalText,
+      buttons: pedePin ? undefined : (buttons ?? buttonsForIntent(intent)),
+      locationRequest: pedePin || undefined,
+    },
     userId,
     intent
   );

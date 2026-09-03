@@ -152,10 +152,13 @@ export function saudacaoDeEntrada(source: string | null | undefined): string {
       `Me conta: o que tá te preocupando na sua lavoura agora?`
     );
   }
+  // Sem origem: a saudação é curta e termina no pin, que é o passo que devolve
+  // algo (solo, janela de hoje, alerta de geada). A marca "clipe 📎 →
+  // Localização" liga o botão nativo de localização (ver onboarding.ts).
   return (
-    'Opa! Eu sou a Stevi, sua ajudante de lavoura aqui no WhatsApp. 🌱 Você pode me mandar foto de uma ' +
-    'folha ou praga pra eu dar uma olhada, perguntar "posso pulverizar hoje?" (me manda sua localização), ' +
-    'ou tirar dúvidas sobre soja, milho, pasto, café e citros. Importante: eu ajudo a entender e a saber ' +
-    'o que perguntar — quem prescreve produto é o agrônomo. Como posso ajudar?'
+    'Opa! Sou a Stevi, ajudante de lavoura aqui no WhatsApp. 🌱 Manda uma foto da folha ou da praga ' +
+    'que eu dou uma olhada. E se me mandar a localização da lavoura (clipe 📎 → Localização), eu já ' +
+    'te digo se dá pra pulverizar hoje e passo a te avisar de geada e fogo por perto. ' +
+    'Quem receita produto é o agrônomo — isso eu não faço.'
   );
 }
