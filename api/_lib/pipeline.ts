@@ -6,6 +6,7 @@
 
 import type { TransportAdapter, InboundMessage } from './transport/types';
 import { appendCardSig, roundCoord, cardSecretConfigured } from './cardSign';
+import { isIdentityQuestion } from './verifyAsk';
 import { routeIntent, type Intent } from './router';
 import { reason, type VisionId } from './reason';
 import { buildFarmCard, isFarmConfirmYes } from './farmcard';
@@ -271,6 +272,19 @@ async function cardUrlFor(
     log.error('cardUrlFor failed:', (e as Error).message);
   }
   return undefined;
+}
+
+/** Public URL for the "quem responde" card. Sem dado na query: a identidade
+ * (número, responsável, CREA) vem do env no endpoint, como na página. */
+export function verifyCardUrl(): string {
+  return `${PUBLIC_BASE}/api/card?type=verify`;
+}
+
+/** Caption do card de verificação: aponta pra página, não pro wa.me — quem
+ * pergunta "é golpe?" precisa de um lugar pra conferir, não de outro convite. */
+export function verifyCardCaption(): string {
+  const host = PUBLIC_BASE.replace(/^https?:\/\//, '');
+  return `Confira antes de confiar 👉 ${host}/verificar`;
 }
 
 /** Public URL for the price card — quotes packed into the query string so the
@@ -1289,12 +1303,20 @@ async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<
   // assinatura e o /api/card recusa — o produtor receberia uma imagem quebrada.
   // Melhor não mandar card nenhum; o texto já responde sozinho. Mesma política
   // do reportToken, que degrada para resumo em texto quando não pode assinar.
+  // "Isso é golpe?" / "vc é robô?" → o card "quem responde" (a página
+  // /verificar como imagem que viaja no grupo). Só quando nenhum card de dado
+  // já vai junto: a pergunta de identidade não compete com o veredito.
+  const verifyAsk =
+    !pestCard && !extraCardUrl && effective.kind === 'text' && isIdentityQuestion(effective.text);
   const mediaUrl =
     !gate.safe || suppressCard || !cardSecretConfigured()
       ? undefined
       : pestCard
         ? pestCardUrl(pestCard)
-        : (extraCardUrl ?? (await cardUrlFor(intent, effective, userId)));
+        : verifyAsk
+          ? verifyCardUrl()
+          : (extraCardUrl ?? (await cardUrlFor(intent, effective, userId)));
+  const cardCaption = verifyAsk ? verifyCardCaption() : cardShareCaption(intent);
 
   // Referral nudge after a DELIVERED victory moment (visual verdict in hand):
   // the produtor→produtor chain the flight plan watches for. The link is
@@ -1333,7 +1355,7 @@ async function finalizeAndSend(ctx: RouteContext, result: RouteResult): Promise<
     await sendOrRecord(
       adapter,
       msg.from,
-      { text: cardShareCaption(intent), mediaUrl: appendCardSig(mediaUrl) },
+      { text: cardCaption, mediaUrl: appendCardSig(mediaUrl) },
       userId,
       intent
     );
