@@ -18,6 +18,8 @@ import { pestSvg } from './_lib/cards/pest';
 import { pricesSvg } from './_lib/cards/prices';
 import { frostSvg } from './_lib/cards/frost';
 import { buildApplicationsReport, applicationsSvg } from './_lib/cards/applications';
+import { verifySvg } from './_lib/cards/verify';
+import { publicWaNumber } from './_lib/waNumber';
 import { verifyReportToken } from './_lib/reportToken';
 import { listApplications, getFarmProfile } from './_lib/db';
 import type { CommodityQuote } from './_lib/tools/prices';
@@ -37,6 +39,12 @@ import { createLogger } from './_lib/logger';
 import { enforcePublicRateLimit } from './_lib/httpRateLimit';
 
 const log = createLogger('card');
+
+/** Host público impresso no card de verificação (sem protocolo). */
+const PUBLIC_HOST = (process.env.PUBLIC_BASE_URL || 'https://roca-black.vercel.app').replace(
+  /^https?:\/\//,
+  ''
+);
 
 function num(v: unknown): number | null {
   const n = Number(v);
@@ -215,6 +223,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         groups,
       });
       maxAge = 3600; // a given triage result is stable
+    } else if (type === 'verify') {
+      // "Quem responde": a página /verificar como imagem compartilhável. Sem
+      // dado na query — a identidade vem do env, como na página, e só entra
+      // quando existe (nunca um CREA fabricado). Assinado como os demais para
+      // que ninguém sirva um "selo" falso no nosso domínio.
+      svg = verifySvg({
+        waNumber: publicWaNumber(),
+        responsible: process.env.VERIFIER_RESPONSIBLE || null,
+        agronomo: process.env.VERIFIER_AGRONOMO || null,
+        crea: process.env.VERIFIER_CREA || null,
+        lgpdEmail: process.env.VERIFIER_LGPD_EMAIL || null,
+        host: PUBLIC_HOST,
+      });
+      maxAge = 3600;
     } else if (type === 'applications') {
       // Signed, expiring, per-user. The data is fetched server-side — the URL
       // carries only an opaque user id + expiry + HMAC, never the records.

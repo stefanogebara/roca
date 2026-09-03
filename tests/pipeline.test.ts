@@ -726,3 +726,37 @@ describe('triagem incerta deixa rastro', () => {
     expect(db.insertTriageEvent).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * "Isso é golpe?" — o card "quem responde" (type=verify) viaja junto da
+ * resposta honesta. Só na pergunta de identidade, nunca no "oi": o card de
+ * confiança em toda saudação viraria ruído e queimaria o efeito.
+ */
+describe('card "quem responde" na pergunta de identidade', () => {
+  it('"vc é robô?" → texto primeiro, depois o card type=verify com a página na caption', async () => {
+    vi.mocked(routeIntent).mockResolvedValue('smalltalk');
+    vi.mocked(reason).mockResolvedValue('Sou, sim — uma assistente por IA. Quem receita é o agrônomo.');
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'vc é robô? isso é golpe?' }));
+
+    expect(adapter.send.mock.calls[0][0].mediaUrl).toBeUndefined();
+    expect(adapter.send.mock.calls[0][0].text).toMatch(/assistente por IA/);
+    const card = adapter.send.mock.calls[1][0];
+    expect(card.mediaUrl).toMatch(/type=verify/);
+    expect(card.mediaUrl).toMatch(/sig=/); // assinado como os demais
+    expect(card.text).toMatch(/\/verificar/);
+    expect(card.text).not.toMatch(/wa\.me/);
+  });
+
+  it('"oi" não recebe o card de verificação', async () => {
+    vi.mocked(routeIntent).mockResolvedValue('smalltalk');
+    vi.mocked(reason).mockResolvedValue('oi! como posso ajudar?');
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'oi' }));
+
+    expect(adapter.send).toHaveBeenCalledTimes(1);
+    expect(adapter.send.mock.calls[0][0].mediaUrl).toBeUndefined();
+  });
+});
