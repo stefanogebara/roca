@@ -3,14 +3,13 @@
  * highest-frequency habit intent and the most forwarded content in rural
  * WhatsApp groups — this card is the product's organic distribution surface.
  *
- * Design system v2 (plan 2026-07-16-card-design-system): brand header, five-step
- * type scale on an 8px grid, drawn trend chips (no font glyphs — tofu-proof),
- * honest sparkline from real closes, atmosphere + depth via cardShell. No emoji
- * in rendered images.
+ * Identidade v2: cabeçalho de marca, escala tipográfica em grade de 8px, chips
+ * de tendência DESENHADOS (sem glifo de fonte — à prova de tofu), sparkline
+ * honesta a partir dos fechamentos reais. Sem emoji em imagem renderizada.
  */
 
 import type { CommodityQuote } from '../tools/prices';
-import { C, T, esc, cardShell, brandHeader, trendChip, sparkline, hairline, waCta } from './render';
+import { C, T, esc, cardShell, brandHeader, trendChip, sparkline, hairline, waCta, display, body, mono } from './render';
 
 const W = 900;
 
@@ -32,51 +31,53 @@ export function pricesSvg(
 ): string {
   const rows = quotes.slice(0, 3);
   const M = T.margin;
-  const headerY = 96;
-  const rowsTop = 152;
+  const headerY = 78;
+  const rowsTop = 136;
   const rowH = 112;
   const footY = rowsTop + rows.length * rowH + 16;
   const H = footY + 88;
 
-  const body = rows
+  const body_ = rows
     .map((q, i) => {
       const top = rowsTop + i * rowH;
-      const base = top + 46; // shared baseline: name + price
+      const base = top + 50; // shared baseline: name + price
       const meta = NAME[q.key] ?? { name: q.label, sub: '' };
       const spark =
         q.series && q.series.length >= 3
           ? sparkline(
-              320,
+              330,
               top + 16,
-              108,
+              110,
               40,
               q.series,
-              q.weekChangePct != null && q.weekChangePct < -0.05 ? C.nogo : C.leaf
+              q.weekChangePct != null && q.weekChangePct < -0.05 ? C.nogo : C.folha
             )
           : '';
       return `
-      <text x="${M}" y="${base}" font-family="DM Sans" font-size="26" font-weight="700" fill="${C.ink}">${esc(meta.name)}</text>
-      <text x="${M}" y="${base + 26}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">${esc(meta.sub)}</text>
+      ${body(M, base, meta.name, { size: 24, color: C.tinta, weight: 600 })}
+      ${body(M, base + 26, meta.sub, { size: T.small, color: C.cinza })}
       ${spark}
-      <text x="${W - 200}" y="${base}" font-family="Instrument Serif" font-size="${T.display}" fill="${C.green}" text-anchor="end">R$ ${brl(q.sacaBrl)}</text>
+      ${display(W - 196, base + 4, `R$ ${brl(q.sacaBrl)}`, 48, C.tinta, 'end')}
       ${trendChip(W - M, base + 16, q.weekChangePct)}
       ${i < rows.length - 1 ? hairline(M, W - M, top + rowH - 8) : ''}`;
     })
     .join('');
 
   const dolar = usdBrl != null ? `Dólar R$ ${brl(usdBrl)}  ·  ` : '';
+  const dateW = 24 + dateLabel.length * 9.6;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   ${cardShell(W, H)}
 
   ${brandHeader(M, headerY, 'Bolsa hoje')}
-  <rect x="${W - M - 96}" y="${headerY - 24}" width="96" height="32" rx="16" fill="${T.pillFlat}"/>
-  <text x="${W - M - 48}" y="${headerY - 2}" font-family="DM Sans" font-size="${T.small}" font-weight="700" fill="${T.inkSoft}" text-anchor="middle">${esc(dateLabel)}</text>
+  <rect x="${W - M - dateW}" y="${headerY - 22}" width="${dateW}" height="30" rx="15" fill="${C.creme2}"/>
+  ${mono(W - M - dateW / 2, headerY - 1, dateLabel, { size: T.small - 1, color: C.tinta, anchor: 'middle' })}
 
-  ${body}
+  ${body_}
 
   ${hairline(M, W - M, footY)}
-  <text x="${M}" y="${footY + 32}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">${esc(`${dolar}futuros de bolsa — o físico brasileiro sai ABAIXO (indicador CEPEA/ESALQ)`)}</text>
-  <text x="${M}" y="${footY + 58}" font-family="DM Sans" font-size="${T.small}" font-weight="800" fill="${C.green}">${esc(waCta('cotação'))}</text>
+  ${body(M, footY + 32, `${dolar}futuros de bolsa — o físico brasileiro sai ABAIXO (indicador CEPEA/ESALQ)`, { size: T.small, color: C.cinza })}
+  ${mono(M, footY + 58, waCta('cotação'), { size: T.small, color: C.tinta })}
+  <desc>${esc(rows.map((q) => `${(NAME[q.key] ?? { name: q.label }).name} R$ ${brl(q.sacaBrl)}`).join(' · '))}</desc>
 </svg>`;
 }

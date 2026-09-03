@@ -13,7 +13,7 @@
 
 import type { ApplicationRow } from '../db';
 import { validateApplication, type ApplicationValidation } from '../tools/applicationValidate';
-import { C, esc } from './render';
+import { C, T, esc, cardShell, wordmark, rotulo, display, body, mono, hairline } from './render';
 
 export interface ReportLine {
   applied_on: string;
@@ -69,9 +69,9 @@ export function buildApplicationsReport(
 
 const VERDICT_COLOR: Record<ApplicationValidation['level'], string> = {
   registrado: C.go,
-  existe_registro: C.green2,
+  existe_registro: C.tinta2,
   nao_localizado: C.caution,
-  sem_dados: C.muted,
+  sem_dados: C.cinza,
 };
 
 function clip(s: string, n: number): string {
@@ -79,12 +79,13 @@ function clip(s: string, n: number): string {
 }
 
 const W = 900;
+const M = T.margin;
 
 /** Build the applications-report card SVG. Height grows with the row count. Pure. */
 export function applicationsSvg(report: ApplicationsReport): string {
-  const headerH = 190;
+  const headerH = 216;
   const rowH = 88;
-  const footerH = 132;
+  const footerH = 136;
   const H = headerH + report.lines.length * rowH + footerH;
 
   const sub = ['declarado pelo produtor', report.cropLabel, report.uf]
@@ -99,14 +100,14 @@ export function applicationsSvg(report: ApplicationsReport): string {
       const y = headerH + i * rowH;
       const color = VERDICT_COLOR[l.verdict.level];
       const l2 = [l.crop, l.target ? `contra ${l.target}` : null].filter(Boolean).join(' · ');
-      const dose = l.dose ? esc(clip(l.dose, 18)) : '';
+      const dose = l.dose ? clip(l.dose, 18) : '';
       return `
-      <line x1="48" y1="${y}" x2="${W - 48}" y2="${y}" stroke="${C.line}" stroke-width="1"/>
-      <text x="48" y="${y + 34}" font-family="DM Sans" font-size="24" font-weight="700" fill="${C.ink}">${esc(dm(l.applied_on))}</text>
-      <text x="140" y="${y + 34}" font-family="DM Sans" font-size="24" font-weight="700" fill="${C.ink}">${esc(clip(l.product ?? '—', 34))}</text>
-      <text x="140" y="${y + 62}" font-family="DM Sans" font-size="18" fill="${C.muted}">${esc(clip(l2 || '—', 48))}</text>
-      <text x="${W - 48}" y="${y + 34}" font-family="Instrument Serif" font-size="26" fill="${C.green}" text-anchor="end">${dose}</text>
-      <text x="${W - 48}" y="${y + 62}" font-family="DM Sans" font-size="17" font-weight="700" fill="${color}" text-anchor="end">${esc(l.verdict.label)}</text>`;
+      ${hairline(M, W - M, y)}
+      ${mono(M, y + 36, dm(l.applied_on), { size: 18, color: C.tinta })}
+      ${body(M + 90, y + 36, clip(l.product ?? '—', 34), { size: 22, color: C.tinta, weight: 600 })}
+      ${body(M + 90, y + 62, clip(l2 || '—', 48), { size: T.small, color: C.cinza })}
+      ${dose ? mono(W - M, y + 36, dose, { size: 20, color: C.tinta, anchor: 'end' }) : ''}
+      ${body(W - M, y + 62, l.verdict.label, { size: 15, color, weight: 600, anchor: 'end' })}`;
     })
     .join('');
 
@@ -117,19 +118,21 @@ export function applicationsSvg(report: ApplicationsReport): string {
   const footY = headerH + report.lines.length * rowH;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="${W}" height="${H}" fill="${C.cream}"/>
-  <rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="24" fill="${C.card}" stroke="${C.line}" stroke-width="2"/>
+  ${cardShell(W, H)}
 
-  <text x="48" y="86" font-family="Instrument Serif" font-size="40" fill="${C.green}">Stevi · Caderno de Aplicações</text>
-  <text x="48" y="122" font-family="DM Sans" font-size="22" font-weight="700" fill="${C.muted}">${esc(sub)}</text>
-  <text x="48" y="154" font-family="DM Sans" font-size="20" fill="${C.muted}">${esc(period)}</text>
+  ${wordmark(M, 78)}
+  ${rotulo(M + 92, 77, 'Caderno de Aplicações')}
+  ${display(M, 150, 'Caderno de aplicações', 52)}
+  ${body(M, 178, sub, { size: 17, color: C.cinza })}
+  ${mono(M, 202, period, { size: 14, color: C.cinza })}
 
   ${rows}
 
-  <text x="48" y="${footY + 40}" font-family="DM Sans" font-size="18" fill="${C.muted}">${esc(moreNote)}</text>
-  <line x1="48" y1="${footY + 58}" x2="${W - 48}" y2="${footY + 58}" stroke="${C.line}" stroke-width="1"/>
-  <text x="48" y="${footY + 86}" font-family="DM Sans" font-size="17" fill="${C.green2}">Registro declarado pelo produtor — não é receituário nem certificação técnica.</text>
-  <text x="48" y="${footY + 110}" font-family="DM Sans" font-size="16" fill="${C.muted}">A escolha de produto e dose é do agrônomo. "Registro MAPA" é cruzamento informativo com o Agrofit.</text>
+  ${moreNote ? body(M, footY + 34, moreNote, { size: T.small, color: C.cinza }) : ''}
+  ${hairline(M, W - M, footY + 54)}
+  ${body(M, footY + 84, 'Registro declarado pelo produtor — não é receituário nem certificação técnica.', { size: T.small, color: C.tinta2, weight: 600 })}
+  ${body(M, footY + 110, 'A escolha de produto e dose é do agrônomo. "Registro MAPA" é cruzamento informativo com o Agrofit.', { size: 15, color: C.cinza })}
+  <desc>${esc(period)}</desc>
 </svg>`;
 }
 
