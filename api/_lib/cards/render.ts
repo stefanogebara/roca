@@ -142,8 +142,8 @@ function upper(text: string): string {
 export function wordmark(x: number, y: number, theme: CardTheme = 'light', size = 30): string {
   const t = tone(theme);
   const dot = size * 0.2;
-  // largura aproximada de "STEVI" na Big Shoulders 900: ~0.35em por letra
-  const w = size * 0.35 * 5;
+  // largura medida de "STEVI" na Big Shoulders 900: ~0.385em por letra
+  const w = size * 0.385 * 5;
   return `
   <text x="${x}" y="${y}" font-family="${F.display}" font-weight="900" font-size="${size}" fill="${t.fg}">${upper('Stevi')}</text>
   <circle cx="${x + w + dot * 0.9}" cy="${y - dot * 0.55}" r="${dot / 2}" fill="${C.cereja}"/>`;
