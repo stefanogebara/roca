@@ -20,6 +20,7 @@ vi.mock('../api/_lib/db', () => ({
 }));
 
 import { buildFarmCard, isFarmConfirmYes } from '../api/_lib/farmcard';
+import { asksForPin } from '../api/_lib/onboarding';
 import { fetchFieldNdvi } from '../api/_lib/tools/ndvi';
 import { fetchSoil } from '../api/_lib/tools/soil';
 import { fetchHourlyWeather } from '../api/_lib/tools/weather';
@@ -44,6 +45,9 @@ describe('buildFarmCard vegetation gate', () => {
 
     expect(res.text).toMatch(/não achei vegetação/i);
     expect(res.text).not.toMatch(/guardei a localização da sua lavoura/i);
+    // Pede o pin de novo → tem que carregar a marca que liga o botão nativo.
+    // É a mensagem em que o produtor mais precisa dele: o pin anterior não serviu.
+    expect(asksForPin(res.text)).toBe(true);
     expect(res.card).toBe(false); // never ship a "SUA LAVOURA" image over a rooftop
     expect(vi.mocked(setAwaiting)).toHaveBeenCalledWith('u1', 'farm_confirm');
     expect(vi.mocked(setAwaiting)).not.toHaveBeenCalledWith('u1', 'crop');

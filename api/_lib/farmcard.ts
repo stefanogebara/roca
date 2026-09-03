@@ -22,6 +22,7 @@ import {
   setCachedNdvi,
   setAwaiting,
 } from './db';
+import { PIN_ASK_MARK } from './onboarding';
 
 // A pin that satellite couldn't confirm as vegetated is NOT asserted as a field.
 // Honest redirect + hold for a confirm or a corrected location. This is the fix
@@ -41,12 +42,17 @@ function withCap<T>(p: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([p.finally(() => clearTimeout(timer)), cap]);
 }
 
+// Carrega a marca literal de PIN_ASK_MARK: é ela que faz a pipeline anexar o
+// botão nativo "Enviar localização". Medido em 03/set — esta resposta pedia o
+// pin escrevendo a marca sem a palavra "clipe" e por isso saía sem botão,
+// logo na mensagem em que o produtor mais precisa dele: a que diz que o pin
+// anterior não serviu.
 const NO_VEGETATION_REPLY = [
   'Recebi seu pin 📍 — mas dei uma olhada por satélite e não achei vegetação nesse ponto.',
   '',
   'Pode ser que você tenha mandado a localização de onde você está agora (cidade, casa), ou a lavoura esteja em pousio / recém-colhida.',
   '',
-  'Se a lavoura é em *outro lugar*, me manda o pin lá na roça (📎 → Localização) ou o nome da cidade/região dela. Se for aí mesmo e só está sem planta agora, é só responder "é aí mesmo" que eu sigo. 🌱',
+  `Se a lavoura é em *outro lugar*, me manda o pin lá na roça (${PIN_ASK_MARK}) ou o nome da cidade/região dela. Se for aí mesmo e só está sem planta agora, é só responder "é aí mesmo" que eu sigo. 🌱`,
 ].join('\n');
 
 // Reply to the "não achei vegetação" question that means "keep this pin, it IS
