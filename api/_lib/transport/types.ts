@@ -55,6 +55,14 @@ export interface OutboundMessage {
   mediaType?: 'image' | 'document';
   /** Filename shown for a 'document' attachment (Cloud API). */
   filename?: string;
+  /**
+   * Pede a localização com o botão NATIVO do WhatsApp ("Enviar localização",
+   * que abre o mapa) em vez de explicar o caminho clipe → Localização. Cloud
+   * API: interactive `location_request_message`. Não coexiste com `buttons`
+   * (uma interação por mensagem) nem com mídia. Adaptadores sem suporte
+   * mandam só o texto — que já traz a explicação por escrito.
+   */
+  locationRequest?: boolean;
 }
 
 /**

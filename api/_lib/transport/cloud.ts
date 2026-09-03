@@ -300,11 +300,27 @@ export class CloudApiAdapter implements TransportAdapter {
       return;
     }
 
+    // Pedido de localização nativo: o produtor toca em "Enviar localização" e
+    // o mapa abre — sem ter que achar o clipe. Uma interação por mensagem, e
+    // esta vence os botões (o pin É o próximo passo). Rejeitado → texto puro.
+    const locationRequest = !!msg.locationRequest && msg.text.length <= 1024;
     // Interactive reply buttons (≤3, titles ≤20 chars, body ≤1024) when
     // requested; plain text otherwise. A rejected interactive send retries as
     // plain text — every rich message carries its plain-text twin.
-    const interactive = !!msg.buttons?.length && msg.text.length <= 1024;
-    const payload = interactive
+    const interactive = locationRequest || (!!msg.buttons?.length && msg.text.length <= 1024);
+    const payload = locationRequest
+      ? {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: msg.to,
+          type: 'interactive',
+          interactive: {
+            type: 'location_request_message',
+            body: { text: msg.text },
+            action: { name: 'send_location' },
+          },
+        }
+      : interactive
       ? {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',

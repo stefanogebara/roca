@@ -167,7 +167,10 @@ export async function buildFarmCard(
     if (vazio.line) lines.push('', vazio.line);
   }
 
-  lines.push('', 'Me conta: o que você planta aí? Soja, milho, pasto?');
+  // A promessa proativa é a aposta do produto e ninguém sabia que ela existia:
+  // o pin é o momento de dizer que a Stevi vigia a lavoura sem ser perguntada.
+  lines.push('', '🔔 Agora que sei onde fica, te aviso de geada e de fogo por perto sem você precisar pedir.');
+  lines.push('', 'Me conta: o que você planta aí? Café, soja, milho, pasto?');
   if (userId) await setAwaiting(userId, 'crop');
   return { text: lines.join('\n'), card: true };
 }

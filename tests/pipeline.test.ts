@@ -85,6 +85,7 @@ import { findPartnerByPhone } from '../api/_lib/partners';
 import { checkOutbound } from '../api/_lib/compliance';
 import { resolveStatedLocation } from '../api/_lib/location';
 import { buildFarmCard } from '../api/_lib/farmcard';
+import { saudacaoDeEntrada } from '../api/_lib/growth';
 import { transcribeVoice } from '../api/_lib/transcribe';
 
 const USER = {
@@ -758,5 +759,60 @@ describe('card "quem responde" na pergunta de identidade', () => {
 
     expect(adapter.send).toHaveBeenCalledTimes(1);
     expect(adapter.send.mock.calls[0][0].mediaUrl).toBeUndefined();
+  });
+});
+
+/**
+ * Onboarding — os primeiros cinco minutos (03/set). O pin é o passo que devolve
+ * algo; tudo que pede o pin sai com o botão nativo de localização, e o cartão
+ * da lavoura pergunta a cultura em três toques.
+ */
+describe('onboarding: caminho curto até o pin', () => {
+  it('primeiro "oi" sem origem sai com o botão nativo de localização, sem botões de texto', async () => {
+    vi.mocked(db.upsertUser).mockResolvedValue({ ...USER, consent_lgpd_at: null });
+    vi.mocked(routeIntent).mockResolvedValue('smalltalk');
+    // reason() é mock neste arquivo; a saudação real é a de growth.ts.
+    vi.mocked(reason).mockResolvedValue(saudacaoDeEntrada(null));
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'oi' }));
+
+    const out = adapter.send.mock.calls[0][0];
+    expect(out.text).toMatch(/clipe 📎 → Localização/);
+    expect(out.locationRequest).toBe(true);
+    expect(out.buttons).toBeUndefined();
+  });
+
+  it('"Ver satélite" antes do pin pede o pin com o botão nativo — não outro beco', async () => {
+    vi.mocked(reason).mockResolvedValue(
+      'Ainda não tenho a localização da sua lavoura. Manda o pin aqui (clipe 📎 → Localização) que eu puxo a imagem.'
+    );
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ text: 'Ver satélite' }));
+
+    const out = adapter.send.mock.calls[0][0];
+    expect(out.locationRequest).toBe(true);
+    expect(out.buttons).toBeUndefined();
+  });
+
+  it('cartão da lavoura entregue → pergunta de cultura com botões Café / Soja / Milho', async () => {
+    vi.mocked(buildFarmCard).mockResolvedValue({ text: 'guardei sua lavoura 📍\n\nMe conta: o que você planta aí?', card: true });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ kind: 'location', text: null, location: { lat: -21.2, lon: -45.0 } }));
+
+    const out = adapter.send.mock.calls[0][0];
+    expect(out.buttons).toEqual(['Café', 'Soja', 'Milho']);
+    expect(out.locationRequest).toBeUndefined();
+  });
+
+  it('pin sem vegetação → pergunta honesta, sem botões de cultura', async () => {
+    vi.mocked(buildFarmCard).mockResolvedValue({ text: 'não achei vegetação aí, é aí mesmo?', card: false });
+    const adapter = makeAdapter();
+
+    await handleInbound(adapter, msgFixture({ kind: 'location', text: null, location: { lat: -23.55, lon: -46.63 } }));
+
+    expect(adapter.send.mock.calls[0][0].buttons).toBeUndefined();
   });
 });

@@ -351,3 +351,52 @@ describe('nenhum fetch do Cloud sai sem deadline', () => {
     temPrazo();
   });
 });
+
+describe('CloudApiAdapter.send — pedido de localização nativo', () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => {
+    process.env.WHATSAPP_CLOUD_TOKEN = 't';
+    process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID = '123';
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.WHATSAPP_CLOUD_TOKEN;
+    delete process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID;
+  });
+
+  it('locationRequest vira interactive location_request_message, e vence os botões', async () => {
+    const calls: Array<{ body: any }> = [];
+    globalThis.fetch = (async (_url: any, init: any) => {
+      calls.push({ body: JSON.parse(init.body) });
+      return { ok: true, text: async () => '' } as any;
+    }) as any;
+
+    await new CloudApiAdapter().send({
+      to: '+5511999887766',
+      text: 'Manda o pin (clipe 📎 → Localização).',
+      buttons: ['Ver satélite'],
+      locationRequest: true,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].body.type).toBe('interactive');
+    expect(calls[0].body.interactive.type).toBe('location_request_message');
+    expect(calls[0].body.interactive.action).toEqual({ name: 'send_location' });
+    expect(calls[0].body.interactive.body.text).toContain('Manda o pin');
+  });
+
+  it('rejeitado pela Meta → degrada pra texto puro (a explicação escrita já está lá)', async () => {
+    const calls: Array<{ body: any }> = [];
+    globalThis.fetch = (async (_url: any, init: any) => {
+      calls.push({ body: JSON.parse(init.body) });
+      if (calls.length === 1) return { ok: false, status: 400, text: async () => 'unsupported' } as any;
+      return { ok: true, text: async () => '' } as any;
+    }) as any;
+
+    await new CloudApiAdapter().send({ to: '+5511999887766', text: 'Manda o pin.', locationRequest: true });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[1].body.type).toBe('text');
+    expect(calls[1].body.text.body).toBe('Manda o pin.');
+  });
+});
