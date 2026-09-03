@@ -6,7 +6,7 @@
  * card never shows a dose — only chemical groups for rotation literacy.
  */
 
-import { C, T, esc, cardShell, brandHeader } from './render';
+import { C, T, F, esc, cardShell, brandHeader, hairline, display, body, mono, rotulo } from './render';
 
 const W = 900;
 const H = 560;
@@ -14,9 +14,9 @@ const M = T.margin;
 
 /** Confidence → colour + PT-BR label. */
 const CONF: Record<string, { color: string; label: string }> = {
-  alta: { color: C.leaf, label: 'confiança alta' },
+  alta: { color: C.folha, label: 'confiança alta' },
   media: { color: C.caution, label: 'confiança média' },
-  baixa: { color: C.muted, label: 'confiança baixa' },
+  baixa: { color: C.cinza, label: 'confiança baixa' },
 };
 
 export interface PestCardData {
@@ -54,10 +54,10 @@ function wrap(text: string, max: number, maxLines: number): string[] {
   return lines;
 }
 
-/** Rounded chip with text; returns SVG and the width consumed. */
+/** Chip de grupo químico (mono sobre creme-2); returns SVG and the width consumed. */
 function chip(x: number, y: number, label: string): { svg: string; w: number } {
-  const w = 22 + label.length * 10.5;
-  const svg = `<rect x="${x}" y="${y}" width="${w}" height="38" rx="19" fill="${C.cream}" stroke="${C.line}" stroke-width="1.5"/><text x="${x + w / 2}" y="${y + 25}" font-family="DM Sans" font-size="19" fill="${C.green2}" text-anchor="middle">${esc(label)}</text>`;
+  const w = 24 + label.length * 9.6;
+  const svg = `<rect x="${x}" y="${y}" width="${w}" height="36" rx="18" fill="${C.creme2}"/>${mono(x + w / 2, y + 24, label, { size: 16, color: C.tinta, anchor: 'middle' })}`;
   return { svg, w };
 }
 
@@ -68,47 +68,48 @@ export function pestSvg(data: PestCardData): string {
   // Agrofit strip + group chips.
   const groups = (data.groups ?? []).slice(0, 4);
   let chipsSvg = '';
-  let cx = 48;
-  const chipY = 402;
+  let cx = M;
+  const chipY = 400;
   for (const g of groups) {
     const c = chip(cx, chipY, g);
     chipsSvg += c.svg;
-    cx += c.w + 12;
+    cx += c.w + 10;
     if (cx > W - 120) break;
   }
 
   const agrofitLine =
     data.products != null
-      ? `Agrofit (MAPA): ${data.products} produtos registrados${data.crop ? ` pra ${esc(data.crop)}` : ''}.`
+      ? `Agrofit (MAPA): ${data.products} produtos registrados${data.crop ? ` pra ${data.crop}` : ''}.`
       : 'Sem registro localizado no Agrofit pra esse alvo.';
+
+  // Nome longo (ex.: "Lagarta-do-cartucho") cabe em 64px; acima disso, reduz.
+  const nameSize = data.pest.length > 22 ? 48 : 64;
+  const confW = 24 + conf.label.length * 9.4;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   ${cardShell(W, H)}
-  ${brandHeader(M, 90, 'Triagem por foto')}
+  ${brandHeader(M, 78, 'Triagem por foto')}
 
-  <text x="48" y="176" font-family="Instrument Serif" font-size="60" fill="${C.green}">${esc(data.pest)}</text>
+  ${display(M, 176, data.pest, nameSize)}
 
-  <rect x="48" y="196" width="${22 + conf.label.length * 11}" height="40" rx="20" fill="${conf.color}"/>
-  <text x="${48 + (22 + conf.label.length * 11) / 2}" y="223" font-family="DM Sans" font-size="20" font-weight="700" fill="#fff" text-anchor="middle">${esc(conf.label)}</text>
-  ${data.crop ? `<text x="${48 + (22 + conf.label.length * 11) + 20}" y="223" font-family="DM Sans" font-size="22" fill="${C.ink}">cultura: ${esc(data.crop)}</text>` : ''}
+  <rect x="${M}" y="200" width="${confW}" height="34" rx="17" fill="${conf.color}"/>
+  <text x="${M + confW / 2}" y="223" font-family="${F.corpo}" font-weight="600" font-size="15" fill="#fff" text-anchor="middle">${esc(conf.label)}</text>
+  ${data.crop ? body(M + confW + 18, 224, `cultura: ${data.crop}`, { size: 18, color: C.cinza }) : ''}
 
   ${
     evidenceLines.length
-      ? `<text x="48" y="292" font-family="DM Sans" font-size="21" font-weight="700" fill="${C.muted}">O que se vê</text>` +
+      ? rotulo(M, 292, 'O que se vê') +
         evidenceLines
-          .map(
-            (l, i) =>
-              `<text x="48" y="${324 + i * 30}" font-family="DM Sans" font-size="22" fill="${C.ink}">${esc(l)}</text>`
-          )
+          .map((l, i) => body(M, 324 + i * 30, l, { size: 21, color: C.tinta }))
           .join('')
       : ''
   }
 
-  <line x1="48" y1="374" x2="${W - 48}" y2="374" stroke="${C.line}" stroke-width="1"/>
+  ${hairline(M, W - M, 374)}
   ${chipsSvg}
-  <text x="48" y="${groups.length ? 462 : 410}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">${esc(agrofitLine)}</text>
+  ${body(M, groups.length ? 462 : 410, agrofitLine, { size: T.small, color: C.cinza })}
 
-  <rect x="${M - 8}" y="${H - 80}" width="${W - (M - 8) * 2}" height="48" rx="16" fill="${C.green}"/>
-  <text x="${W / 2}" y="${H - 50}" font-family="DM Sans" font-size="${T.small}" font-weight="700" fill="${C.cream}" text-anchor="middle">Produto e dose: só o agrônomo, no receituário · triagem, não prescrição</text>
+  <rect x="0" y="${H - 64}" width="${W}" height="64" fill="${C.tinta}"/>
+  ${mono(W / 2, H - 26, 'Produto e dose: só o agrônomo, no receituário · triagem, não prescrição', { size: 15, color: C.creme, anchor: 'middle' })}
 </svg>`;
 }

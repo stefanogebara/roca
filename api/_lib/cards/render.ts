@@ -1,12 +1,17 @@
 /**
  * Server-side card rendering: hand-authored SVG → PNG, no headless browser.
  *
- * We build small, legible SVG cards (spray window, NDVI) and rasterize them with
- * @resvg/resvg-js using bundled brand fonts (DM Sans + Instrument Serif). Fonts
- * are read from disk once and cached; loadSystemFonts is off for determinism
- * (serverless has no reliable system fonts). The TTFs ship with the function via
- * vercel.json includeFiles. Output PNG stays well under WhatsApp's 5 MB image cap
- * (these are typically <120 KB).
+ * We build small, legible SVG cards (spray window, NDVI, frost…) and rasterize
+ * them with @resvg/resvg-js using bundled brand fonts. Fonts are read from disk
+ * once and cached; loadSystemFonts is off for determinism (serverless has no
+ * reliable system fonts). The TTFs ship with the function via vercel.json
+ * includeFiles. Output PNG stays well under WhatsApp's 5 MB image cap.
+ *
+ * Identidade v2 (set/2026, web/README.md): o card que o produtor encaminha no
+ * grupo tem que parecer o site em que ele cai — creme + tinta, cereja uma vez,
+ * Big Shoulders Display caixa-alta como voz, Hanken Grotesk no corpo, IBM Plex
+ * Mono no dado. As cores de veredito (pode / atenção / não), o marrom do solo e
+ * o azul da geada continuam SEMÂNTICAS, de propósito fora da marca.
  */
 
 import { Resvg } from '@resvg/resvg-js';
@@ -14,23 +19,44 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { publicWaNumber } from '../waNumber';
 
-/** Brand palette (matches the landing page / ops console). */
-// "Campo Editorial" (just-br-derived) — matches web/styles.css so the cards a
-// farmer forwards look like the site they land on. Verdict colours (go/caution/
-// nogo), soil brown and the frost blue stay SEMANTIC, deliberately off-brand.
+/** Famílias como estão nos TTFs de fonts/ (resvg casa pelo nome interno). */
+export const F = {
+  display: 'Big Shoulders Display',
+  corpo: 'Hanken Grotesk',
+  mono: 'IBM Plex Mono',
+} as const;
+
+/**
+ * Paleta. As chaves antigas (green, leaf, cream…) continuam existindo — mapeadas
+ * para os tokens v2 — porque os cards as usam por papel, não por cor.
+ */
 export const C = {
-  green: '#303b0c', // olive-dark — headings/brand
-  green2: '#4c5e03', // deep olive — secondary brand text (7:1 on white)
-  leaf: '#748145', // mid olive — accents/ramp fills
-  cream: '#f7fbeb', // olive wash — outer bg (paper would erase the card frame)
-  card: '#ffffff',
-  ink: '#0c0c0c',
-  muted: '#7a7568',
-  line: '#e3e0dc',
-  go: '#2e9e63',
-  caution: '#c98a1a',
-  nogo: '#c0392b',
-  soil: '#8a6d4b',
+  // tokens v2
+  creme: '#F4F0E4',
+  creme2: '#EAE4D2',
+  tinta: '#15130F',
+  tinta2: '#2A2620',
+  cinza: '#6D675C',
+  cinzaClaro: '#A9A292',
+  linha: '#D9D3C3',
+  linhaEscura: '#3D3830',
+  cereja: '#D6321B',
+  folha: '#2E6E3C',
+  // papéis (nomes legados)
+  green: '#15130F', // títulos / marca → tinta
+  green2: '#2A2620', // texto secundário de marca → tinta-2
+  leaf: '#2E6E3C', // acento "vivo" → folha
+  cream: '#F4F0E4', // fundo → creme
+  card: '#F4F0E4', // não há mais cartão branco: o card É o creme
+  ink: '#15130F',
+  muted: '#6D675C',
+  line: '#D9D3C3',
+  // semânticos (fora da marca de propósito)
+  go: '#2E6E3C',
+  caution: '#B8770F',
+  nogo: '#D6321B',
+  soil: '#8A6D4B',
+  frost: '#2F5F9E',
 };
 
 /** Resolve a bundled font path across local + Vercel-bundled layouts. */
@@ -49,7 +75,12 @@ let fontFilesCache: string[] | null = null;
 function loadFontFiles(): string[] {
   if (fontFilesCache) return fontFilesCache;
   const paths: string[] = [];
-  for (const f of ['DMSans.ttf', 'InstrumentSerif.ttf']) {
+  for (const f of [
+    'BigShouldersDisplay-Black.ttf',
+    'HankenGrotesk-Medium.ttf',
+    'HankenGrotesk-SemiBold.ttf',
+    'IBMPlexMono-Medium.ttf',
+  ]) {
     const p = fontPath(f);
     if (p) paths.push(p);
   }
@@ -58,51 +89,97 @@ function loadFontFiles(): string[] {
 }
 
 /**
- * Design tokens v2 (plan 2026-07-16-card-design-system). Additive — the legacy
- * `C` palette above stays for cards not yet migrated. Hard rules: five type
- * steps only; 8px grid; icons are DRAWN paths (never font glyphs/emoji — the
- * bundled fonts lack them and resvg renders tofu).
+ * Escala tipográfica (cinco degraus + display) e grade de 8px. Ícones são
+ * caminhos DESENHADOS (nunca glifo de fonte/emoji — os TTFs não têm e o resvg
+ * renderiza tofu).
  */
 export const T = {
-  display: 44,
-  h1: 30,
-  h2: 22,
-  body: 18,
-  small: 15,
-  micro: 12.5,
+  display: 72, // manchete em Big Shoulders 900 caixa-alta
+  h1: 44,
+  h2: 26,
+  body: 20,
+  small: 16,
+  micro: 13,
   unit: 8,
   margin: 56,
-  atmoTop: '#dfe8d3',
-  pillGo: '#e3f2e7',
-  pillNo: '#f7e3df',
-  pillFlat: '#eceae2',
-  inkSoft: '#4b564f',
+  // chips de tendência
+  pillGo: '#DCEBDD',
+  pillNo: '#F7DAD6',
+  pillFlat: '#EAE4D2',
+  inkSoft: '#2A2620',
 };
 
-/**
- * Card shell: cream ground, soft green atmosphere wash fading into the cream,
- * faint offset shadow, white card. resvg-safe (plain gradient + rects, no
- * filters). Prepend to the card body inside the root <svg>.
- */
-export function cardShell(w: number, h: number): string {
-  return `
-  <defs>
-    <linearGradient id="atmo" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${T.atmoTop}"/>
-      <stop offset="1" stop-color="${C.cream}"/>
-    </linearGradient>
-  </defs>
-  <rect width="${w}" height="${h}" fill="${C.cream}"/>
-  <rect width="${w}" height="${Math.round(h * 0.55)}" fill="url(#atmo)"/>
-  <rect x="24" y="30" width="${w - 48}" height="${h - 52}" rx="26" fill="${C.ink}" opacity="0.07"/>
-  <rect x="24" y="24" width="${w - 48}" height="${h - 52}" rx="26" fill="${C.card}" stroke="${C.line}" stroke-width="1"/>`;
+export type CardTheme = 'light' | 'dark';
+
+/** Cor de texto principal / secundária / fio para o tema. */
+export function tone(theme: CardTheme = 'light'): { fg: string; fg2: string; line: string; bg: string } {
+  return theme === 'dark'
+    ? { fg: C.creme, fg2: C.cinzaClaro, line: C.linhaEscura, bg: C.tinta }
+    : { fg: C.tinta, fg2: C.cinza, line: C.linha, bg: C.creme };
 }
 
-/** Brand anchor: "Stevi" serif logotype + middot + card title. Same spot always. */
-export function brandHeader(x: number, y: number, title: string): string {
+/**
+ * Casca do card: um plano só (creme ou tinta), sem cartão branco, sem sombra —
+ * profundidade vem de contraste e escala, como no site. resvg-safe.
+ */
+export function cardShell(w: number, h: number, theme: CardTheme = 'light'): string {
+  const t = tone(theme);
   return `
-  <text x="${x}" y="${y}" font-family="Instrument Serif" font-size="34" fill="${C.green}">Stevi</text>
-  <text x="${x + 92}" y="${y}" font-family="DM Sans" font-size="${T.h2}" fill="${C.muted}">·  ${esc(title)}</text>`;
+  <rect width="${w}" height="${h}" fill="${t.bg}"/>`;
+}
+
+/**
+ * Caixa-alta é visual: o SVG não tem text-transform no resvg, então os glifos
+ * saem maiúsculos e o texto original fica num <title> (nome acessível, e o que
+ * os testes leem). Só entra quando difere.
+ */
+function upper(text: string): string {
+  const up = text.toUpperCase();
+  return up === text ? esc(up) : `${esc(up)}<title>${esc(text)}</title>`;
+}
+
+/** Wordmark "STEVI" em display + ponto cereja (o único acento decorativo). */
+export function wordmark(x: number, y: number, theme: CardTheme = 'light', size = 30): string {
+  const t = tone(theme);
+  const dot = size * 0.2;
+  // largura aproximada de "STEVI" na Big Shoulders 900: ~0.35em por letra
+  const w = size * 0.35 * 5;
+  return `
+  <text x="${x}" y="${y}" font-family="${F.display}" font-weight="900" font-size="${size}" fill="${t.fg}">${upper('Stevi')}</text>
+  <circle cx="${x + w + dot * 0.9}" cy="${y - dot * 0.55}" r="${dot / 2}" fill="${C.cereja}"/>`;
+}
+
+/** Rótulo: caixa-alta, espaçado, secundário — o "eyebrow" do site. */
+export function rotulo(x: number, y: number, text: string, theme: CardTheme = 'light', anchor: 'start' | 'end' | 'middle' = 'start'): string {
+  const t = tone(theme);
+  return `<text x="${x}" y="${y}" font-family="${F.corpo}" font-weight="600" font-size="${T.micro}" letter-spacing="1.6" fill="${t.fg2}" text-anchor="${anchor}">${upper(text)}</text>`;
+}
+
+/** Manchete em display caixa-alta. */
+export function display(x: number, y: number, text: string, size = T.display, color = C.tinta, anchor: 'start' | 'end' | 'middle' = 'start'): string {
+  return `<text x="${x}" y="${y}" font-family="${F.display}" font-weight="900" font-size="${size}" letter-spacing="-0.5" fill="${color}" text-anchor="${anchor}">${upper(text)}</text>`;
+}
+
+/** Texto de corpo (Hanken). */
+export function body(x: number, y: number, text: string, opts: { size?: number; color?: string; weight?: 500 | 600; anchor?: 'start' | 'end' | 'middle' } = {}): string {
+  const { size = T.body, color = C.tinta, weight = 500, anchor = 'start' } = opts;
+  return `<text x="${x}" y="${y}" font-family="${F.corpo}" font-weight="${weight}" font-size="${size}" fill="${color}" text-anchor="${anchor}">${esc(text)}</text>`;
+}
+
+/** Dado em mono (Delta T, pH, °C, R$). */
+export function mono(x: number, y: number, text: string, opts: { size?: number; color?: string; anchor?: 'start' | 'end' | 'middle' } = {}): string {
+  const { size = T.small, color = C.tinta, anchor = 'start' } = opts;
+  return `<text x="${x}" y="${y}" font-family="${F.mono}" font-weight="500" font-size="${size}" fill="${color}" text-anchor="${anchor}">${esc(text)}</text>`;
+}
+
+/**
+ * Cabeçalho: wordmark + rótulo do card, sempre no mesmo lugar (x, y = linha de
+ * base do wordmark). O título vai como rótulo à direita do wordmark.
+ */
+export function brandHeader(x: number, y: number, title: string, theme: CardTheme = 'light'): string {
+  return `
+  ${wordmark(x, y, theme)}
+  ${rotulo(x + 92, y - 1, title, theme)}`;
 }
 
 /**
@@ -115,9 +192,9 @@ export function trendChip(anchorX: number, cy: number, weekChangePct: number | n
   const label = flat
     ? 'estável'
     : `${up ? '+' : '−'}${Math.abs(weekChangePct as number).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
-  const color = flat ? C.muted : up ? C.go : C.nogo;
+  const color = flat ? C.cinza : up ? C.go : C.nogo;
   const bg = flat ? T.pillFlat : up ? T.pillGo : T.pillNo;
-  const w = 22 + label.length * 9 + 18;
+  const w = 22 + label.length * 9.5 + 18;
   const x = anchorX - w;
   const iconCx = x + 16;
   const icon = flat
@@ -128,7 +205,7 @@ export function trendChip(anchorX: number, cy: number, weekChangePct: number | n
   return `
   <rect x="${x}" y="${cy - 14}" width="${w}" height="28" rx="14" fill="${bg}"/>
   ${icon}
-  <text x="${iconCx + 12}" y="${cy + 5}" font-family="DM Sans" font-size="${T.small}" font-weight="700" fill="${color}">${esc(label)}</text>`;
+  <text x="${iconCx + 12}" y="${cy + 5}" font-family="${F.mono}" font-weight="500" font-size="${T.small - 1}" fill="${color}">${esc(label)}</text>`;
 }
 
 /**
@@ -161,8 +238,7 @@ export function sparkline(
   <circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="3.5" fill="${color}"/>`;
 }
 
-/** 1px hairline separator. */
-/** Bold-green share CTA content for card footers: the typable way back to
+/** Bold share CTA content for card footers: the typable way back to
  * Stevi that survives a forward (screenshots included). Static per card TYPE —
  * never per user (a per-user link would leak who forwarded it). */
 export function waCta(prompt: string): string {
@@ -185,8 +261,26 @@ export function issuedStamp(now: Date = new Date()): string {
   return `emitido hoje, ${s.replace(', ', ' · ')}`;
 }
 
-export function hairline(x1: number, x2: number, y: number): string {
-  return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${C.line}" stroke-width="1"/>`;
+/** 1px hairline separator. */
+export function hairline(x1: number, x2: number, y: number, theme: CardTheme = 'light'): string {
+  return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${tone(theme).line}" stroke-width="1"/>`;
+}
+
+/** Fio forte (na cor do texto) — abre uma seção, como as bordas dos números no site. */
+export function rule(x1: number, x2: number, y: number, theme: CardTheme = 'light'): string {
+  return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${tone(theme).fg}" stroke-width="1.5"/>`;
+}
+
+/**
+ * Rodapé padrão: fio + linha 1 (leitura, cinza) + linha 2 (CTA em mono, forte).
+ * `y` é a linha do fio; ocupa 60px abaixo dele.
+ */
+export function footer(x1: number, x2: number, y: number, line1: string, line2: string | null, theme: CardTheme = 'light'): string {
+  const t = tone(theme);
+  return `
+  ${hairline(x1, x2, y, theme)}
+  ${body(x1, y + 30, line1, { size: T.small, color: t.fg2 })}
+  ${line2 ? mono(x1, y + 56, line2, { size: T.small, color: t.fg }) : ''}`;
 }
 
 /** XML-escape text for safe interpolation into SVG. */
@@ -205,10 +299,10 @@ export function svgToPng(svg: string, width = 900): Buffer {
     fitTo: { mode: 'width', value: width },
     font: {
       fontFiles: loadFontFiles(),
-      defaultFontFamily: 'DM Sans',
+      defaultFontFamily: F.corpo,
       loadSystemFonts: false,
     },
-    background: C.cream,
+    background: C.creme,
   });
   return Buffer.from(resvg.render().asPng());
 }

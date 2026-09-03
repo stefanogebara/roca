@@ -3,10 +3,13 @@
  * country forwards frost warnings farm to farm — this card carries the
  * warning (and Stevi's name) at arm's-length readability: one big worst-night
  * number, a strip of the risky days, protection guidance with no products.
+ *
+ * É o único card ESCURO: a geada chega de noite e o alerta tem que saltar no
+ * grupo — no site, as seções escuras são o desenho, não um tema.
  */
 
 import type { FrostDay } from '../tools/frost';
-import { C, T, esc, cardShell, brandHeader, hairline, waCta } from './render';
+import { C, T, esc, cardShell, brandHeader, hairline, waCta, display, body, mono } from './render';
 
 const W = 900;
 const H = 520;
@@ -24,9 +27,10 @@ function snowflake(cx: number, cy: number, col: string, r = 15): string {
     .join('');
 }
 
+// Cores sobre a tinta: azul gelo para geada provável, âmbar claro para risco.
 const RISK = {
-  geada: { color: '#3b6fb2', label: 'GEADA PROVÁVEL', note: 'temperatura de formação de geada' },
-  risco: { color: C.caution, label: 'RISCO DE GEADA', note: 'perto do ponto de geada' },
+  geada: { color: '#8FB4E8', label: 'Geada provável', note: 'temperatura de formação de geada' },
+  risco: { color: '#E0A93A', label: 'Risco de geada', note: 'perto do ponto de geada' },
 } as const;
 
 function dm(iso: string): string {
@@ -44,32 +48,33 @@ export function frostSvg(days: FrostDay[]): string {
   const worst = shown.reduce((a, b) => (b.minC < a.minC ? b : a), shown[0]);
   const r = RISK[worst.risk];
 
-  const stripY = 300;
+  const stripY = 296;
   const cellW = (W - M * 2) / shown.length;
   const strip = shown
     .map((d, i) => {
       const x = M + i * cellW;
       const col = RISK[d.risk].color;
       return `
-      <rect x="${x + 4}" y="${stripY}" width="${cellW - 8}" height="88" rx="12" fill="${col}" opacity="0.14"/>
-      <rect x="${x + 4}" y="${stripY}" width="${cellW - 8}" height="6" rx="3" fill="${col}"/>
-      <text x="${x + cellW / 2}" y="${stripY + 40}" font-family="DM Sans" font-size="22" font-weight="700" fill="${C.ink}" text-anchor="middle">${dm(d.date)}</text>
-      <text x="${x + cellW / 2}" y="${stripY + 72}" font-family="DM Sans" font-size="24" fill="${col}" text-anchor="middle">${celsius(d.minC)} °C</text>`;
+      <rect x="${x + 4}" y="${stripY}" width="${cellW - 8}" height="96" rx="10" fill="${col}" opacity="0.14"/>
+      <rect x="${x + 4}" y="${stripY}" width="${cellW - 8}" height="5" rx="2.5" fill="${col}"/>
+      ${mono(x + cellW / 2, stripY + 40, dm(d.date), { size: 18, color: C.creme, anchor: 'middle' })}
+      ${display(x + cellW / 2, stripY + 82, `${celsius(d.minC)} °C`, 36, col, 'middle')}`;
     })
     .join('');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  ${cardShell(W, H)}
-  ${brandHeader(M, 92, 'Alerta de geada')}
+  ${cardShell(W, H, 'dark')}
+  ${brandHeader(M, 78, 'Alerta de geada', 'dark')}
 
-  ${snowflake(M + 15, 162, r.color)}
-  <text x="${M + 44}" y="178" font-family="Instrument Serif" font-size="${T.display}" fill="${r.color}">${esc(r.label)}</text>
-  <text x="${M}" y="232" font-family="DM Sans" font-size="${T.body}" fill="${C.ink}">Mínima de ${celsius(worst.minC)} °C na madrugada de ${dm(worst.date)} — ${esc(r.note)}.</text>
+  ${snowflake(M + 15, 172, r.color)}
+  ${display(M + 44, 194, r.label, 64, C.creme)}
+  ${body(M, 240, `Mínima de ${celsius(worst.minC)} °C na madrugada de ${dm(worst.date)} — ${r.note}.`, { size: 19, color: C.cinzaClaro })}
 
   ${strip}
 
-  ${hairline(M, W - M, H - 104)}
-  <text x="${M}" y="${H - 68}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">Vale proteger mudas e talhões baixos, e conversar com seu técnico sobre irrigação na véspera.</text>
-  <text x="${M}" y="${H - 42}" font-family="DM Sans" font-size="${T.small}" font-weight="800" fill="${C.green}">${esc(waCta('geada'))} — aviso pra SUA lavoura</text>
+  ${hairline(M, W - M, H - 104, 'dark')}
+  ${body(M, H - 70, 'Vale proteger mudas e talhões baixos, e conversar com seu técnico sobre irrigação na véspera.', { size: T.small, color: C.cinzaClaro })}
+  ${mono(M, H - 44, `${waCta('geada')} — aviso pra SUA lavoura`, { size: T.small, color: C.creme })}
+  <desc>${esc(r.label)}</desc>
 </svg>`;
 }

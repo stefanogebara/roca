@@ -8,10 +8,11 @@
  */
 
 import type { SprayVerdict } from '../tools/deltaT';
-import { C, esc, cardShell, issuedStamp } from './render';
+import { C, T, esc, cardShell, brandHeader, hairline, issuedStamp, display, body, mono, rotulo } from './render';
 
 const W = 900;
 const H = 600;
+const M = T.margin;
 
 const VERDICT: Record<SprayVerdict, { color: string; label: string }> = {
   go: { color: C.go, label: 'Pode pulverizar' },
@@ -30,17 +31,17 @@ export interface FarmCardData {
 
 /** A pin glyph drawn as an SVG path (no emoji font). */
 function pin(cx: number, cy: number, col: string): string {
-  return `<path d="M${cx},${cy - 16} C${cx - 11},${cy - 16} ${cx - 11},${cy - 2} ${cx},${cy + 10} C${cx + 11},${cy - 2} ${cx + 11},${cy - 16} ${cx},${cy - 16} Z" fill="${col}"/><circle cx="${cx}" cy="${cy - 9}" r="4.2" fill="#fff"/>`;
+  return `<path d="M${cx},${cy - 16} C${cx - 11},${cy - 16} ${cx - 11},${cy - 2} ${cx},${cy + 10} C${cx + 11},${cy - 2} ${cx + 11},${cy - 16} ${cx},${cy - 16} Z" fill="${col}"/><circle cx="${cx}" cy="${cy - 9}" r="4.2" fill="${C.creme}"/>`;
 }
 
 /** One labelled row block: dot + heading + value line. Returns SVG. */
 function row(y: number, dotCol: string, dotInner: string, heading: string, value: string): string {
-  const x = 56;
+  const x = M;
   return `
     <circle cx="${x + 18}" cy="${y}" r="20" fill="${dotCol}"/>
     ${dotInner ? dotInner.replace('__CX__', String(x + 18)).replace('__CY__', String(y)) : ''}
-    <text x="${x + 56}" y="${y - 6}" font-family="DM Sans" font-size="20" font-weight="700" fill="${C.muted}">${esc(heading)}</text>
-    <text x="${x + 56}" y="${y + 24}" font-family="DM Sans" font-size="26" fill="${C.ink}">${esc(value)}</text>`;
+    ${rotulo(x + 56, y - 8, heading)}
+    ${body(x + 56, y + 22, value, { size: 23, color: C.tinta })}`;
 }
 
 export function farmSvg(data: FarmCardData): string {
@@ -57,7 +58,7 @@ export function farmSvg(data: FarmCardData): string {
   }
 
   // Spray row (with verdict color + mark inside the dot).
-  let sprayDot = C.muted;
+  let sprayDot = C.cinzaClaro;
   let sprayInner = '';
   let sprayText = 'Sem dados de clima agora.';
   if (data.spray) {
@@ -68,7 +69,7 @@ export function farmSvg(data: FarmCardData): string {
   }
 
   // Vazio row.
-  const vazioDot = data.vazio?.active ? C.nogo : C.leaf;
+  const vazioDot = data.vazio?.active ? C.nogo : C.folha;
   const vazioText = !data.vazio
     ? 'Sem janela de vazio sanitário mapeada aqui.'
     : data.vazio.active
@@ -77,20 +78,22 @@ export function farmSvg(data: FarmCardData): string {
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   ${cardShell(W, H)}
+  ${brandHeader(M, 78, 'Cartão da lavoura')}
+  ${mono(W - M, 78, issuedStamp(), { size: T.micro, color: C.cinza, anchor: 'end' })}
 
-  ${pin(74, 92, C.leaf)}
-  <text x="104" y="90" font-family="Instrument Serif" font-size="46" fill="${C.green}">Sua lavoura</text>
-  <text x="104" y="122" font-family="DM Sans" font-size="20" fill="${C.muted}">Stevi · ${esc(where)}</text>
-  <text x="${W - 56}" y="90" font-family="DM Sans" font-size="19" fill="${C.muted}" text-anchor="end">${esc(issuedStamp())}</text>
+  ${pin(M + 14, 168, C.cereja)}
+  ${display(M + 40, 190, 'Sua lavoura', 60)}
+  ${mono(M, 226, where, { size: 17, color: C.cinza })}
 
-  <line x1="56" y1="156" x2="${W - 56}" y2="156" stroke="${C.line}" stroke-width="1"/>
+  ${hairline(M, W - M, 254)}
 
-  ${row(220, C.soil, '<circle cx="__CX__" cy="__CY__" r="7" fill="#fff"/>', 'SOLO', soilText)}
-  ${row(330, sprayDot, sprayInner, 'PULVERIZAÇÃO AGORA', sprayText)}
-  ${row(440, vazioDot, '', 'CALENDÁRIO SANITÁRIO', vazioText)}
+  ${row(310, C.soil, `<circle cx="__CX__" cy="__CY__" r="7" fill="${C.creme}"/>`, 'Solo', soilText)}
+  ${row(410, sprayDot, sprayInner, 'Pulverização agora', sprayText)}
+  ${row(510, vazioDot, '', 'Calendário sanitário', vazioText)}
 
-  <line x1="56" y1="496" x2="${W - 56}" y2="496" stroke="${C.line}" stroke-width="2"/>
-  <text x="56" y="540" font-family="DM Sans" font-size="19" fill="${C.muted}">Leituras aproximadas (solo, clima, satélite) pra orientar — não substituem o agrônomo.</text>
+  ${hairline(M, W - M, 556)}
+  ${body(M, 582, 'Leituras aproximadas (solo, clima, satélite) pra orientar — não substituem o agrônomo.', { size: T.small, color: C.cinza })}
+  <desc>${esc(where)}</desc>
 </svg>`;
 }
 

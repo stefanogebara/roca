@@ -6,7 +6,7 @@
  */
 
 import { type HourAssessment, DELTA_T_MIN, DELTA_T_MAX } from '../tools/deltaT';
-import { C, T, esc, cardShell, brandHeader, hairline, issuedStamp } from './render';
+import { C, T, F, esc, cardShell, brandHeader, hairline, issuedStamp, display, body, mono } from './render';
 
 const W = 900;
 const H = 520;
@@ -57,10 +57,10 @@ export function spraySvg(hours: HourAssessment[], bestUpcoming: HourAssessment |
       const isBest = bestUpcoming && h.time === bestUpcoming.time;
       const barH = 64;
       return `
-        <rect x="${x + 3}" y="${trackY}" width="${cellW - 6}" height="${barH}" rx="7" fill="${col}"/>
-        <text x="${x + cellW / 2}" y="${trackY + barH + 26}" font-family="DM Sans" font-size="20" fill="${C.ink}" text-anchor="middle">${hourLabel(h.time)}</text>
-        ${isNow ? `<text x="${x + cellW / 2}" y="${trackY - 12}" font-family="DM Sans" font-size="17" font-weight="700" fill="${C.green}" text-anchor="middle">agora</text>` : ''}
-        ${isBest ? `<text x="${x + cellW / 2}" y="${trackY - 12}" font-family="DM Sans" font-size="17" font-weight="700" fill="${C.leaf}" text-anchor="middle">melhor</text>` : ''}
+        <rect x="${x + 3}" y="${trackY}" width="${cellW - 6}" height="${barH}" rx="6" fill="${col}"/>
+        ${mono(x + cellW / 2, trackY + barH + 26, hourLabel(h.time), { size: 17, color: C.tinta, anchor: 'middle' })}
+        ${isNow ? `<text x="${x + cellW / 2}" y="${trackY - 12}" font-family="${F.corpo}" font-weight="600" font-size="${T.micro}" letter-spacing="1.2" fill="${C.tinta}" text-anchor="middle">AGORA<title>agora</title></text>` : ''}
+        ${isBest ? `<text x="${x + cellW / 2}" y="${trackY - 12}" font-family="${F.corpo}" font-weight="600" font-size="${T.micro}" letter-spacing="1.2" fill="${C.folha}" text-anchor="middle">MELHOR<title>melhor</title></text>` : ''}
       `;
     })
     .join('');
@@ -74,19 +74,20 @@ export function spraySvg(hours: HourAssessment[], bestUpcoming: HourAssessment |
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   ${cardShell(W, H)}
-  ${brandHeader(padX, 92, 'Janela de pulverização')}
-  <text x="${W - padX}" y="92" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}" text-anchor="end">${esc(issuedStamp())}</text>
+  ${brandHeader(padX, 78, 'Janela de pulverização')}
+  ${mono(W - padX, 78, issuedStamp(), { size: T.micro, color: C.cinza, anchor: 'end' })}
 
-  <circle cx="${padX + 22}" cy="158" r="22" fill="${v.color}"/>
-  ${verdictMark(now.verdict, padX + 22, 158)}
-  <text x="${padX + 62}" y="170" font-family="Instrument Serif" font-size="${T.display}" fill="${C.green}">${esc(v.label)} agora</text>
+  <circle cx="${padX + 22}" cy="${176}" r="22" fill="${v.color}"/>
+  ${verdictMark(now.verdict, padX + 22, 176)}
+  ${display(padX + 62, 198, `${v.label} agora`, 60)}
 
-  <text x="${padX}" y="224" font-family="DM Sans" font-size="${T.body}" fill="${C.ink}">Delta T ${now.deltaT} °C · vento ${Math.round(now.windKmh)} km/h${now.precipProb != null ? ` · chuva ${now.precipProb}%` : ''}</text>
+  ${mono(padX, 244, `Delta T ${now.deltaT} °C · vento ${Math.round(now.windKmh)} km/h${now.precipProb != null ? ` · chuva ${now.precipProb}%` : ''}`, { size: 18, color: C.cinza })}
 
   ${bars}
 
   ${hairline(padX, W - padX, H - 104)}
-  <text x="${padX}" y="${H - 68}" font-family="DM Sans" font-size="${T.small}" fill="${C.green2}">${esc(best)}</text>
-  <text x="${padX}" y="${H - 42}" font-family="DM Sans" font-size="${T.small}" fill="${C.muted}">Faixa boa: Delta T ${DELTA_T_MIN}–${DELTA_T_MAX} °C, vento fraco, sem chuva. Combine com o que você vê no campo.</text>
+  ${body(padX, H - 70, best, { size: T.small, color: C.tinta, weight: 600 })}
+  ${body(padX, H - 44, `Faixa boa: Delta T ${DELTA_T_MIN}–${DELTA_T_MAX} °C, vento fraco, sem chuva. Combine com o que você vê no campo.`, { size: T.small, color: C.cinza })}
+  <desc>${esc(v.label)} agora</desc>
 </svg>`;
 }
