@@ -1,11 +1,13 @@
-/* Stevi — sistema de design v2.4 (set/2026). Ver README.md nesta pasta.
-   Papel e tinta. A página é uma conversa só, descendo pela coluna da direita;
-   à esquerda, o comentário. O acento (--cereja) é um sistema: o ponto do
-   wordmark, o ponto final do hero, a marca da Stevi em cada fala. */
+/* Stevi — sistema de design v2.5 (set/2026). Ver README.md nesta pasta.
+   Papel e tinta, duas famílias: a display condensada e a mono. Toda seção é
+   uma afirmação à esquerda e um documento datado à direita. O acento
+   (--cereja) aparece no ponto do wordmark, na marca da Stevi nos documentos
+   e no ponto final da última linha. */
 
 /* ── Tokens ─────────────────────────────────────────────────────────── */
 :root {
   --creme: #F4F0E4;
+  --papel: #FBF8EF;
   --tinta: #15130F;
   --cinza: #5F5A50;
   --cinza-claro: #A9A292;
@@ -14,7 +16,6 @@
   --cereja: #D6321B;
 
   --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
-  --corpo: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   --ease: cubic-bezier(.32, .72, 0, 1);
@@ -25,12 +26,11 @@
   --gutter: 32px;
   --header-h: 72px;
 
-  /* Três tamanhos: display, corpo, mono. E só. */
   --h1: clamp(5rem, 15.5vw, 15rem);
-  --h2: clamp(4.5rem, 12.5vw, 12rem);
-  --corpo-s: 1.0625rem;
-  --lede: clamp(1.375rem, 2.1vw, 1.875rem);
-  --mono-s: .875rem;
+  --h2: clamp(4.5rem, 11.5vw, 11rem);
+  --corpo-s: 1rem;
+  --lede: clamp(1.25rem, 1.8vw, 1.625rem);
+  --mono-s: .8125rem;
   --pad: clamp(4.5rem, 9vw, 8rem);
 }
 @media (max-width: 767.98px) {
@@ -44,9 +44,9 @@ body {
   margin: 0;
   background: var(--creme);
   color: var(--tinta);
-  font-family: var(--corpo);
+  font-family: var(--mono);
   font-size: var(--corpo-s);
-  line-height: 1.5;
+  line-height: 1.55;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -59,13 +59,12 @@ h1, h2, h3, .display {
   font-weight: 900;
   text-transform: uppercase;
   line-height: .88;
-  letter-spacing: -.02em;
+  letter-spacing: -.03em;
   font-kerning: normal;
   margin: 0;
 }
-h1 { font-size: var(--h1); letter-spacing: -.035em; }
-h2, h3 { font-size: var(--h2); letter-spacing: -.035em; }
-h2.lede { font-family: var(--corpo); text-transform: none; letter-spacing: 0; font-size: var(--lede); line-height: 1.3; font-weight: 500; }
+h1 { font-size: var(--h1); }
+h2, h3 { font-size: var(--h2); }
 p { margin: 0; }
 strong { font-weight: 600; }
 :focus-visible { outline: 3px solid var(--cereja); outline-offset: 3px; }
@@ -79,37 +78,40 @@ strong { font-weight: 600; }
 
 .container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
 
-/* O ponto em cereja. */
 .fim { white-space: nowrap; }
-.ponto { display: inline-block; width: .17em; height: .17em; border-radius: 50%; background: var(--cereja); margin-left: .04em; vertical-align: baseline; transform: translateY(.01em); }
+.ponto { display: inline-block; width: .17em; height: .17em; border-radius: 50%; background: var(--cereja); margin-left: .04em; vertical-align: baseline; }
 
-/* Um rótulo só, em toda parte: numeral, régua, texto. */
+/* Um rótulo só: numeral, régua, texto. */
 .rotulo {
   display: flex; align-items: center; gap: 14px; margin: 0 0 22px;
-  font-family: var(--mono); font-size: var(--mono-s); font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
+  font-size: var(--mono-s); font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
   color: var(--cinza);
 }
-.rotulo .num { color: var(--tinta); display: inline-flex; align-items: center; gap: 14px; }
+.rotulo .num { color: var(--tinta); display: inline-flex; align-items: center; gap: 14px; flex: none; }
 .rotulo .num::after { content: ""; display: inline-block; width: 28px; height: 1px; background: var(--tinta); opacity: .5; }
+.rotulo--claro { color: var(--cinza-claro); }
+.rotulo--claro .num { color: var(--creme); }
+.rotulo--claro .num::after { background: var(--creme); }
 
-/* Três vozes: alta (lede), normal (prosa), baixa (mono). */
-.lede { font-size: var(--lede); line-height: 1.3; font-weight: 500; max-width: 30ch; text-wrap: pretty; }
-.tres { display: grid; gap: 10px; margin: 8px 0 clamp(2.5rem, 5vw, 4rem); max-width: 860px; }
-.tres p { font-size: var(--lede); line-height: 1.3; font-weight: 500; text-wrap: pretty; color: var(--cinza); }
-.tres strong { font-weight: 600; color: var(--tinta); }
-.nota { font-family: var(--mono); font-size: var(--mono-s); line-height: 1.6; letter-spacing: .01em; color: var(--cinza); max-width: 46ch; margin-top: 22px; }
+/* Vozes: a afirmação (lede), a prosa, a nota. */
+.lede, .afirma { font-family: var(--mono); font-size: var(--lede); line-height: 1.3; font-weight: 500; text-transform: none; letter-spacing: 0; max-width: 28ch; text-wrap: pretty; }
+.tres { display: grid; gap: 14px; margin-top: 28px; max-width: 44ch; }
+.tres p { color: var(--cinza); text-wrap: pretty; }
+.tres strong { color: var(--tinta); }
+.nota { font-size: var(--mono-s); line-height: 1.6; color: var(--cinza); max-width: 46ch; margin-top: 22px; }
 .nota a { color: var(--tinta); }
-.nota--inline { margin: 0; }
 .acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin-top: 32px; }
 .link { color: var(--tinta); font-weight: 600; text-decoration: none; border-bottom: 1px solid var(--tinta); padding-bottom: 2px; }
 .link:hover { color: var(--cereja); border-color: var(--cereja); }
+.stevi { color: var(--tinta); }
+.stevi::after { content: ""; display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: var(--cereja); margin-left: .35em; vertical-align: baseline; }
 
 /* ── Botões: um só ──────────────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: .6em;
   min-height: 44px; padding: 0 22px;
   border: 1px solid currentColor; border-radius: 2px;
-  font: 600 .9375rem/1 var(--corpo); color: inherit; text-decoration: none;
+  font: 600 .9375rem/1 var(--mono); color: inherit; text-decoration: none;
   background: transparent; cursor: pointer; white-space: nowrap;
   transition: background-color var(--t-hover) var(--ease), color var(--t-hover) var(--ease), border-color var(--t-hover) var(--ease);
 }
@@ -118,8 +120,8 @@ strong { font-weight: 600; }
 .btn--solid { background: var(--tinta); color: var(--creme); border-color: var(--tinta); }
 .btn--solid:hover { background: var(--cereja); border-color: var(--cereja); color: #fff; }
 .is-dark .btn--solid { background: var(--creme); color: var(--tinta); border-color: var(--creme); }
-.btn--lg { min-height: 56px; padding: 0 30px; font-size: 1.0625rem; }
-.btn--sm { padding: 0 16px; font-size: .875rem; }
+.btn--lg { min-height: 56px; padding: 0 30px; font-size: 1rem; }
+.btn--sm { padding: 0 16px; font-size: .8125rem; }
 
 /* ── Chips de dado (piso de 14px: é o conteúdo que importa) ─────────── */
 .tag {
@@ -147,21 +149,22 @@ strong { font-weight: 600; }
   font-family: var(--display); font-weight: 900; font-size: 2rem; letter-spacing: -.02em;
   text-transform: uppercase; text-decoration: none; line-height: 1; display: inline-flex; align-items: center; gap: .28em;
 }
-.wordmark--sm { font-size: 1.5rem; }
 .wordmark__dot { width: .34em; height: .34em; border-radius: 50%; background: var(--cereja); transform: translateY(.04em); }
-.site-nav { display: flex; gap: 32px; }
-.site-nav a { font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; font-weight: 500; text-decoration: none; opacity: .8; padding: 12px 0; }
+.site-nav { display: flex; gap: 28px; }
+.site-nav a { font-size: var(--mono-s); letter-spacing: .06em; text-transform: uppercase; font-weight: 500; text-decoration: none; opacity: .75; padding: 12px 0; }
 .site-nav a:hover { opacity: 1; }
-@media (max-width: 991.98px) { .site-nav { display: none; } }
-@media (min-width: 992px) { .site-header__cta { display: none; } }
+@media (max-width: 1199.98px) { .site-nav { display: none; } }
 
-/* ── Seções: um passo só de respiro ────────────────────────────────── */
+/* ── A seção: afirmação à esquerda, documento à direita ─────────────── */
 .secao { padding-block: var(--pad); }
-.secao + .secao { padding-top: 0; }
-
-.hero { padding: calc(var(--header-h) + 40px) 0 var(--pad); }
-.hero__grid { display: grid; gap: 48px; align-items: start; }
-@media (min-width: 992px) { .hero__grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 80px; } .hero__lado { position: sticky; top: calc(var(--header-h) + 40px); } }
+.secao + .secao:not(.escuro) { padding-top: 0; }
+.escuro + .secao { padding-top: var(--pad); }
+.secao__grid { display: grid; gap: 48px; align-items: start; }
+@media (min-width: 992px) {
+  .secao__grid { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 80px; }
+  .secao__lado { position: sticky; top: calc(var(--header-h) + 40px); }
+}
+.hero { padding-top: calc(var(--header-h) + 40px); }
 .hero .lede { margin-top: 36px; }
 @media (max-width: 767.98px) {
   .hero { padding-top: calc(var(--header-h) + 24px); }
@@ -169,129 +172,112 @@ strong { font-weight: 600; }
   .hero .lede { margin-top: 28px; }
 }
 
-/* ── O fio: a transcrição. Régua, quem+hora em mono, texto. A marca da
-   Stevi é o ponto em cereja; o produtor não leva cor. ───────────────── */
-.fio { margin: 0; width: 100%; }
-.fio--largo { max-width: 860px; }
-.fio__meta { border-bottom: 1px solid var(--tinta); padding-bottom: 12px; margin-bottom: 0; }
-.fio__quando { margin-left: auto; }
-.fala { padding: 18px 0 22px; border-bottom: 1px solid var(--linha); display: grid; gap: 12px; }
-.fala--ultima { border-bottom: 0; }
-.fala__quem { display: flex; justify-content: space-between; font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .06em; text-transform: uppercase; color: var(--cinza); }
-.fala__quem .stevi { color: var(--tinta); }
-.fala__quem .stevi::after { content: ""; display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: var(--cereja); margin-left: .4em; vertical-align: baseline; }
-.fala--eu .fala__texto { color: var(--cinza); }
-.fala__texto { font-size: 1.1875rem; line-height: 1.45; max-width: 46ch; text-wrap: pretty; }
-.fala__texto--mono { font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .02em; }
+/* Documento: cabeça com marca, título e data; texto; pé. */
+.doc__cabeca { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; color: var(--cinza); padding-bottom: 12px; border-bottom: 1px solid var(--tinta); }
+.doc__marca { font-family: var(--display); font-weight: 900; font-size: 1.5rem; letter-spacing: -.02em; color: var(--tinta); line-height: 1; }
+.doc__marca .ponto { width: .2em; height: .2em; margin-left: .05em; }
+.doc__quando { margin-left: auto; }
+.doc__texto { margin-top: 18px; font-size: 1.125rem; line-height: 1.5; text-wrap: pretty; }
+.doc__pe { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--linha); font-size: var(--mono-s); line-height: 1.6; color: var(--cinza); }
+.doc--claro { margin: 0; color: var(--creme); }
+.doc--claro .doc__cabeca { color: var(--cinza-claro); border-color: var(--creme); }
+.doc--claro .doc__marca { color: var(--creme); }
+.doc--claro .doc__pe { color: var(--cinza-claro); border-color: var(--linha-escura); }
+@media (max-width: 767.98px) { .doc__quando { margin-left: 0; flex-basis: 100%; } }
+
+/* A lâmina: a foto do produtor, coluna inteira, com o diagnóstico anotado. */
+.lamina { margin: 0; display: grid; }
+.lamina__foto { display: block; }
+.lamina__foto img { aspect-ratio: 4 / 5; }
+@media (min-width: 992px) { .lamina__foto { margin-right: calc(-1 * var(--gutter)); } }
+.anota { margin: 0; display: grid; border-bottom: 1px solid var(--tinta); }
+.anota div { padding: 14px 0; border-top: 1px solid var(--linha); display: grid; gap: 6px; }
+.anota dt { font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; color: var(--cinza); }
+.anota dd { margin: 0; font-size: 1.0625rem; line-height: 1.5; max-width: 46ch; text-wrap: pretty; }
 
 /* Uma série só: mesma curva, mesmo grão, nas duas fotos da página. */
 .foto { display: block; margin: 0; position: relative; overflow: hidden; }
-.foto__hora { position: absolute; right: 10px; bottom: 10px; z-index: 1; font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .06em; color: var(--creme); background: var(--tinta); padding: .3em .55em; }
-.foto img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; filter: grayscale(1) contrast(1.12) brightness(.98); }
+.foto img { width: 100%; object-fit: cover; filter: grayscale(1) contrast(1.15) brightness(.98); }
 .foto::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .22; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E"); }
-.fala .foto img { mix-blend-mode: multiply; }
 
+/* O fio: a conversa. */
+.fio { margin: 0; width: 100%; }
+.fala { padding: 16px 0 18px; border-bottom: 1px solid var(--linha); display: grid; gap: 8px; }
+.fala--ultima { border-bottom: 1px solid var(--tinta); }
+.fala__quem { display: flex; justify-content: space-between; font-size: var(--mono-s); letter-spacing: .06em; text-transform: uppercase; color: var(--cinza); }
+.fala--eu .fala__texto { color: var(--cinza); }
+.fala__texto { font-size: 1.0625rem; line-height: 1.5; max-width: 46ch; text-wrap: pretty; }
 
-/* ── O cartão: anexo da resposta. Réguas, não caixa. ─────────────────── */
-.cartao { margin: 0; max-width: 860px; border-top: 2px solid var(--tinta); border-bottom: 1px solid var(--tinta); padding: 14px 0 12px; }
-.cartao__cabeca { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; color: var(--cinza); padding-bottom: 12px; }
-.cartao__marca { font-family: var(--display); font-weight: 900; font-size: 1.5rem; letter-spacing: -.02em; color: var(--tinta); line-height: 1; }
-.cartao__marca .ponto { width: .2em; height: .2em; margin-left: .05em; }
-.cartao__emitido { margin-left: auto; }
-.cartao__linhas { margin: 0; display: grid; }
-.cartao__linhas div { display: grid; gap: 4px 20px; padding: 12px 0; border-top: 1px solid var(--linha); }
-@media (min-width: 768px) { .cartao__linhas div { grid-template-columns: 200px 1fr; align-items: baseline; } }
-.cartao__linhas dt { font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; color: var(--cinza); }
-.cartao__linhas dd { margin: 0; font-size: 1.125rem; line-height: 1.35; }
-.cartao__pe { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--linha); font-family: var(--mono); font-size: var(--mono-s); line-height: 1.6; color: var(--cinza); }
+/* O cartão: laudo. Coordenadas como numeral. */
+.cartao { margin: 0; }
+.cartao__ponto { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline; margin-top: 20px; font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.02em; line-height: 1; }
+.cartao__coord { font-size: clamp(2.5rem, 4.4vw, 4rem); font-variant-numeric: tabular-nums; }
+.cartao__uf { font-size: clamp(1.5rem, 2.4vw, 2.25rem); color: var(--cinza); }
+.cartao__linhas { margin: 16px 0 0; display: grid; border-top: 1px solid var(--tinta); }
+.cartao__linhas div { display: grid; gap: 4px 20px; padding: 14px 0; border-bottom: 1px solid var(--linha); }
+@media (min-width: 768px) { .cartao__linhas div { grid-template-columns: 190px 1fr; align-items: baseline; } }
+.cartao__linhas dt { font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; color: var(--cinza); }
+.cartao__linhas dd { margin: 0; font-size: 1.0625rem; line-height: 1.45; }
+.cartao .doc__pe { border-top: 0; padding-top: 0; }
 
-/* ── A placa: o aviso num bloco de tinta; a lavoura de cima, tinta e papel ── */
-.placa { display: grid; background: var(--tinta); color: var(--creme); min-height: min(92svh, 860px); }
-@media (min-width: 992px) { .placa { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
-.placa__texto { display: flex; align-items: center; padding: clamp(48px, 7vw, 96px) var(--gutter); }
-@media (min-width: 992px) { .placa__texto { padding-left: max(var(--gutter), calc((100vw - var(--container)) / 2 + var(--gutter))); padding-right: clamp(40px, 5vw, 80px); } }
-.placa__miolo { max-width: 520px; }
-.placa__foto { position: relative; background: var(--creme); min-height: 60vw; }
-@media (min-width: 992px) { .placa__foto { min-height: 0; } }
-.placa__foto img { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; object-position: center 50%; filter: grayscale(1) contrast(1.7) brightness(1.05); mix-blend-mode: multiply; }
-.placa__foto::after { opacity: .3; }
-.rotulo--claro { color: var(--cinza-claro); }
-.rotulo--claro .num { color: var(--creme); }
-.rotulo--claro .num::after { background: var(--creme); }
-.placa__fala { font-size: clamp(1.5rem, 2.4vw, 2.125rem); line-height: 1.25; font-weight: 500; text-wrap: pretty; }
-.placa__pe { margin-top: 28px; font-family: var(--mono); font-size: var(--mono-s); line-height: 1.6; letter-spacing: .02em; color: var(--cinza-claro); max-width: 52ch; }
+/* ── O alerta: o momento mais alto ──────────────────────────────────── */
+.escuro { background: var(--tinta); color: var(--creme); }
+.alerta { position: relative; overflow: hidden; }
+.alerta__foto { position: absolute; inset: 0; }
+.alerta__foto img { width: 100%; height: 100%; filter: grayscale(1) contrast(1.4) brightness(.42); }
+.alerta__foto::after { opacity: .35; }
+.alerta .secao__grid { position: relative; z-index: 1; }
+.alerta__grau { font-size: clamp(5rem, 15.5vw, 15rem); letter-spacing: -.04em; }
+.alerta__quando { margin-top: 28px; font-size: var(--mono-s); line-height: 1.6; letter-spacing: .02em; color: var(--cinza-claro); max-width: 40ch; }
+@media (min-width: 992px) { .alerta .doc--claro { padding-top: 56px; } }
 
-/* ── Manifesto: uma palavra enorme, duas linhas em negrito ───────────── */
-.manifesto__grid { display: grid; gap: 32px; margin-top: 32px; align-items: start; }
-@media (min-width: 992px) { .manifesto__grid { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 80px; } }
-.manifesto__mais { margin: 0; display: grid; border-top: 1px solid var(--tinta); }
-.manifesto__mais div { padding: 18px 0 20px; border-bottom: 1px solid var(--linha); }
-.manifesto__mais dt { font-weight: 600; font-size: 1.1875rem; }
-.manifesto__mais dd { margin: 6px 0 0; color: var(--cinza); max-width: 46ch; text-wrap: pretty; }
+/* ── Onde ela para: a lei como número ───────────────────────────────── */
+.lei { font-size: clamp(4.5rem, 11.5vw, 11rem); }
+.regras { margin: 32px 0 0; display: grid; border-top: 1px solid var(--tinta); max-width: 46ch; }
+.regras div { padding: 16px 0 18px; border-bottom: 1px solid var(--linha); }
+.regras dt { font-weight: 600; font-size: 1.0625rem; }
+.regras dd { margin: 4px 0 0; color: var(--cinza); text-wrap: pretty; }
 
-/* ── Cooperativas ───────────────────────────────────────────────────── */
-.coop__grid { display: grid; gap: 24px; align-items: start; }
-@media (min-width: 992px) { .coop__grid { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 80px; } .coop__texto { padding-top: 46px; } }
-.coop__texto { display: grid; gap: 18px; }
-.coop__texto p:not(.lede) { color: var(--cinza); max-width: 46ch; text-wrap: pretty; }
-
-/* ── O cartaz: folha impressa — marcas de corte, dobra, canhotos ──────── */
-.cartaz { margin: 0; position: relative; width: min(100%, 330px); justify-self: end; padding: 14px; }
-.cartaz__folha { position: relative; background: #FBF8EF; padding: clamp(22px, 3vw, 32px) clamp(22px, 3vw, 32px) 0; box-shadow: inset 0 0 0 1px var(--linha); }
-.cartaz::before, .cartaz::after, .cartaz__folha::before, .cartaz__folha::after { content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none; border: 0 solid var(--tinta); }
-.cartaz::before { top: 0; left: 0; border-width: 0 1px 1px 0; }
-.cartaz::after { top: 0; right: 0; border-width: 0 0 1px 1px; }
-.cartaz__folha::before { bottom: -14px; left: -14px; border-width: 1px 1px 0 0; }
-.cartaz__folha::after { bottom: -14px; right: -14px; border-width: 1px 0 0 1px; }
+/* ── O cartaz: folha impressa com canhotos ──────────────────────────── */
+.cartaz { margin: 0; width: min(100%, 360px); }
+.cartaz__folha { background: var(--papel); padding: clamp(22px, 3vw, 32px) clamp(22px, 3vw, 32px) 0; box-shadow: inset 0 0 0 1px var(--linha); }
 .cartaz__marca { font-family: var(--display); font-weight: 900; font-size: 2.5rem; letter-spacing: -.02em; text-transform: uppercase; line-height: 1; }
 .cartaz__marca .ponto { width: .2em; height: .2em; }
-.cartaz__linha { margin-top: 12px; font-weight: 600; font-size: 1rem; line-height: 1.35; max-width: 24ch; }
+.cartaz__linha { margin-top: 12px; font-weight: 600; font-size: .9375rem; line-height: 1.4; max-width: 24ch; }
 .cartaz__qr { width: 100%; margin-top: 20px; filter: grayscale(1) contrast(1.4); mix-blend-mode: multiply; }
-.cartaz__pe { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--tinta); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .04em; text-transform: uppercase; }
+.cartaz__pe { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--tinta); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: var(--mono-s); letter-spacing: .04em; text-transform: uppercase; }
 .cartaz__canhotos { margin: 22px calc(-1 * clamp(22px, 3vw, 32px)) 0; border-top: 1px dashed var(--tinta); display: grid; grid-template-columns: repeat(4, 1fr); }
-.cartaz__canhotos span { padding: 14px 4px 16px; border-right: 1px dashed var(--linha); font-family: var(--mono); font-size: .6875rem; letter-spacing: .02em; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; color: var(--cinza); }
+.cartaz__canhotos span { padding: 14px 4px 16px; border-right: 1px dashed var(--linha); font-size: .6875rem; letter-spacing: .02em; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; color: var(--cinza); }
 .cartaz__canhotos span:last-child { border-right: 0; }
-.cartaz figcaption { margin: 28px 0 0; }
+.cartaz figcaption { margin: 24px 0 0; }
 
-/* ── Perguntas, impressas ───────────────────────────────────────────── */
-.perguntas { margin: 8px 0 0; display: grid; border-top: 1px solid var(--tinta); }
-@media (min-width: 992px) { .perguntas { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 80px; } }
-.perguntas div { padding: 18px 0 22px; border-bottom: 1px solid var(--linha); display: grid; gap: 8px; }
-.perguntas dt { font-weight: 600; font-size: 1.125rem; }
-.perguntas dd { margin: 0; color: var(--cinza); max-width: 52ch; text-wrap: pretty; }
-
-/* ── Fecho: a linha no tamanho do hero, a barra, o cartaz ───────────── */
+/* ── Fecho: a linha e a barra ───────────────────────────────────────── */
 .fecho { border-top: 1px solid var(--tinta); padding-top: var(--pad) !important; }
-.fecho h2 { font-size: clamp(4.5rem, 11.5vw, 11rem); }
-.barra { display: grid; grid-template-columns: 1fr auto auto; gap: 24px; align-items: center; margin-top: clamp(32px, 5vw, 56px); padding: clamp(20px, 3vw, 28px) clamp(20px, 3vw, 32px); background: var(--tinta); color: var(--creme); text-decoration: none; font-weight: 600; font-size: clamp(1.125rem, 1.8vw, 1.5rem); transition: background-color var(--t-hover) var(--ease); }
+.fecho h2 { font-size: var(--h2); }
+.barra { display: grid; grid-template-columns: 1fr auto auto; gap: 24px; align-items: center; margin-top: clamp(32px, 5vw, 56px); padding: clamp(20px, 3vw, 28px) clamp(20px, 3vw, 32px); background: var(--tinta); color: var(--creme); text-decoration: none; font-weight: 600; font-size: clamp(1.0625rem, 1.6vw, 1.375rem); transition: background-color var(--t-hover) var(--ease); }
 .barra:hover { background: var(--cereja); }
-.barra__nota { font-family: var(--mono); font-size: var(--mono-s); font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--cinza-claro); }
+.barra__nota { font-size: var(--mono-s); font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--cinza-claro); }
 .barra:hover .barra__nota { color: #fff; }
-@media (max-width: 767.98px) { .barra { grid-template-columns: 1fr auto; } .barra__nota { grid-column: 1 / -1; } }
-.fecho__grid { display: grid; gap: 40px; align-items: start; }
-@media (min-width: 992px) { .fecho__grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 80px; } }
-.fecho .nota { margin-top: 28px; }
+@media (max-width: 767.98px) { .barra { grid-template-columns: 1fr auto; } .barra__nota { grid-column: 1 / -1; } .barra__seta { grid-row: 1; grid-column: 2; } }
 
-/* ── Rodapé: uma linha ──────────────────────────────────────────────── */
+/* ── Rodapé ─────────────────────────────────────────────────────────── */
 .site-footer { border-top: 1px solid var(--tinta); padding-block: 28px 20px; }
 .site-footer__grid { display: grid; gap: 16px; }
 @media (min-width: 992px) { .site-footer__grid { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: 64px; align-items: start; } }
-.site-footer__linha { display: flex; flex-wrap: wrap; gap: 6px 32px; font-family: var(--mono); font-size: var(--mono-s); line-height: 1.6; letter-spacing: .02em; color: var(--cinza); }
+.site-footer__linha { display: flex; flex-wrap: wrap; gap: 6px 32px; font-size: var(--mono-s); line-height: 1.6; color: var(--cinza); }
 .site-footer__col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 32px; }
 @media (min-width: 992px) { .site-footer__col ul { justify-content: flex-end; } }
-.site-footer__col a, .site-footer__col span { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; color: var(--tinta); font-family: var(--mono); font-size: var(--mono-s); letter-spacing: .06em; text-transform: uppercase; }
+.site-footer__col a, .site-footer__col span { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; color: var(--tinta); font-size: var(--mono-s); letter-spacing: .06em; text-transform: uppercase; }
 .site-footer__col span { color: var(--cinza); }
 .site-footer__col a:hover { color: var(--cereja); }
 
-/* ── Movimento: revelação e redução ─────────────────────────────────── */
+/* ── Movimento ──────────────────────────────────────────────────────── */
 .js .reveal { opacity: 0; transform: translateY(18px); transition: opacity var(--t-reveal) var(--ease), transform var(--t-reveal) var(--ease); }
 .js .reveal.is-visible { opacity: 1; transform: none; }
 .js .reveal[data-delay="1"] { transition-delay: .1s; }
 .js .reveal[data-delay="2"] { transition-delay: .2s; }
 .js .reveal[data-delay="3"] { transition-delay: .3s; }
-.js .fio .fala.reveal { transform: translateY(10px); }
-/* A máscara deixa espaço em cima para os acentos das caixas-altas (Ô, Á). */
 .mask { display: block; overflow: hidden; padding: .18em 0 .06em; margin: -.18em 0 -.06em; }
 .js .mask > span { display: block; transform: translateY(110%); transition: transform .9s var(--ease); }
 .js .mask.is-visible > span { transform: none; }
