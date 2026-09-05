@@ -90,38 +90,45 @@ escreve: **a máquina escreve em mono, a pessoa lê em serifa.**
 ## Componentes
 
 - **Rótulo** (`.rotulo`): numeral, régua de 28px, texto. Abre toda seção.
-- **Ledger** (`.ledger`): a legenda de três células — *quem · quando · onde* —
-  sob toda foto, sem fio. Coordenadas só no cartão, onde são evidência;
-  nas legendas entra outra coisa (a altitude, o aparelho, o lugar).
-- **Lâmina** (`.lamina` + `.foto`): uma foto com o ledger. **Uma série só**:
-  todas em preto e branco, contraste 1.15, grão (SVG `feTurbulence` em
-  `multiply`). Duas escalas apenas: a coluna (folha 1:1 no hero, sangrando à
-  direita; balcão 4:5 na 04) e a faixa sangrada de borda a borda (talhão com
-  geada 21:9 fechando a seção escura, `.lamina--sangria`).
-- **Documento** (`.doc`, `.cartao`): a "tira" — tudo que a Stevi manda tem a
-  mesma forma: caixa de 1px, cabeça (marca Stevi + tipo + data, fio forte
-  embaixo), texto em serifa a 18px, pé em mono 14px com fio fraco. Variante
-  `.doc--claro` sobre a tinta. A pergunta do produtor entra como
-  `.doc__pergunta`. Na 02 a tira senta em cima da curva (`.curva__slip`).
+- **Ledger** (`.ledger`): a legenda de três células em mono, sem fio. Só sob
+  o cartaz ("A4 · O cartaz do balcão · Impressão em preto"). Coordenadas só no
+  cartão, onde são evidência.
+- **Lâmina** (`.lamina` + `.foto`): uma foto, sem legenda. As fotos são
+  geradas; legenda com hora e coordenada fingiria proveniência numa página
+  que vive de proveniência — por isso não têm ledger e o `aria-label` diz
+  "ilustração". Duas na página, mesmo tratamento (preto e branco, contraste
+  1.15, grão SVG em `multiply`), dentro da coluna: a mão fotografando a
+  folha (1:1, hero) e o talhão com geada (21:9, fechando a 02).
+- **Documento** (`.doc`, `.cartao`): a "tira" — o que a Stevi manda tem a
+  mesma forma: caixa de 1px em `--papel`, cabeça (marca Stevi + tipo + data,
+  fio forte embaixo), texto em serifa a 18px, pé em mono 15px com fio fraco.
+  Variante `.doc--claro` sobre a tinta. São três na página: o cartão (01), o
+  alerta (02) e "Quem responde" no rodapé. Sem sombra: sombra vira mockup.
+- **Citação** (`.citacao`): a resposta da Stevi na 03 é uma citação, não uma
+  tira — pergunta do produtor em itálico, resposta em serifa, a lei como nota.
+- **Carimbos** (`.carimbos`): "Não receita. / Não inventa. / Mostra a fonte."
+  em display (~4rem) com a definição ao lado, em linhas com fio.
 - **Cartão** (`.cartao`): documento com as coordenadas em display e uma
   `table.tabela` Leitura/Valor/Fonte, tudo alinhado à esquerda, sem quebra de
   linha no desktop; no mobile some a coluna Fonte.
 - **Curva** (`.curva`): o instrumento da página. SVG inline da temperatura
-  horária prevista (18h→08h) em largura cheia, com a linha de 3 °C (risco de
-  geada) tracejada em cereja, a janela de geada sombreada, a mínima marcada.
-  Dois SVGs (desktop 1280×560, celular 400×300) porque texto em SVG não
+  horária prevista (18h→08h) em largura cheia; a linha de 3 °C tracejada em
+  cereja; a faixa sombreada cobre exatamente o trecho abaixo de 3 °C; o
+  "1,2 °C" em display senta em cima da mínima, com uma linha até o ponto.
+  Dois SVGs (desktop 1280×480, celular 400×300) porque texto em SVG não
   escala bem. Dado, não ornamento: o papel milimetrado foi removido por isso.
-- **Regras** (`.regras`): três linhas `dt` display / `dd` corpo, com fios.
-- **Perguntas** (`.regras--faq`): a pergunta do produtor em display, a
-  resposta da Stevi em serifa, em linhas com fio. Sem carimbo de hora: não é
-  uma conversa, é uma lista.
+- **Perguntas** (`.regras--faq`): pergunta em serifa itálica, resposta em
+  serifa, em linhas com fio. Sem carimbo de hora: não é uma conversa, é uma
+  lista. Três perguntas; a de "receita defensivo?" a 03 já responde.
 - **Cartaz** (`.cartaz`): folha A4 (`aspect-ratio: 1/1.4142`) em `--papel`,
-  fio de 1px e marcas de corte nos cantos (sem sombra — sombra vira mockup),
-  QR real com `mix-blend-mode: multiply`, canhotos destacáveis em
-  `writing-mode` vertical. Na 04 fica lado a lado com a foto do balcão.
-- **Barra** (`.barra`): a ação. Faixa preta com o texto a 17–22px, a nota em
-  rótulo e a seta. **A mesma no hero e no fecho**; hover vai a cereja. É o
-  único lugar em que o acento entra como fundo.
+  fio de 1px, QR real com `mix-blend-mode: multiply`, canhotos destacáveis em
+  `writing-mode` vertical. Na 04 fica ao lado do título e do texto, na mesma
+  altura. No celular o QR encolhe e ganha um toque "Abrir no WhatsApp"
+  (`.cartaz__toque`): o telefone não lê o próprio QR; os canhotos somem.
+- **Barra** (`.barra`): a ação. Faixa com o rótulo em display (`--display-s`),
+  a nota em mono e a seta, numa linha só. **A mesma no hero (preta) e no fecho
+  (creme sobre tinta)**; hover vai a cereja. É o único lugar em que o acento
+  entra como fundo.
 - **Link do header** (`.site-header__wa`): texto mono sublinhado, 44px de
   altura mínima. O `.btn` continua no CSS para as páginas internas.
 - Container 1360px, gutter 32px (20px no mobile). Raio 0 em tudo salvo o
