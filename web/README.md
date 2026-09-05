@@ -93,12 +93,12 @@ escreve: **a máquina escreve em mono, a pessoa lê em serifa.**
 - **Ledger** (`.ledger`): a legenda de três células em mono, sem fio. Só sob
   o cartaz ("A4 · O cartaz do balcão · Impressão em preto"). Coordenadas só no
   cartão, onde são evidência.
-- **Lâmina** (`.lamina` + `.foto`): uma foto, sem legenda. As fotos são
-  geradas; legenda com hora e coordenada fingiria proveniência numa página
-  que vive de proveniência — por isso não têm ledger e o `aria-label` diz
-  "ilustração". Duas na página, mesmo tratamento (preto e branco, contraste
-  1.15, grão SVG em `multiply`), dentro da coluna: a mão fotografando a
-  folha (1:1, hero) e o talhão com geada (21:9, fechando a 02).
+- **A troca** (`.fio--hero`): o objeto do hero é a conversa real — o
+  produtor manda a foto da folha às 08:11, a Stevi responde às 08:12 com a
+  triagem (texto do produto). A foto vai **em cor** dentro da fala: ferrugem
+  se diagnostica pela cor; preto e branco contradiria a resposta. É a única
+  foto da página. A foto é gerada; por isso não leva legenda com coordenada
+  (fingiria proveniência) e o `aria-label` diz "ilustração".
 - **Documento** (`.doc`, `.cartao`): a "tira" — o que a Stevi manda tem a
   mesma forma: caixa de 1px em `--papel`, cabeça (marca Stevi + tipo + data,
   fio forte embaixo), texto em serifa a 18px, pé em mono 15px com fio fraco.
