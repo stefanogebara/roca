@@ -88,12 +88,20 @@
             <p class="lede">A folha, o áudio, o pin. A Stevi diz o que vê, de onde tirou, e onde ela para.</p>
             <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">Sem app, sem cadastro</span><span class="barra__seta" aria-hidden="true">↗</span></a>
           </div>
-          <figure class="lamina hero__foto reveal" data-delay="1" role="figure" aria-label="Ilustração: a folha com ferrugem, virada para a luz.">
-          <picture class="foto lamina__foto">
-            <source srcset="media/leaf-rust.webp" type="image/webp" />
-            <img src="media/leaf-rust.jpg" width="1920" height="1072" alt="Folha de café virada para a luz, com pústulas alaranjadas de ferrugem no verso" loading="eager" />
-          </picture>
-        </figure>
+          <figure class="fio fio--hero reveal" data-delay="1" role="figure" aria-label="A troca: o produtor manda a foto da folha, a Stevi responde com a triagem.">
+            <div class="fala fala--eu">
+              <p class="fala__quem"><span>Produtor</span><span>ter, 3 set · 08:11</span></p>
+              <picture class="foto fala__foto">
+                <source srcset="media/leaf-rust.webp" type="image/webp" />
+                <img src="media/leaf-rust.jpg" width="1920" height="1072" alt="Folha de café virada para a luz, com pústulas alaranjadas de ferrugem no verso" loading="eager" />
+              </picture>
+              <p class="fala__texto">que que é isso? tá se alastrando</p>
+            </div>
+            <div class="fala fala--ultima">
+              <p class="fala__quem"><span>Stevi<span class="ponto"></span></span><span>08:12</span></p>
+              <p class="fala__texto">Pela foto, tem muita cara de <strong>ferrugem do cafeeiro</strong> — confiança média. Pra confirmar, uma foto do verso da folha ajuda: é onde saem as pústulas.</p>
+            </div>
+          </figure>
         </div>
       </div>
     </section>
@@ -145,23 +153,18 @@
             <g class="curva__num">
               <text x="0" y="412">0 °C</text><text x="0" y="285">5 °C</text><text x="0" y="159">10 °C</text><text x="0" y="32">15 °C</text>
               <text x="0" y="464">18h</text><text x="365.7" y="464" text-anchor="middle">22h</text><text x="731.4" y="464" text-anchor="middle">02h</text><text x="1097.1" y="464" text-anchor="middle">06h</text><text x="1280" y="464" text-anchor="end">08h</text>
-              <text class="curva__num--risco" x="8" y="326">3 °C · abaixo disso, risco de geada</text>
-              <text class="curva__num--banda" x="794" y="406">abaixo de 3 °C</text>
-            </g>
+              <text class="curva__num--risco" x="1180" y="330" text-anchor="end">3 °C · risco de geada</text>
+                          </g>
             <path class="curva__linha" d="M0.0 45.1 L91.4 93.2 L182.9 136.3 L274.3 176.8 L365.7 214.8 L457.1 250.3 L548.6 283.2 L640.0 311.1 L731.4 333.9 L822.9 354.1 L914.3 371.9 L1005.7 384.5 L1097.1 389.6 L1188.6 374.4 L1280.0 321.2"/>
             <circle class="curva__min" cx="1097.1" cy="389.6" r="7"/>
-            <path class="curva__eixo curva__eixo--min" d="M1097.1 382V226"/>
-            <rect class="curva__fundo" x="940" y="48" width="320" height="170"/>
-            <text class="curva__grau" x="1097.1" y="160" text-anchor="middle">1,2 °C</text>
-            <text class="curva__num curva__num--min" x="1097.1" y="200" text-anchor="middle">mínima prevista · 06h</text>
+                        
           </svg>
-          <svg class="curva__svg curva__svg--m" viewBox="0 0 400 420" aria-hidden="true">
-            <text class="curva__grau" x="0" y="96">1,2 °C</text>
-            <text class="curva__num curva__num--min" x="0" y="128">mínima prevista · 06h</text>
+          <svg class="curva__svg curva__svg--m" viewBox="0 150 400 270" aria-hidden="true">
             <rect class="curva__banda" x="243" y="328" width="140" height="42"/>
             <g class="curva__eixo"><path d="M0 370H400"/><path d="M342.9 370v6"/></g>
             <path class="curva__risco" d="M0 328H400"/>
             <g class="curva__num">
+              <text class="curva__num--risco" x="400" y="318" text-anchor="end">3 °C</text>
               <text x="0" y="404">18h</text><text x="342.9" y="404" text-anchor="middle">06h</text>
                           </g>
             <path class="curva__linha" d="M0.0 162.8 L28.6 189.4 L57.1 213.2 L85.7 235.6 L114.3 256.6 L142.9 276.2 L171.4 294.4 L200.0 309.8 L228.6 322.4 L257.1 333.6 L285.7 343.4 L314.3 350.4 L342.9 353.2 L371.4 344.8 L400.0 315.4"/>
@@ -169,10 +172,13 @@
           </svg>
         </figure>
         <div class="secao__grid secao__grid--baixo">
-          <p class="alerta__quando reveal" data-delay="1">Mínima prevista pra madrugada de qua, 4 set, no ponto do pin — abaixo de 3 °C, risco de geada. Aviso mandado na véspera, às 22:00. Ninguém pediu.</p>
+          <div>
+            <p class="alerta__grau"><span class="mask"><span>1,2 °C</span></span></p>
+            <p class="alerta__quando reveal" data-delay="1">Mínima prevista pra madrugada de qua, 4 set, no ponto do pin — abaixo de 3 °C, risco de geada. Aviso mandado na véspera, às 22:00. Ninguém pediu.</p>
+          </div>
           <div class="doc doc--claro reveal" data-delay="2" role="figure" aria-label="O alerta de geada que a Stevi manda na véspera.">
             <p class="doc__cabeca"><span class="doc__marca">Stevi<span class="ponto"></span></span><span>Alerta de geada</span><span class="doc__quando">ter, 3 set · 22:00</span></p>
-            <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET). Previsão de ponto tem incerteza.</p>
+            <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET).</p>
             <p class="doc__pe">Previsão horária do ponto: Open-Meteo. Ela olha todo dia e avisa na véspera.</p>
           </div>
         </div>
@@ -193,11 +199,11 @@
     </section>
 
     <!-- 04 — COOPERATIVAS: o texto em 2/3, o cartaz em 1/3 -->
-    <section class="secao escuro coop" id="coop" data-theme="dark" aria-labelledby="coop-title">
+    <section class="secao coop" id="coop" data-theme="light" aria-labelledby="coop-title">
       <div class="container">
         <div class="coop__par">
           <div>
-            <p class="rotulo rotulo--claro reveal"><span class="num">04</span>Para cooperativas e revendas</p>
+            <p class="rotulo reveal"><span class="num">04</span>Para cooperativas e revendas</p>
             <h2 id="coop-title" class="h2--multi reveal" data-delay="1">O dado é do produtor.<br /> A cooperativa vê<br /> o que ele autorizar.</h2>
             <div class="tres reveal" data-delay="2">
             <p>O cooperado manda a foto pra Stevi, no WhatsApp que já usa.</p>
@@ -214,7 +220,7 @@
               <p class="cartaz__pe"><span>Aponta a câmera</span><span>Abre no WhatsApp</span></p>
               <p class="cartaz__canhotos" aria-hidden="true"><span>wa.me/19705509125</span><span>wa.me/19705509125</span><span>wa.me/19705509125</span><span>wa.me/19705509125</span></p>
             </div>
-            <figcaption class="ledger ledger--claro"><span>A4</span><span>O cartaz do balcão</span><span>Impressão em preto</span></figcaption>
+            <figcaption class="ledger"><span>A4</span><span>O cartaz do balcão</span><span>Impressão em preto</span></figcaption>
           </figure>
         </div>
       </div>
