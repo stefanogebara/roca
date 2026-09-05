@@ -73,7 +73,7 @@
         <a href="#coop">04 Cooperativas</a>
         <a href="#perguntas">05 Perguntas</a>
       </nav>
-      <a class="btn btn--solid btn--sm" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">WhatsApp</a>
+      <a class="site-header__wa" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">WhatsApp <span aria-hidden="true">↗</span></a>
     </div>
   </header>
 
@@ -87,8 +87,8 @@
           <h1 id="hero-title"><span class="mask"><span>Manda</span></span><span class="mask"><span>a foto</span></span></h1>
           <div class="reveal" data-delay="2">
             <p class="lede">A folha, o áudio, o pin. A Stevi diz o que vê, de onde tirou, e onde ela para.</p>
-            <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">O WhatsApp abre com o “oi” já escrito</span><span class="barra__seta" aria-hidden="true">↗</span></a>
             <p class="nota">Sem app, sem cadastro. Número de teste, em beta. <a href="/verificar">Quem responde pela Stevi.</a></p>
+            <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">O WhatsApp abre com o “oi” já escrito</span><span class="barra__seta" aria-hidden="true">↗</span></a>
           </div>
         </div>
         <figure class="lamina reveal" data-delay="1" role="figure" aria-label="A foto que o produtor mandou: folha de café com ferrugem.">
@@ -96,7 +96,7 @@
             <source srcset="media/leaf-rust.webp" type="image/webp" />
             <img src="media/leaf-rust.jpg" width="1920" height="1072" alt="Folha de café virada para a luz, com pústulas alaranjadas de ferrugem no verso" loading="eager" />
           </picture>
-          <figcaption class="ledger"><span>Produtor</span><span>ter, 3 set · 08:11</span><span>−21.42, −45.94</span></figcaption>
+          <figcaption class="ledger"><span>Produtor</span><span>ter, 3 set · 08:11</span><span>Foto do celular</span></figcaption>
         </figure>
       </div>
     </section>
@@ -105,7 +105,7 @@
     <section class="secao" id="casos" data-theme="light" aria-labelledby="casos-title">
       <div class="container">
         <p class="rotulo reveal"><span class="num">01</span>O que ela lê</p>
-        <h2 id="casos-title" class="reveal" data-delay="1">Você larga o pin uma vez. Ela devolve a lavoura em um cartão.</h2>
+        <h2 id="casos-title" class="reveal" data-delay="1">Você larga o pin<br class="m" /> uma vez.<br class="m" /> Ela devolve<br class="d" /> a lavoura<br class="m" /> em um cartão.</h2>
         <div class="secao__grid secao__grid--baixo">
           <div class="tres reveal" data-delay="2">
             <p><strong>Da foto,</strong> a praga ou a doença, e o quanto ela confia no que viu.</p>
@@ -130,61 +130,72 @@
       </div>
     </section>
 
-    <!-- 02 — ANTES DE ACONTECER: preto chapado, a curva da noite, a madrugada, o aviso -->
+    <!-- 02 — ANTES DE ACONTECER: preto chapado, a curva da noite em largura cheia, o aviso e a madrugada -->
     <section class="secao escuro alerta" id="alerta" data-theme="dark" aria-labelledby="alerta-title">
       <div class="container">
         <p class="rotulo rotulo--claro reveal"><span class="num">02</span>Antes de acontecer</p>
         <h2 id="alerta-title" class="alerta__grau"><span class="mask"><span>1,2 °C</span></span></h2>
+        <p class="alerta__quando reveal" data-delay="1">Mínima prevista pra madrugada de qua, 4 set, no ponto do pin. Aviso mandado na véspera, às 22:00. Ninguém pediu.</p>
+        <figure class="curva reveal" data-delay="2" role="figure" aria-label="Curva da temperatura prevista das 18h às 8h, com mínima de 1,2 °C às 6h.">
+          <svg class="curva__svg curva__svg--d" viewBox="0 0 1280 400" aria-hidden="true">
+            <g class="curva__eixo">
+              <path d="M0 340H1280M0 240H1280M0 140H1280M0 40H1280"/>
+              <path d="M365.7 340v10M731.4 340v10M1097.1 340v10"/>
+            </g>
+            <g class="curva__num">
+              <text x="0" y="332">0 °C</text><text x="0" y="232">5</text><text x="0" y="132">10</text><text x="0" y="32">15</text>
+              <text x="0" y="384">18h</text><text x="365.7" y="384" text-anchor="middle">22h</text><text x="731.4" y="384" text-anchor="middle">02h</text><text x="1097.1" y="384" text-anchor="middle">06h</text><text x="1280" y="384" text-anchor="end">08h</text>
+            </g>
+            <path class="curva__linha" d="M0.0 44.0 L91.4 82.0 L182.9 116.0 L274.3 148.0 L365.7 178.0 L457.1 206.0 L548.6 232.0 L640.0 254.0 L731.4 272.0 L822.9 288.0 L914.3 302.0 L1005.7 312.0 L1097.1 316.0 L1188.6 304.0 L1280.0 262.0"/>
+            <path class="curva__eixo curva__eixo--min" d="M1097.1 316V340"/>
+            <circle class="curva__min" cx="1097.1" cy="316" r="7"/>
+            <text class="curva__num curva__num--min" x="1080" y="296" text-anchor="end">mínima 1,2 °C</text>
+          </svg>
+          <svg class="curva__svg curva__svg--m" viewBox="0 0 400 300" aria-hidden="true">
+            <g class="curva__eixo">
+              <path d="M0 250H400M0 180H400M0 110H400M0 40H400"/>
+              <path d="M114.3 250v6M228.6 250v6M342.9 250v6"/>
+            </g>
+            <g class="curva__num">
+              <text x="0" y="245">0 °C</text><text x="0" y="175">5</text><text x="0" y="105">10</text><text x="0" y="35">15</text>
+              <text x="0" y="284">18h</text><text x="114.3" y="284" text-anchor="middle">22h</text><text x="228.6" y="284" text-anchor="middle">02h</text><text x="342.9" y="284" text-anchor="middle">06h</text><text x="400" y="284" text-anchor="end">08h</text>
+            </g>
+            <path class="curva__linha" d="M0.0 42.8 L28.6 69.4 L57.1 93.2 L85.7 115.6 L114.3 136.6 L142.9 156.2 L171.4 174.4 L200.0 189.8 L228.6 202.4 L257.1 213.6 L285.7 223.4 L314.3 230.4 L342.9 233.2 L371.4 224.8 L400.0 195.4"/>
+            <path class="curva__eixo curva__eixo--min" d="M342.9 233.2V250"/>
+            <circle class="curva__min" cx="342.9" cy="233.2" r="5"/>
+            <text class="curva__num curva__num--min" x="330" y="214" text-anchor="end">mínima 1,2 °C</text>
+          </svg>
+          <figcaption class="ledger ledger--claro"><span>Previsão horária</span><span>ter, 3 set · 22:00</span><span>Open-Meteo</span></figcaption>
+        </figure>
         <div class="secao__grid secao__grid--baixo">
-          <div>
-            <p class="alerta__quando reveal" data-delay="1">Mínima prevista pra madrugada de qua, 4 set, no ponto do pin. Aviso mandado na véspera, às 22:00. Ninguém pediu.</p>
-            <figure class="curva reveal" data-delay="2" role="figure" aria-label="Curva da temperatura prevista das 18h às 8h, com mínima de 1,2 °C às 6h.">
-              <svg viewBox="0 0 640 236" aria-hidden="true">
-                <g class="curva__eixo">
-                  <path d="M0 200H640M0 143.8H640M0 87.5H640M0 31.3H640"/>
-                  <path d="M182.9 200v6M365.7 200v6M548.6 200v6"/>
-                </g>
-                <g class="curva__num">
-                  <text x="0" y="195">0 °C</text><text x="0" y="139">5</text><text x="0" y="83">10</text><text x="0" y="27">15</text>
-                  <text x="0" y="226">18h</text><text x="182.9" y="226" text-anchor="middle">22h</text><text x="365.7" y="226" text-anchor="middle">02h</text><text x="548.6" y="226" text-anchor="middle">06h</text><text x="640" y="226" text-anchor="end">08h</text>
-                </g>
-                <path class="curva__linha" d="M0.0 33.5 L45.7 54.9 L91.4 74.0 L137.1 92.0 L182.9 108.9 L228.6 124.6 L274.3 139.3 L320.0 151.6 L365.7 161.8 L411.4 170.8 L457.1 178.6 L502.9 184.3 L548.6 186.5 L594.3 179.8 L640.0 156.1"/>
-                <circle class="curva__min" cx="548.6" cy="186.5" r="5"/>
-                <text class="curva__num curva__num--min" x="536" y="170" text-anchor="end">1,2 °C · 06h</text>
-              </svg>
-              <figcaption class="ledger ledger--claro"><span>Previsão horária</span><span>ter, 3 set · 22:00</span><span>Open-Meteo</span></figcaption>
-            </figure>
-            <figure class="doc doc--claro reveal" data-delay="2" role="figure" aria-label="O alerta de geada que a Stevi manda na véspera.">
-              <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Alerta de geada</span><span class="doc__quando">ter, 3 set · 22:00</span></p>
-              <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET). Previsão de ponto tem incerteza.</p>
-              <p class="doc__pe">Com o pin, ela olha a previsão do ponto todo dia e avisa na véspera — geada, fogo perto. Só quando muda o risco.</p>
-            </figure>
-          </div>
-          <div class="alerta__lado">
-            <figure class="lamina reveal" data-delay="1" role="figure" aria-label="O talhão baixo na madrugada seguinte, com geada nas folhas.">
-              <picture class="foto foto--noite lamina__foto lamina__foto--alta">
-                <source srcset="media/frost.webp" type="image/webp" />
-                <img src="media/frost.jpg" width="1920" height="1080" alt="Lavoura de café com geada nas folhas ao amanhecer, névoa no vale e um produtor andando entre as ruas" loading="lazy" />
-              </picture>
-              <figcaption class="ledger ledger--claro"><span>Talhão baixo</span><span>qua, 4 set · 06:10</span><span>−21.42, −45.94</span></figcaption>
-            </figure>
-          </div>
+          <figure class="doc doc--claro reveal" data-delay="1" role="figure" aria-label="O alerta de geada que a Stevi manda na véspera.">
+            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Alerta de geada</span><span class="doc__quando">ter, 3 set · 22:00</span></p>
+            <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET). Previsão de ponto tem incerteza.</p>
+            <p class="doc__pe">Com o pin, ela olha a previsão do ponto todo dia e avisa na véspera — geada, fogo perto. Só quando muda o risco.</p>
+          </figure>
+          <figure class="lamina reveal" data-delay="2" role="figure" aria-label="O talhão baixo na madrugada seguinte, com geada nas folhas.">
+            <picture class="foto foto--noite lamina__foto lamina__foto--larga">
+              <source srcset="media/frost.webp" type="image/webp" />
+              <img src="media/frost.jpg" width="1920" height="1080" alt="Lavoura de café com geada nas folhas ao amanhecer, névoa no vale e um produtor andando entre as ruas" loading="lazy" />
+            </picture>
+            <figcaption class="ledger ledger--claro"><span>Talhão baixo</span><span>qua, 4 set · 06:10</span><span>1.180 m</span></figcaption>
+          </figure>
         </div>
       </div>
     </section>
 
-    <!-- 03 — ONDE ELA PARA: a lei, três regras em linhas, a resposta como documento -->
+    <!-- 03 — ONDE ELA PARA: as três regras como título, a lei como rótulo, a resposta como documento -->
     <section class="secao limites" id="porque" data-theme="light" aria-labelledby="porque-title">
       <div class="container">
-        <p class="rotulo reveal"><span class="num">03</span>Onde ela para</p>
-        <h2 id="porque-title"><span class="mask"><span>Lei 14.785</span></span></h2>
+        <p class="rotulo reveal"><span class="num">03</span>Onde ela para · Lei 14.785/2023</p>
+        <h2 id="porque-title" class="reveal" data-delay="1">Não receita.<br class="d" /> Não inventa.<br class="d" /> Mostra a fonte.</h2>
         <div class="secao__grid secao__grid--baixo">
           <dl class="regras reveal" data-delay="1">
-            <div><dt>Não receita.</dt><dd>Produto e dose são ato do engenheiro agrônomo, no receituário. Ela para nessa linha de propósito.</dd></div>
-            <div><dt>Não inventa.</dt><dd>Sem base sólida, diz que não sabe e manda pro agrônomo.</dd></div>
-            <div><dt>Mostra a fonte.</dt><dd>Cada frase diz de onde veio. Dá pra conferir.</dd></div>
+            <div><dt>Não receita</dt><dd>Produto e dose são ato do engenheiro agrônomo, no receituário. Ela para nessa linha de propósito.</dd></div>
+            <div><dt>Não inventa</dt><dd>Sem base sólida, diz que não sabe e manda pro agrônomo.</dd></div>
+            <div><dt>Mostra a fonte</dt><dd>Cada frase diz de onde veio. Dá pra conferir.</dd></div>
           </dl>
-          <figure class="doc reveal" data-delay="2" role="figure" aria-label="O produtor pergunta que produto passar e a Stevi encaminha para o agrônomo.">
+          <figure class="doc doc--alinhado reveal" data-delay="2" role="figure" aria-label="O produtor pergunta que produto passar e a Stevi encaminha para o agrônomo.">
             <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Resposta</span><span class="doc__quando">ter, 3 set · 08:14</span></p>
             <p class="doc__pergunta"><span>Produtor · 08:14</span>e o que eu passo nela?</p>
             <p class="doc__texto">Isso é do engenheiro agrônomo, no receituário — é ele que assina a responsabilidade técnica. O que dá pra fazer agora: monitorar talhão a talhão, agir cedo e rotacionar os modos de ação (FRAC-BR). Leva essa suspeita pra ele que você já chega com a conversa pronta.</p>
@@ -198,7 +209,7 @@
     <section class="secao coop" id="coop" data-theme="light" aria-labelledby="coop-title">
       <div class="container">
         <p class="rotulo reveal"><span class="num">04</span>Para cooperativas e revendas</p>
-        <h2 id="coop-title" class="reveal" data-delay="1">O dado é do produtor. A cooperativa vê o que ele autorizar.</h2>
+        <h2 id="coop-title" class="reveal" data-delay="1">O dado é do<br class="m" /> produtor.<br class="d" /> A cooperativa<br class="m" /> vê<br class="d" /> o que ele<br class="m" /> autorizar.</h2>
         <div class="secao__grid secao__grid--baixo">
           <div>
             <div class="tres reveal" data-delay="2">
@@ -228,28 +239,17 @@
       </div>
     </section>
 
-    <!-- 05 — PERGUNTAS: a conversa numa coluna, a margem à esquerda -->
+    <!-- 05 — PERGUNTAS: a pergunta do produtor em display, a resposta da Stevi em mono -->
     <section class="secao" id="perguntas" data-theme="light" aria-labelledby="faq-title">
       <div class="container">
-        <p class="rotulo reveal"><span class="num">05</span>Perguntas</p>
-        <h2 id="faq-title" class="reveal" data-delay="1">Antes da primeira foto.</h2>
-        <div class="secao__grid secao__grid--baixo">
-          <div class="margem reveal" data-delay="2">
-            <p>As quatro perguntas que chegam antes de qualquer foto, respondidas do jeito que ela responde: curto, em texto, sem prometer o que não faz.</p>
-            <p class="ledger ledger--solto"><span>Conversa</span><span>qui, 5 set · 06:40</span><span>Número de teste</span></p>
-          </div>
-          <figure class="fio fio--chat reveal" data-delay="1" role="figure" aria-label="Perguntas frequentes, respondidas pela Stevi na conversa.">
-            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Conversa</span><span class="doc__quando">qui, 5 set</span></p>
-            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:40</span></p><p class="fala__texto">é de graça?</p></div>
-            <div class="fala"><p class="fala__quem"><span>Stevi</span><span>06:40</span></p><p class="fala__texto">É. No beta sou gratuita. Quando quiser ir além da triagem, te conecto a um agrônomo.</p></div>
-            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:41</span></p><p class="fala__texto">você receita defensivo?</p></div>
-            <div class="fala"><p class="fala__quem"><span>Stevi</span><span>06:41</span></p><p class="fala__texto">Não. Isso é do agrônomo. Eu faço a triagem e encaminho.</p></div>
-            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:43</span></p><p class="fala__texto">aqui a internet é ruim</p></div>
-            <div class="fala"><p class="fala__quem"><span>Stevi</span><span>06:43</span></p><p class="fala__texto">Sem problema. Respondo em texto, que é leve. Funciona em conexão de campo.</p></div>
-            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:44</span></p><p class="fala__texto">e os meus dados?</p></div>
-            <div class="fala fala--ultima"><p class="fala__quem"><span>Stevi</span><span>06:44</span></p><p class="fala__texto">Guardo o mínimo: o pin e o histórico. Peço permissão uma vez. “Apaga meus dados” funciona.</p></div>
-          </figure>
-        </div>
+        <p class="rotulo reveal"><span class="num">05</span>Perguntas · Antes da primeira foto</p>
+        <h2 id="faq-title" class="sr">Perguntas</h2>
+        <dl class="regras regras--faq reveal" data-delay="1">
+          <div><dt>É de graça?</dt><dd><span class="regras__quem">Stevi · 06:40</span>É. No beta sou gratuita. Quando quiser ir além da triagem, te conecto a um agrônomo.</dd></div>
+          <div><dt>Você receita defensivo?</dt><dd><span class="regras__quem">Stevi · 06:41</span>Não. Isso é do agrônomo. Eu faço a triagem e encaminho.</dd></div>
+          <div><dt>Aqui a internet é ruim.</dt><dd><span class="regras__quem">Stevi · 06:43</span>Sem problema. Respondo em texto, que é leve. Funciona em conexão de campo.</dd></div>
+          <div><dt>E os meus dados?</dt><dd><span class="regras__quem">Stevi · 06:44</span>Guardo o mínimo: o pin e o histórico. Peço permissão uma vez. “Apaga meus dados” funciona.</dd></div>
+        </dl>
       </div>
     </section>
 
