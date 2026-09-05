@@ -91,7 +91,8 @@ strong { font-weight: 600; }
 
 .fim { white-space: nowrap; }
 br.d { display: none; }
-@media (min-width: 992px) { br.d { display: inline; } br.m { display: none; } }
+.so-d { display: none; }
+@media (min-width: 992px) { br.d { display: inline; } br.m { display: none; } .so-d { display: inline; } .so-m { display: none; } }
 .ponto { display: inline-block; width: .17em; height: .17em; border-radius: 50%; background: var(--cereja); margin-left: .04em; vertical-align: baseline; }
 
 /* Duas vozes de texto. A máquina escreve em mono: rótulos, legendas, cabeças,
@@ -104,10 +105,10 @@ br.d { display: none; }
 
 /* Um rótulo só: numeral, régua, texto. */
 .rotulo { display: flex; align-items: center; gap: 14px; margin: 0 0 24px; color: var(--cinza); }
-.rotulo .num { color: var(--cereja); display: inline-flex; align-items: center; gap: 14px; flex: none; }
+.rotulo .num { color: var(--tinta); display: inline-flex; align-items: center; gap: 14px; flex: none; }
 .rotulo .num::after { content: ""; display: inline-block; width: 28px; height: 1px; background: var(--tinta); opacity: .5; }
 .rotulo--claro { color: var(--cinza-claro); }
-.rotulo--claro .num { color: var(--cereja); }
+.rotulo--claro .num { color: var(--creme); }
 .rotulo--claro .num::after { background: var(--creme); }
 
 /* A legenda-ledger: quem · quando · onde. A mesma sob toda foto e documento. */
@@ -187,12 +188,13 @@ br.d { display: none; }
 /* ── A seção: título em largura cheia, depois prosa e documento ─────── */
 .secao { padding-block: var(--pad); scroll-margin-top: 24px; }
 .secao:not(.escuro) + .secao:not(.escuro) { border-top: 1px solid var(--linha); }
+@media (max-width: 767.98px) { .secao:not(.escuro) + .secao:not(.escuro) { border-top: 1px solid var(--tinta); } }
 .secao + .secao:not(.escuro) { padding-top: 0; }
 .secao.escuro + .secao { padding-top: clamp(3rem, 5vw, 4.5rem); }
 .secao.escuro + .secao.escuro { padding-top: var(--pad); }
 .secao__grid { display: grid; gap: 48px; align-items: start; }
 .hero__grid { margin-top: clamp(1.5rem, 3vw, 2.5rem); }
-.hero__acao { display: flex; flex-direction: column; justify-content: flex-start; }
+.hero__acao { display: flex; flex-direction: column; justify-content: space-between; }
 .hero .lede { max-width: 30ch; font-size: clamp(1.375rem, 2.2vw, 2rem); line-height: 1.25; }
 .fio--hero .fala { padding: 14px 0 18px; }
 .fio--hero .fala--eu { justify-self: stretch; text-align: left; }
@@ -324,9 +326,9 @@ br.d { display: none; }
 /* ── Onde ela para: três carimbos, a definição ao lado ─────────────────── */
 .carimbos { margin: 0; display: grid; border-top: 1px solid var(--tinta); }
 .carimbos div { display: grid; gap: 12px 64px; padding: 22px 0 26px; border-bottom: 1px solid var(--tinta); align-items: end; }
-@media (min-width: 992px) { .carimbos div { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); } .carimbos dd { padding-bottom: .5em; } }
-.carimbos dt { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.025em; line-height: .88; font-size: clamp(2.5rem, 5.8vw, 5.5rem); white-space: nowrap; }
-.carimbos dd { margin: 0; font-size: var(--lede); line-height: 1.3; max-width: 26ch; text-wrap: pretty; color: var(--tinta); }
+@media (min-width: 992px) { .carimbos div { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); } .carimbos dd { padding-bottom: .5em; } }
+.carimbos dt { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.025em; line-height: .88; font-size: clamp(2.75rem, 5.8vw, 5.5rem); white-space: nowrap; }
+.carimbos dd { margin: 0; font-size: var(--lede); line-height: 1.3; max-width: 30ch; text-wrap: pretty; color: var(--tinta); }
 .limites .lede { color: var(--cinza); max-width: 32ch; }
 .citacao { margin: 0; }
 .citacao__quem { display: block; margin-bottom: 8px; font-family: var(--mono); font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--cinza); }
@@ -372,14 +374,14 @@ br.d { display: none; }
 /* ── Fecho: encosta na conversa, a linha e a barra ──────────────────── */
 .fecho { padding-top: var(--pad); }
 .fecho h2 { font-size: clamp(3.25rem, 12vw, 11rem); letter-spacing: -.025em; line-height: .9; }
-@media (max-width: 767.98px) { .fecho h2 { font-size: 4rem; letter-spacing: -.03em; } .fecho .fim { white-space: normal; } }
+@media (max-width: 767.98px) { .fecho h2 { font-size: 3.75rem; letter-spacing: -.03em; } }
 .fecho .barra { background: var(--creme); color: var(--tinta); }
 .fecho .barra .barra__nota { color: var(--cinza); }
 .fecho .barra:hover { background: var(--cereja); color: #fff; }
 .fecho .barra:hover .barra__nota { color: #fff; }
 
 /* ── Rodapé ─────────────────────────────────────────────────────────── */
-.site-footer { background: var(--tinta); color: var(--creme); padding-block: 8px 28px; border-top: 1px solid var(--linha-escura); }
+.site-footer { background: var(--tinta); color: var(--creme); padding-block: 28px 28px; border-top: 1px solid var(--linha-escura); }
 .fecho { padding-bottom: clamp(2.5rem, 5vw, 4rem); }
 .site-footer__grid { display: grid; gap: 16px; }
 .site-footer__grid { gap: 16px; }
