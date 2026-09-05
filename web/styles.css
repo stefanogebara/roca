@@ -174,9 +174,9 @@ br.d { display: none; }
 .site-header__inner { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .wordmark {
   font-family: var(--display); font-weight: 900; font-size: 2rem; letter-spacing: -.02em;
-  text-transform: uppercase; text-decoration: none; line-height: 1; display: inline-flex; align-items: center; gap: .28em;
+  text-transform: uppercase; text-decoration: none; line-height: 1; display: inline-flex; align-items: baseline; gap: .06em;
 }
-.wordmark__dot { width: .34em; height: .34em; border-radius: 50%; background: var(--cereja); transform: translateY(.04em); }
+.wordmark__dot { width: .2em; height: .2em; border-radius: 50%; background: var(--cereja); }
 .site-header__wa { display: inline-flex; align-items: center; gap: .5em; min-height: 44px; font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; text-decoration: none; border-bottom: 1px solid currentColor; line-height: 1; padding: 0; margin-top: 0; }
 .site-header__wa:hover { color: var(--cereja); }
 .site-nav { display: flex; gap: 30px; }
@@ -186,13 +186,14 @@ br.d { display: none; }
 
 /* ── A seção: título em largura cheia, depois prosa e documento ─────── */
 .secao { padding-block: var(--pad); scroll-margin-top: 24px; }
+.secao:not(.escuro) + .secao:not(.escuro) { border-top: 1px solid var(--linha); }
 .secao + .secao:not(.escuro) { padding-top: 0; }
 .secao.escuro + .secao { padding-top: clamp(3rem, 5vw, 4.5rem); }
 .secao.escuro + .secao.escuro { padding-top: var(--pad); }
 .secao__grid { display: grid; gap: 48px; align-items: start; }
 .hero__grid { margin-top: clamp(1.5rem, 3vw, 2.5rem); }
 .hero__acao { display: flex; flex-direction: column; justify-content: flex-start; }
-.hero .lede { max-width: 34ch; }
+.hero .lede { max-width: 30ch; font-size: clamp(1.375rem, 2.2vw, 2rem); line-height: 1.25; }
 .fio--hero .fala { padding: 14px 0 18px; }
 .fio--hero .fala--eu { justify-self: stretch; text-align: left; }
 .fio--hero .fala--eu .fala__quem { flex-direction: row; justify-content: space-between; }
@@ -201,11 +202,12 @@ br.d { display: none; }
 .fio--hero .fala__texto { max-width: none; }
 .fio--hero .fala__quem .ponto { width: .5em; height: .5em; margin-left: .25em; }
 @media (min-width: 992px) { .hero .secao__grid { align-items: stretch; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 80px; } }
-@media (max-width: 991.98px) { .fio--hero { order: -1; } .hero .secao__grid { gap: 28px; } }
+@media (max-width: 991.98px) { .hero__acao { display: contents; } .hero .lede { order: 1; } .fio--hero { order: 2; margin-top: 8px; } .barra--hero { order: 3; margin-top: 0; } .hero .secao__grid { gap: 28px; } }
 .secao__grid--baixo { margin-top: clamp(2rem, 4vw, 3.5rem); }
 @media (min-width: 992px) { .secao__grid--lado { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); } }
 .secao__grid--lado .tres { margin-top: clamp(1.5rem, 3vw, 2.5rem); }
 .secao__grid--lado .cartao { align-self: start; }
+@media (min-width: 992px) { .secao__grid--lado > div:first-child { display: flex; flex-direction: column; } .secao__grid--lado .tres { flex: 1; align-content: space-between; } }
 @media (min-width: 992px) {
   .secao__grid { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 80px; }
   .hero .secao__grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; }
@@ -277,7 +279,7 @@ br.d { display: none; }
 .tabela th, .tabela td { text-align: left; padding: 10px 24px 10px 0; border-top: 1px solid var(--linha); vertical-align: baseline; }
 .tabela thead th { color: var(--cinza); border-top: 1px solid var(--tinta); }
 .tabela tbody th { font-weight: 500; color: var(--cinza); }
-.tabela td:last-child { color: var(--cinza); padding-right: 6px; }
+.tabela td:last-child { color: var(--cinza); padding-right: 12px; }
 @media (min-width: 992px) { .tabela th, .tabela td { white-space: nowrap; } .tabela td:last-child { width: 1%; } }
 @media (max-width: 767.98px) {
   .tabela thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -317,13 +319,14 @@ br.d { display: none; }
 .curva__num--banda { fill: var(--creme); }
 .curva__linha { fill: none; stroke: var(--creme); stroke-width: 3.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .curva__min { fill: var(--tinta); stroke: var(--cereja); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.curva__horas circle { fill: var(--creme); }
 
 /* ── Onde ela para: três carimbos, a definição ao lado ─────────────────── */
 .carimbos { margin: 0; display: grid; border-top: 1px solid var(--tinta); }
 .carimbos div { display: grid; gap: 12px 64px; padding: 22px 0 26px; border-bottom: 1px solid var(--tinta); align-items: end; }
 @media (min-width: 992px) { .carimbos div { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); } .carimbos dd { padding-bottom: .5em; } }
 .carimbos dt { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.025em; line-height: .88; font-size: clamp(2.5rem, 5.8vw, 5.5rem); white-space: nowrap; }
-.carimbos dd { margin: 0; font-size: var(--corpo-s); line-height: 1.5; max-width: 34ch; text-wrap: pretty; color: var(--tinta); }
+.carimbos dd { margin: 0; font-size: var(--lede); line-height: 1.3; max-width: 26ch; text-wrap: pretty; color: var(--tinta); }
 .limites .lede { color: var(--cinza); max-width: 32ch; }
 .citacao { margin: 0; }
 .citacao__quem { display: block; margin-bottom: 8px; font-family: var(--mono); font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--cinza); }
@@ -384,7 +387,7 @@ br.d { display: none; }
 .site-footer__doc { max-width: var(--col); }
 .site-footer__doc .doc__texto { font-size: var(--corpo-s); }
 .site-footer__doc a { color: var(--creme); }
-.site-footer__linha { display: grid; gap: 6px; font-size: var(--mono-s); line-height: 1.6; color: var(--cinza-claro); max-width: 64ch; }
+.site-footer__linha { display: grid; gap: 6px; font-size: var(--mono-s); line-height: 1.6; color: var(--cinza-claro); max-width: 80ch; }
 .site-footer__linha a { color: var(--creme); }
 .site-footer__col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 32px; }
 .site-footer__col a, .site-footer__col span { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; color: var(--creme); font-size: var(--mono-s); letter-spacing: .08em; text-transform: uppercase; }
