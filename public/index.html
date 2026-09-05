@@ -85,15 +85,15 @@
         <div>
           <p class="rotulo reveal"><span class="num">00</span>Assistente agronômica no WhatsApp</p>
           <h1 id="hero-title"><span class="mask"><span>Manda</span></span><span class="mask"><span>a foto</span></span></h1>
-          <div class="reveal" data-delay="2">
+          <div class="reveal hero__acao" data-delay="2">
             <p class="lede">A folha, o áudio, o pin. A Stevi diz o que vê, de onde tirou, e onde ela para.</p>
             <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">Sem app, sem cadastro</span><span class="barra__seta" aria-hidden="true">↗</span></a>
           </div>
         </div>
-        <figure class="lamina reveal" data-delay="1" role="figure" aria-label="Ilustração: a folha com ferrugem fotografada pelo celular.">
+        <figure class="lamina hero__foto reveal" data-delay="1" role="figure" aria-label="Ilustração: a folha com ferrugem, virada para a luz.">
           <picture class="foto lamina__foto">
-            <source srcset="media/foto-mao.webp" type="image/webp" />
-            <img src="media/foto-mao.jpg" width="720" height="1280" alt="Mão suja de terra segurando o celular, fotografando uma folha de café com ferrugem na tela da câmera" loading="eager" />
+            <source srcset="media/leaf-rust.webp" type="image/webp" />
+            <img src="media/leaf-rust.jpg" width="1920" height="1072" alt="Folha de café virada para a luz, com pústulas alaranjadas de ferrugem no verso" loading="eager" />
           </picture>
         </figure>
       </div>
@@ -103,7 +103,7 @@
     <section class="secao" id="casos" data-theme="light" aria-labelledby="casos-title">
       <div class="container">
         <p class="rotulo reveal"><span class="num">01</span>O que ela lê</p>
-        <h2 id="casos-title" class="reveal" data-delay="1">Você larga o pin<br class="m" /> uma vez.<br class="d" /> Ela devolve<br class="m" /> a lavoura<br /> em um cartão.</h2>
+        <h2 id="casos-title" class="reveal" data-delay="1">Você larga o pin<br class="m" /> uma vez.<br /> Ela devolve a lavoura<br /> em um cartão.</h2>
         <div class="secao__grid secao__grid--baixo">
           <div class="tres reveal" data-delay="2">
             <p><strong>Da foto,</strong> a praga ou a doença, e o quanto ela confia no que viu.</p>
@@ -153,16 +153,18 @@
             <text class="curva__num curva__num--min" x="1070" y="236" text-anchor="end">mínima prevista · 06h</text>
             <text class="curva__grau" x="1070" y="352" text-anchor="end">1,2 °C</text>
           </svg>
-          <svg class="curva__svg curva__svg--m" viewBox="0 0 400 300" aria-hidden="true">
-            <rect class="curva__banda" x="243" y="30" width="140" height="220"/>
-            <g class="curva__eixo"><path d="M0 250H400"/><path d="M114.3 250v6M228.6 250v6M342.9 250v6"/></g>
-            <path class="curva__risco" d="M0 208H400"/>
+          <svg class="curva__svg curva__svg--m" viewBox="0 0 400 420" aria-hidden="true">
+            <text class="curva__grau" x="0" y="96">1,2 °C</text>
+            <text class="curva__num curva__num--min" x="0" y="128">mínima prevista · 06h</text>
+            <rect class="curva__banda" x="243" y="160" width="140" height="210"/>
+            <g class="curva__eixo"><path d="M0 370H400"/><path d="M114.3 370v6M342.9 370v6"/></g>
+            <path class="curva__risco" d="M0 328H400"/>
             <g class="curva__num">
-              <text x="0" y="284">18h</text><text x="114.3" y="284" text-anchor="middle">22h</text><text x="228.6" y="284" text-anchor="middle">02h</text><text x="342.9" y="284" text-anchor="middle">06h</text>
+              <text x="0" y="404">18h</text><text x="114.3" y="404" text-anchor="middle">22h</text><text x="342.9" y="404" text-anchor="middle">06h</text>
+              <text class="curva__num--risco" x="6" y="322">3 °C · risco</text>
             </g>
-            <path class="curva__linha" d="M0.0 42.8 L28.6 69.4 L57.1 93.2 L85.7 115.6 L114.3 136.6 L142.9 156.2 L171.4 174.4 L200.0 189.8 L228.6 202.4 L257.1 213.6 L285.7 223.4 L314.3 230.4 L342.9 233.2 L371.4 224.8 L400.0 195.4"/>
-            <circle class="curva__min" cx="342.9" cy="233.2" r="5"/>
-            <text class="curva__grau" x="330" y="196" text-anchor="end">1,2 °C</text>
+            <path class="curva__linha" d="M0.0 162.8 L28.6 189.4 L57.1 213.2 L85.7 235.6 L114.3 256.6 L142.9 276.2 L171.4 294.4 L200.0 309.8 L228.6 322.4 L257.1 333.6 L285.7 343.4 L314.3 350.4 L342.9 353.2 L371.4 344.8 L400.0 315.4"/>
+            <circle class="curva__min" cx="342.9" cy="353.2" r="5"/>
           </svg>
         </figure>
         <div class="secao__grid secao__grid--baixo">
@@ -174,14 +176,6 @@
           </div>
         </div>
       </div>
-      <figure class="lamina lamina--faixa reveal" data-delay="1" role="figure" aria-label="Ilustração: lavoura de café com geada ao amanhecer.">
-        <div class="container">
-          <picture class="foto foto--noite lamina__foto lamina__foto--faixa">
-            <source srcset="media/frost.webp" type="image/webp" />
-            <img src="media/frost.jpg" width="1920" height="1080" alt="Lavoura de café com geada nas folhas ao amanhecer, névoa no vale e um produtor andando entre as ruas" loading="lazy" />
-          </picture>
-        </div>
-      </figure>
     </section>
 
     <!-- 03 — ONDE ELA PARA: três carimbos, a definição ao lado de cada um; a lei; a resposta -->
@@ -195,11 +189,12 @@
           <div><dt>Mostra a fonte.</dt><dd>Cada frase diz de onde veio. Dá pra conferir.</dd></div>
         </dl>
         <div class="secao__grid secao__grid--baixo">
-          <p class="lede reveal" data-delay="1">A pergunta que mais chega. A resposta é sempre a mesma.</p>
-          <figure class="citacao reveal" data-delay="2">
-            <p class="citacao__pergunta"><span class="citacao__quem">Produtor · ter, 3 set · 08:14</span>“e o que eu passo nela?”</p>
-            <blockquote class="citacao__resposta"><span class="citacao__quem">Stevi · 08:14</span>Isso é do engenheiro agrônomo, no receituário — é ele que assina a responsabilidade técnica. O que dá pra fazer agora: monitorar talhão a talhão, agir cedo e rotacionar os modos de ação (FRAC-BR). Leva essa suspeita pra ele que você já chega com a conversa pronta.</blockquote>
-            <figcaption class="citacao__pe">Lei 14.785/2023, art. 40: receituário assinado por profissional habilitado.</figcaption>
+          <p class="lede reveal" data-delay="1">A pergunta que mais chega. A resposta é sempre a mesma: a Lei 14.785/2023 põe produto e dose no receituário, assinado por engenheiro agrônomo.</p>
+          <figure class="doc reveal" data-delay="2" role="figure" aria-label="O produtor pergunta que produto passar e a Stevi encaminha para o agrônomo.">
+            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Resposta</span><span class="doc__quando">ter, 3 set · 08:14</span></p>
+            <p class="doc__pergunta"><span>Produtor · 08:14</span>e o que eu passo nela?</p>
+            <p class="doc__texto">Isso é do engenheiro agrônomo, no receituário — é ele que assina a responsabilidade técnica. O que dá pra fazer agora: monitorar talhão a talhão, agir cedo e rotacionar os modos de ação (FRAC-BR). Leva essa suspeita pra ele que você já chega com a conversa pronta.</p>
+            <p class="doc__pe">Lei 14.785/2023, art. 40: receituário assinado por profissional habilitado.</p>
           </figure>
         </div>
       </div>
@@ -211,7 +206,7 @@
         <div class="coop__par">
           <div>
             <p class="rotulo reveal"><span class="num">04</span>Para cooperativas e revendas</p>
-            <h2 id="coop-title" class="reveal" data-delay="1">O dado é<br class="d" /> do produtor.<br /> A cooperativa<br class="d" /> vê o que<br class="d" /> ele autorizar.</h2>
+            <h2 id="coop-title" class="reveal" data-delay="1">O dado é<br /> do produtor.<br /> A cooperativa vê<br /> o que ele autorizar.</h2>
             <div class="tres reveal" data-delay="2">
             <p>O cooperado manda a foto pra Stevi, no WhatsApp que já usa.</p>
             <p>O técnico recebe a triagem pronta, com o caderno de aplicações montado, e visita quem precisa primeiro.</p>
@@ -237,8 +232,8 @@
     <section class="secao" id="perguntas" data-theme="light" aria-labelledby="faq-title">
       <div class="container">
         <p class="rotulo reveal"><span class="num">05</span>Perguntas · Antes da primeira foto</p>
-        <h2 id="faq-title" class="sr">Perguntas</h2>
-        <dl class="regras regras--faq reveal" data-delay="1">
+        <h2 id="faq-title" class="reveal" data-delay="1">Antes da<br class="m" /> primeira foto.</h2>
+        <dl class="regras regras--faq secao__grid--baixo reveal" data-delay="2">
           <div><dt>É de graça?</dt><dd>É. No beta sou gratuita. Quando quiser ir além da triagem, te conecto a um agrônomo.</dd></div>
           <div><dt>Aqui a internet é ruim.</dt><dd>Sem problema. Respondo em texto, que é leve. Funciona em conexão de campo.</dd></div>
           <div><dt>E os meus dados?</dt><dd>Guardo o mínimo: o pin e o histórico. Peço permissão uma vez. “Apaga meus dados” funciona.</dd></div>
@@ -257,11 +252,7 @@
 
   <footer class="site-footer" data-theme="dark">
     <div class="container site-footer__grid">
-      <div class="doc doc--claro site-footer__doc">
-        <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Quem responde</span><span class="doc__quando">/verificar</span></p>
-        <p class="doc__texto">Responsável técnico, CREA do engenheiro agrônomo e contato LGPD ficam numa página pública: <a href="/verificar">/verificar</a>.</p>
-        <p class="doc__pe">Número de teste, em beta. Feita no Brasil.</p>
-      </div>
+      <p class="site-footer__linha"><span>Responsável técnico, CREA do engenheiro agrônomo e contato LGPD ficam numa página pública: <a href="/verificar">/verificar</a>.</span><span>Número de teste, em beta. Feita no Brasil.</span></p>
       <nav class="site-footer__col" aria-label="Links do rodapé">
         <ul>
           <li><a href="/verificar">Quem responde</a></li>
