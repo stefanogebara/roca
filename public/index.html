@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stevi — manda a foto. Assistente agronômica no WhatsApp</title>
   <meta name="description" content="Manda a foto da folha, o áudio ou o pin da lavoura pelo WhatsApp. A Stevi faz a triagem — praga, janela de pulverização, geada, solo — com fonte oficial e sem receitar produto. Quem receita é o agrônomo." />
-  <meta name="theme-color" content="#15130F" />
+  <meta name="theme-color" content="#F4F0E4" />
   <meta name="color-scheme" content="light" />
   <link rel="canonical" href="https://roca-black.vercel.app/" />
 
@@ -28,12 +28,10 @@
   <meta name="twitter:description" content="Foto da folha, áudio ou pin da lavoura, pelo WhatsApp. A Stevi faz a triagem com fonte oficial. Quem receita é o agrônomo." />
   <meta name="twitter:image" content="https://roca-black.vercel.app/og-image.png" />
 
-  <!-- Fontes: display condensada (voz do site), grotesca de corpo, mono para dado -->
+  <!-- Fontes: display condensada (as afirmações), Plex Serif (o que uma pessoa lê), Plex Mono (o que a máquina escreve) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="preload" as="image" href="media/hero-desktop-poster.jpg" media="(min-width: 768px)" />
-  <link rel="preload" as="image" href="media/hero-mobile-poster.jpg" media="(max-width: 767.98px)" />
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="styles.css" />
 
@@ -69,375 +67,208 @@
     <div class="container site-header__inner">
       <a class="wordmark" href="#topo" aria-label="Stevi — início">Stevi<span class="wordmark__dot" aria-hidden="true"></span></a>
       <nav class="site-nav" aria-label="Navegação principal">
-        <a href="#casos">O que ela vê</a>
-        <a href="#como">Como funciona</a>
-        <a href="#porque">Por quê</a>
-        <a href="#coop">Cooperativas</a>
-        <a href="#perguntas">Perguntas</a>
+        <a href="#casos">01 O que ela lê</a>
+        <a href="#alerta">02 Antes</a>
+        <a href="#porque">03 Onde ela para</a>
+        <a href="#coop">04 Cooperativas</a>
+        <a href="#perguntas">05 Perguntas</a>
       </nav>
-      <a class="btn btn--sm" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">WhatsApp</a>
+      <a class="site-header__wa" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">WhatsApp</a>
     </div>
   </header>
 
   <main id="conteudo">
 
-    <!-- HERO — uma pessoa, um gesto -->
-    <section class="hero" data-theme="dark" aria-labelledby="hero-title">
-      <div class="hero__bg" aria-hidden="true">
-        <video
-          muted loop playsinline autoplay preload="none"
-          poster="media/hero-desktop-poster.jpg"
-          data-desktop-mp4="media/hero-desktop.mp4"
-          data-desktop-webm="media/hero-desktop.webm"
-          data-desktop-poster="media/hero-desktop-poster.jpg"
-          data-mobile-mp4="media/hero-mobile.mp4"
-          data-mobile-poster="media/hero-mobile-poster.jpg"></video>
-      </div>
-      <div class="container hero__content">
-        <div class="hero__grid">
-          <div>
-            <p class="rotulo reveal">Assistente agronômica no WhatsApp</p>
-            <h1 id="hero-title">
-              <span class="mask"><span>Manda</span></span>
-              <span class="mask"><span>a foto.</span></span>
-            </h1>
-          </div>
+    <!-- 00 — HERO: a afirmação, a barra, a foto com a legenda-ledger -->
+    <section class="secao hero" id="como" data-theme="light" aria-labelledby="hero-title">
+      <div class="container secao__grid">
+        <div>
+          <p class="rotulo reveal"><span class="num">00</span>Assistente agronômica no WhatsApp</p>
+          <h1 id="hero-title"><span class="mask"><span>Manda</span></span><span class="mask"><span>a foto</span></span></h1>
           <div class="reveal" data-delay="2">
-            <p class="lede hero__lede">A folha com mancha, o áudio com a dúvida, o pin da lavoura. A Stevi olha, diz o que está vendo e de onde tirou — e nunca receita produto.</p>
-            <div class="hero__acoes">
-              <a class="btn btn--solid" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">Falar com a Stevi</a>
-              <a class="btn" href="#casos">Ver o que ela vê</a>
-            </div>
-            <p class="hero__nota">Número de teste (beta). Quem receita é o agrônomo — <a href="/verificar">veja quem responde pela Stevi</a>.</p>
+            <p class="lede">A folha, o áudio, o pin. A Stevi diz o que vê, de onde tirou, e onde ela para.</p>
+            <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">Sem app, sem cadastro</span><span class="barra__seta" aria-hidden="true">↗</span></a>
           </div>
         </div>
+        <figure class="lamina reveal" data-delay="1" role="figure" aria-label="Ilustração: a folha com ferrugem fotografada pelo celular.">
+          <picture class="foto lamina__foto">
+            <source srcset="media/foto-mao.webp" type="image/webp" />
+            <img src="media/foto-mao.jpg" width="720" height="1280" alt="Mão suja de terra segurando o celular, fotografando uma folha de café com ferrugem na tela da câmera" loading="eager" />
+          </picture>
+        </figure>
       </div>
     </section>
 
-    <!-- CASOS — pinado: título fixo, complemento troca, imagem aproxima -->
-    <section class="section section--cortina casos" id="casos" data-theme="light" aria-labelledby="casos-title">
-      <div class="pin" data-pin data-steps="3">
-        <div class="stage">
-          <div class="container">
-            <div class="casos__grid">
-              <div>
-                <p class="rotulo reveal">O que a Stevi vê</p>
-                <h2 class="casos__titulo" id="casos-title">
-                  <span class="fixo">Ela vê</span>
-                  <span class="casos__linhas" aria-live="polite">
-                    <span data-i="0" class="is-active">a ferrugem na folha.</span>
-                    <span data-i="1">a geada que vem de noite.</span>
-                    <span data-i="2">a hora de pulverizar.</span>
-                  </span>
-                </h2>
-              </div>
-              <div>
-                <div class="casos__midia">
-                  <picture>
-                    <source srcset="media/leaf-rust.webp" type="image/webp" />
-                    <img data-i="0" class="is-active" src="media/leaf-rust.jpg" width="1920" height="1080" alt="Folha de café virada para a luz, com pústulas alaranjadas de ferrugem no verso" loading="eager" />
-                  </picture>
-                  <picture>
-                    <source srcset="media/frost.webp" type="image/webp" />
-                    <img data-i="1" src="media/frost.jpg" width="1920" height="1080" alt="Lavoura de café coberta de geada ao amanhecer, com a neblina baixa no vale" loading="lazy" />
-                  </picture>
-                  <video data-i="2" muted loop playsinline preload="none" poster="media/rows-desktop-poster.jpg" data-lazy-mp4="media/rows-desktop.mp4" aria-hidden="true"></video>
-                </div>
-                <p class="casos__legenda" aria-live="polite">
-                  <span data-i="0" class="is-active"><span class="tag tag--data">ferrugem · confiança média</span><span class="tag">foto do verso da folha</span></span>
-                  <span data-i="1"><span class="tag tag--data">min. −1,2 °C às 05h</span><span class="tag tag--warn">aviso na noite anterior</span></span>
-                  <span data-i="2"><span class="tag tag--data">Delta T 6.0 °C</span><span class="tag tag--go">pode pulverizar</span></span>
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="progresso" aria-hidden="true"><i data-i="0" class="is-active"></i><i data-i="1"></i><i data-i="2"></i></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- PROVA — o texto que ela manda de verdade -->
-    <section class="section dark prova" data-theme="dark" aria-labelledby="prova-title">
+    <!-- 01 — O QUE ELA LÊ -->
+    <section class="secao" id="casos" data-theme="light" aria-labelledby="casos-title">
       <div class="container">
-        <div class="prova__grid">
-          <div>
-            <p class="rotulo reveal">Conversa de verdade</p>
-            <h2 id="prova-title" class="reveal" data-delay="1">Ela diz o que vê. E o que não sabe.</h2>
-            <ul class="prova__lista reveal" data-delay="2">
-              <li><b>fonte</b><span>EMBRAPA, Agrofit/MAPA, FRAC-BR, Portaria SDA/MAPA 1.579/2026 — em texto, não em chute.</span></li>
-              <li><b>clima</b><span>Delta T, vento e chuva do ponto exato da lavoura (Open-Meteo).</span></li>
-              <li><b>solo</b><span>Textura e pH pelo pin (SoilGrids/ISRIC), com o porquê da calagem.</span></li>
-              <li><b>limite</b><span>Produto e dose, nunca. Isso é receituário — e ela te prepara pra ele.</span></li>
-            </ul>
+        <p class="rotulo reveal"><span class="num">01</span>O que ela lê</p>
+        <h2 id="casos-title" class="reveal" data-delay="1">Você larga o pin<br class="m" /> uma vez.<br class="d" /> Ela devolve<br class="m" /> a lavoura<br /> em um cartão.</h2>
+        <div class="secao__grid secao__grid--baixo">
+          <div class="tres reveal" data-delay="2">
+            <p><strong>Da foto,</strong> a praga ou a doença, e o quanto ela confia no que viu.</p>
+            <p><strong>Do áudio,</strong> a pergunta transcrita e respondida por escrito.</p>
+            <p><strong>Do pin,</strong> o solo, o clima do ponto, o calendário sanitário e o vigor por satélite.</p>
           </div>
-          <figure class="chat reveal" data-delay="1" role="figure" aria-label="Conversa de exemplo: o produtor manda uma foto da folha de soja e a Stevi faz a triagem.">
-            <div class="chat__meta"><span>Stevi · WhatsApp</span><span class="mono">08:12</span></div>
-            <p class="balao balao--eu">que que é isso na folha da soja? tá se alastrando<small>08:12 ✓✓</small></p>
-            <p class="balao balao--eles">Pela foto, tem muita cara de <strong>ferrugem asiática</strong> (<em>Phakopsora pachyrhizi</em>) — confiança média. Pra confirmar, uma foto da parte de baixo da folha ajuda: é onde saem as pústulas.<small>08:12</small></p>
-            <p class="balao balao--eles">No princípio (MIP): monitore talhão a talhão, aja cedo e rotacione os modos de ação — já tem resistência confirmada em vários grupos (estrobilurinas, triazóis, carboxamidas).<small>08:13</small></p>
-            <p class="balao balao--eles">Agora, <strong>qual produto e qual dose, quem define é o engenheiro agrônomo</strong>, no receituário — é ele que assina a responsabilidade técnica. Leva essa suspeita pra ele que você já chega com a conversa pronta.<small>08:13</small></p>
+          <figure class="cartao reveal" data-delay="1" role="figure" aria-label="Cartão da lavoura que a Stevi manda depois do pin.">
+            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Cartão da lavoura</span><span class="doc__quando">qua, 4 set · 07:40</span></p>
+            <p class="cartao__ponto"><span class="cartao__coord">−21.42, −45.94</span><span class="cartao__uf">Sul de Minas · o ponto do pin</span></p>
+            <table class="tabela">
+              <thead><tr><th scope="col">Leitura</th><th scope="col">Valor</th><th scope="col">Fonte</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Solo</th><td>Argiloso · pH 5,2 · ácido</td><td>SoilGrids</td></tr>
+                <tr><th scope="row">Pulverizar</th><td>Pode · ΔT 6,5 °C · 7 km/h</td><td>Open-Meteo</td></tr>
+                <tr><th scope="row">Calendário</th><td>Vazio sanitário da soja ativo</td><td>Portaria 1.579/26</td></tr>
+                <tr><th scope="row">Vigor</th><td>NDVI 0,62 · vigorosa</td><td>Sentinel-2 30/08</td></tr>
+              </tbody>
+            </table>
+            <p class="doc__pe">Fontes consultadas na hora em que o pin chega. Leituras aproximadas.</p>
           </figure>
         </div>
       </div>
     </section>
 
-    <!-- COMO FUNCIONA — pinado: "Você manda" + o que muda + telefone -->
-    <section class="section passos" id="como" data-theme="light" aria-labelledby="como-title">
-      <div class="pin pin--3" data-pin data-steps="3">
-        <div class="stage">
-          <div class="container">
-            <p class="rotulo reveal" style="margin-bottom: 24px">Como funciona</p>
-            <div class="passos__grid">
-              <div>
-                <h2 class="passos__lado" id="como-title">Você manda</h2>
-                <p class="passos__desc">Pelo WhatsApp que já está no seu celular. Sem app, sem cadastro, sem senha.</p>
-              </div>
-              <div class="telefone" aria-hidden="true">
-                <div class="telefone__painel is-active" data-i="0">
-                  <picture>
-                    <source srcset="media/foto-mao.webp" type="image/webp" />
-                    <img src="media/foto-mao.jpg" width="720" height="1290" alt="" loading="lazy" />
-                  </picture>
-                  <div class="telefone__topo"><i></i>Stevi</div>
-                  <p class="telefone__msg">Pela foto, tem cara de ferrugem — confiança média. Manda uma do verso da folha?<small>08:12</small></p>
-                </div>
-                <div class="telefone__painel" data-i="1">
-                  <picture>
-                    <source srcset="media/audio.webp" type="image/webp" />
-                    <img src="media/audio.jpg" width="720" height="1290" alt="" loading="lazy" />
-                  </picture>
-                  <div class="telefone__topo"><i></i>Stevi</div>
-                  <p class="telefone__msg">Entendi o áudio: “posso pulverizar hoje?”. Melhor não agora — Delta T 11.2 °C, vento 16 km/h. Janela boa por volta das 17:00.<small>11:58</small></p>
-                </div>
-                <div class="telefone__painel" data-i="2">
-                  <picture>
-                    <source srcset="media/pin-drone.webp" type="image/webp" />
-                    <img src="media/pin-drone.jpg" width="720" height="1290" alt="" loading="lazy" />
-                  </picture>
-                  <div class="telefone__topo"><i></i>Stevi</div>
-                  <p class="telefone__msg">Prontinho, guardei a localização da sua lavoura. 📍 Solo argiloso, pH ~5.2. Seu estado está em vazio sanitário da soja até 06 de setembro.<small>07:40</small></p>
-                </div>
-              </div>
-              <div>
-                <h2 class="passos__lado passos__lado--dir" aria-live="polite">
-                  <span data-i="0" class="is-active">uma foto.</span>
-                  <span data-i="1">um áudio.</span>
-                  <span data-i="2">o pin.</span>
-                </h2>
-              </div>
-            </div>
-          </div>
-          <div class="progresso" aria-hidden="true"><i data-i="0" class="is-active"></i><i data-i="1"></i><i data-i="2"></i></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- FAIXA — o alerta que chega antes -->
-    <section class="faixa" data-theme="dark" data-pin data-scroll aria-labelledby="faixa-title">
-      <div class="faixa__bg" aria-hidden="true">
-        <picture>
-          <source srcset="media/noite.webp" type="image/webp" />
-          <img src="media/noite.jpg" width="1920" height="1071" alt="" loading="lazy" />
-        </picture>
-      </div>
-      <div class="container faixa__content">
-        <div class="faixa__row">
-          <h2 id="faixa-title" class="reveal">Geada às 4. Aviso às 22.</h2>
-          <div class="reveal" data-delay="1">
-            <p class="lede">Com o pin da lavoura, a Stevi olha o tempo todo dia e manda o alerta na véspera — geada, fogo perto, janela de plantio. Você não pergunta; ela avisa.</p>
-            <p class="hero__nota">Alertas de geada e queimada (INPE) para quem deixou o pin. Nada de spam: só quando muda o risco.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- POR QUÊ — escuro, pinado, lente -->
-    <section class="section dark porque" id="porque" data-theme="dark" aria-labelledby="porque-title">
-      <div class="pin pin--3" data-pin data-steps="3">
-        <div class="stage">
-          <div class="container">
-            <p class="rotulo reveal" style="margin-bottom: 24px">Por que confiar</p>
-            <div class="porque__grid">
-              <div>
-                <div class="porque__titulos" id="porque-title">
-                  <h3 data-i="0" class="is-active">Não receita.</h3>
-                  <h3 data-i="1">Não inventa.</h3>
-                  <h3 data-i="2">Mostra a fonte.</h3>
-                </div>
-                <div class="porque__desc" aria-live="polite">
-                  <p data-i="0" class="is-active">Indicar produto e dose é ato do engenheiro agrônomo, no receituário (Lei 14.785/2023). A Stevi para nessa linha de propósito — e te leva até ela com a conversa pronta.</p>
-                  <p data-i="1">Sem base sólida, ela diz que não sabe e manda pro agrônomo. Chute no campo custa a safra; silêncio honesto custa uma mensagem.</p>
-                  <p data-i="2">EMBRAPA, Agrofit/MAPA, FRAC-BR, a portaria do vazio sanitário em texto. Dá pra conferir de onde vem cada frase.</p>
-                </div>
-              </div>
-              <div class="lente" aria-hidden="true">
-                <picture>
-                  <source srcset="media/agronoma.webp" type="image/webp" />
-                  <img data-i="0" class="is-active" src="media/agronoma.jpg" width="1920" height="1433" alt="" loading="lazy" />
-                </picture>
-                <picture>
-                  <source srcset="media/farmer-portrait.webp" type="image/webp" />
-                  <img data-i="1" src="media/farmer-portrait.jpg" width="1200" height="1761" alt="" loading="lazy" />
-                </picture>
-                <picture>
-                  <source srcset="media/aerial.webp" type="image/webp" />
-                  <img data-i="2" src="media/aerial.jpg" width="1920" height="1080" alt="" loading="lazy" />
-                </picture>
-              </div>
-            </div>
-          </div>
-          <div class="progresso" aria-hidden="true"><i data-i="0" class="is-active"></i><i data-i="1"></i><i data-i="2"></i></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- NÚMEROS -->
-    <section class="numeros" data-theme="dark" aria-label="Números da Stevi">
-      <div class="numeros__bg" aria-hidden="true">
-        <picture>
-          <source srcset="media/terreiro.webp" type="image/webp" />
-          <img src="media/terreiro.jpg" width="1600" height="893" alt="" loading="lazy" />
-        </picture>
-      </div>
+    <!-- 02 — ANTES DE ACONTECER: o instrumento em largura cheia, o número sentado na mínima -->
+    <section class="secao escuro alerta" id="alerta" data-theme="dark" aria-labelledby="alerta-title">
       <div class="container">
-        <div class="numeros__grid">
-          <div class="numero reveal">
-            <span class="numero__valor"><span data-count="5">5</span></span>
-            <p class="numero__desc">culturas com fonte oficial: soja, milho, pastagem, café e citros.</p>
+        <p class="rotulo rotulo--claro reveal"><span class="num">02</span>Antes de acontecer</p>
+        <h2 id="alerta-title" class="sr">Mínima de 1,2 °C prevista pra madrugada</h2>
+        <figure class="curva reveal" data-delay="1" role="figure" aria-label="Curva da temperatura prevista das 18h às 8h, com a janela de geada entre 1h e 7h e mínima de 1,2 °C às 6h.">
+          <svg class="curva__svg curva__svg--d" viewBox="0 0 1280 480" aria-hidden="true">
+            <rect class="curva__banda" x="777" y="40" width="448" height="380"/>
+            <g class="curva__eixo">
+              <path d="M0 420H1280M0 293.3H1280M0 166.7H1280M0 40H1280"/>
+              <path d="M365.7 420v10M731.4 420v10M1097.1 420v10M0 420h-10M0 293.3h-10M0 166.7h-10M0 40h-10"/>
+            </g>
+            <path class="curva__risco" d="M0 344H1280"/>
+            <g class="curva__num">
+              <text x="0" y="412">0 °C</text><text x="0" y="285">5 °C</text><text x="0" y="159">10 °C</text><text x="0" y="32">15 °C</text>
+              <text x="0" y="464">18h</text><text x="365.7" y="464" text-anchor="middle">22h</text><text x="731.4" y="464" text-anchor="middle">02h</text><text x="1097.1" y="464" text-anchor="middle">06h</text><text x="1280" y="464" text-anchor="end">08h</text>
+              <text class="curva__num--risco" x="8" y="336">3 °C · abaixo disso, risco de geada</text>
+              <text class="curva__num--banda" x="1001" y="64" text-anchor="middle">abaixo de 3 °C · 02h30–07h30</text>
+            </g>
+            <path class="curva__linha" d="M0.0 45.1 L91.4 93.2 L182.9 136.3 L274.3 176.8 L365.7 214.8 L457.1 250.3 L548.6 283.2 L640.0 311.1 L731.4 333.9 L822.9 354.1 L914.3 371.9 L1005.7 384.5 L1097.1 389.6 L1188.6 374.4 L1280.0 321.2"/>
+            <circle class="curva__min" cx="1097.1" cy="389.6" r="7"/>
+            <path class="curva__eixo" d="M1097.1 389.6L1078 366"/>
+            <text class="curva__num curva__num--min" x="1070" y="236" text-anchor="end">mínima prevista · 06h</text>
+            <text class="curva__grau" x="1070" y="352" text-anchor="end">1,2 °C</text>
+          </svg>
+          <svg class="curva__svg curva__svg--m" viewBox="0 0 400 300" aria-hidden="true">
+            <rect class="curva__banda" x="243" y="30" width="140" height="220"/>
+            <g class="curva__eixo"><path d="M0 250H400"/><path d="M114.3 250v6M228.6 250v6M342.9 250v6"/></g>
+            <path class="curva__risco" d="M0 208H400"/>
+            <g class="curva__num">
+              <text x="0" y="284">18h</text><text x="114.3" y="284" text-anchor="middle">22h</text><text x="228.6" y="284" text-anchor="middle">02h</text><text x="342.9" y="284" text-anchor="middle">06h</text>
+            </g>
+            <path class="curva__linha" d="M0.0 42.8 L28.6 69.4 L57.1 93.2 L85.7 115.6 L114.3 136.6 L142.9 156.2 L171.4 174.4 L200.0 189.8 L228.6 202.4 L257.1 213.6 L285.7 223.4 L314.3 230.4 L342.9 233.2 L371.4 224.8 L400.0 195.4"/>
+            <circle class="curva__min" cx="342.9" cy="233.2" r="5"/>
+            <text class="curva__grau" x="330" y="196" text-anchor="end">1,2 °C</text>
+          </svg>
+        </figure>
+        <div class="secao__grid secao__grid--baixo">
+          <p class="alerta__quando reveal" data-delay="1">Mínima prevista pra madrugada de qua, 4 set, no ponto do pin — abaixo de 3 °C, risco de geada. Aviso mandado na véspera, às 22:00. Ninguém pediu.</p>
+          <div class="doc doc--claro reveal" data-delay="2" role="figure" aria-label="O alerta de geada que a Stevi manda na véspera.">
+            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Alerta de geada</span><span class="doc__quando">ter, 3 set · 22:00</span></p>
+            <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET). Previsão de ponto tem incerteza.</p>
+            <p class="doc__pe">Previsão horária do ponto: Open-Meteo. Com o pin, ela olha todo dia e avisa na véspera — geada, fogo perto. Só quando muda o risco.</p>
           </div>
-          <div class="numero reveal" data-delay="1">
-            <span class="numero__valor"><span data-count="0">0</span></span>
-            <p class="numero__desc">receitas de produto ou dose. Nunca. Isso é do agrônomo.</p>
-          </div>
-          <div class="numero reveal" data-delay="2">
-            <span class="numero__valor"><span data-count="24">24</span><small> h</small></span>
-            <p class="numero__desc">de vigia por dia no pin da lavoura, com alerta na véspera.</p>
-          </div>
+        </div>
+      </div>
+      <figure class="lamina lamina--faixa reveal" data-delay="1" role="figure" aria-label="Ilustração: lavoura de café com geada ao amanhecer.">
+        <div class="container">
+          <picture class="foto foto--noite lamina__foto lamina__foto--faixa">
+            <source srcset="media/frost.webp" type="image/webp" />
+            <img src="media/frost.jpg" width="1920" height="1080" alt="Lavoura de café com geada nas folhas ao amanhecer, névoa no vale e um produtor andando entre as ruas" loading="lazy" />
+          </picture>
+        </div>
+      </figure>
+    </section>
+
+    <!-- 03 — ONDE ELA PARA: três carimbos, a definição ao lado de cada um; a lei; a resposta -->
+    <section class="secao limites" id="porque" data-theme="light" aria-labelledby="porque-title">
+      <div class="container">
+        <p class="rotulo reveal"><span class="num">03</span>Onde ela para</p>
+        <h2 id="porque-title" class="sr">Não receita. Não inventa. Mostra a fonte.</h2>
+        <dl class="carimbos reveal" data-delay="1">
+          <div><dt>Não receita.</dt><dd>Produto e dose são ato do engenheiro agrônomo, no receituário. Ela para nessa linha de propósito.</dd></div>
+          <div><dt>Não inventa.</dt><dd>Sem base sólida, diz que não sabe e manda pro agrônomo.</dd></div>
+          <div><dt>Mostra a fonte.</dt><dd>Cada frase diz de onde veio. Dá pra conferir.</dd></div>
+        </dl>
+        <div class="secao__grid secao__grid--baixo">
+          <p class="lede reveal" data-delay="1">A pergunta que mais chega. A resposta é sempre a mesma.</p>
+          <figure class="citacao reveal" data-delay="2">
+            <p class="citacao__pergunta"><span class="citacao__quem">Produtor · ter, 3 set · 08:14</span>“e o que eu passo nela?”</p>
+            <blockquote class="citacao__resposta"><span class="citacao__quem">Stevi · 08:14</span>Isso é do engenheiro agrônomo, no receituário — é ele que assina a responsabilidade técnica. O que dá pra fazer agora: monitorar talhão a talhão, agir cedo e rotacionar os modos de ação (FRAC-BR). Leva essa suspeita pra ele que você já chega com a conversa pronta.</blockquote>
+            <figcaption class="citacao__pe">Lei 14.785/2023, art. 40: receituário assinado por profissional habilitado.</figcaption>
+          </figure>
         </div>
       </div>
     </section>
 
-    <!-- COOPERATIVAS -->
-    <section class="section coop" id="coop" data-theme="light" aria-labelledby="coop-title">
+    <!-- 04 — COOPERATIVAS: o texto em 2/3, o cartaz em 1/3 -->
+    <section class="secao coop" id="coop" data-theme="light" aria-labelledby="coop-title">
       <div class="container">
-        <div class="coop__grid">
-          <div class="coop__foto reveal">
-            <picture>
-              <source srcset="media/coop.webp" type="image/webp" />
-              <img src="media/coop.jpg" width="1920" height="1080" alt="Armazém de cooperativa com sacas de café empilhadas e um produtor conversando com o técnico" loading="lazy" />
-            </picture>
-          </div>
+        <div class="coop__par">
           <div>
-            <p class="rotulo reveal">Para cooperativas e revendas</p>
-            <h2 id="coop-title" class="reveal" data-delay="1">O agrônomo chega com a foto já vista.</h2>
-            <ul class="coop__lista reveal" data-delay="2">
-              <li>O cooperado manda a foto pra Stevi; o técnico recebe a triagem pronta e visita quem precisa primeiro.</li>
-              <li>O dado da lavoura é do produtor. A cooperativa vê o que ele autorizar — e nada sai do Brasil.</li>
-              <li>Um número, um QR no balcão. Sem app pra instalar, sem treinamento.</li>
-            </ul>
-            <a class="btn btn--solid reveal" data-delay="3" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Sou%20de%20cooperativa%20e%20quero%20conversar." rel="noopener">Conversar sobre a cooperativa</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- FAQ -->
-    <section class="section" id="perguntas" data-theme="light" aria-labelledby="faq-title" style="background: var(--creme-2)">
-      <div class="container">
-        <header class="section__head reveal">
-          <p class="rotulo">Perguntas</p>
-          <h2 id="faq-title">O que perguntam.</h2>
-        </header>
-        <div class="faq reveal" data-delay="1">
-          <details name="faq">
-            <summary>É de graça?</summary>
-            <p>É, no beta a Stevi é gratuita. A ferramenta ajuda de graça e, quando você quiser ir além da triagem, ela te conecta a um agrônomo.</p>
-          </details>
-          <details name="faq">
-            <summary>Funciona pra qual cultura?</summary>
-            <p>Soja, milho, pastagem, café e citros — todas fundamentadas no registro Agrofit/MAPA (ferrugem, lagarta-do-cartucho, broca, greening e companhia).</p>
-          </details>
-          <details name="faq">
-            <summary>A Stevi receita defensivo?</summary>
-            <p>Não. Indicar produto e dose é ato do engenheiro agrônomo, no receituário agronômico (Lei 14.785/2023). A Stevi faz a triagem — te ajuda a entender e a saber o que perguntar — e encaminha a decisão pro agrônomo. É de propósito.</p>
-          </details>
-          <details name="faq">
-            <summary>Preciso de internet boa?</summary>
-            <p>Não. Ela vive dentro do WhatsApp e responde em texto, que é leve. Funciona bem em conexão de campo.</p>
-          </details>
-          <details name="faq">
-            <summary>E se ela não souber?</summary>
-            <p>Ela diz que não sabe e te manda procurar um agrônomo. Prefere o silêncio honesto a um chute — porque chute no campo custa caro.</p>
-          </details>
-          <details name="faq">
-            <summary>Como ela sabe do meu clima e do meu solo?</summary>
-            <p>Pelo pin da sua localização. Com ele, a Stevi puxa o clima (Open-Meteo) e o solo (SoilGrids/ISRIC). Você larga o pin uma vez e pronto.</p>
-          </details>
-          <details name="faq">
-            <summary>E os meus dados?</summary>
-            <p>A Stevi guarda o mínimo: a localização da lavoura e o histórico da conversa. Na primeira conversa ela pede permissão, uma vez só. “Apaga meus dados” funciona — é só pedir.</p>
-          </details>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA FINAL -->
-    <section class="section dark cta" data-theme="dark" aria-labelledby="cta-title">
-      <div class="container">
-        <div class="cta__grid">
-          <h2 id="cta-title">
-            <span class="mask"><span>Manda</span></span>
-            <span class="mask"><span>um oi.</span></span>
-          </h2>
-          <div class="reveal" data-delay="1">
-            <p class="numero-publico">+1 (970) 550-9125</p>
-            <div class="hero__acoes">
-              <a class="btn btn--solid" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">Abrir no WhatsApp</a>
+            <p class="rotulo reveal"><span class="num">04</span>Para cooperativas e revendas</p>
+            <h2 id="coop-title" class="reveal" data-delay="1">O dado é<br class="d" /> do produtor.<br /> A cooperativa<br class="d" /> vê o que<br class="d" /> ele autorizar.</h2>
+            <div class="tres reveal" data-delay="2">
+            <p>O cooperado manda a foto pra Stevi, no WhatsApp que já usa.</p>
+            <p>O técnico recebe a triagem pronta, com o caderno de aplicações montado, e visita quem precisa primeiro.</p>
+            <p>Nada sai do Brasil. Um número, um cartaz no balcão.</p>
             </div>
-            <p class="cta__nota" style="margin-top: 18px">O WhatsApp abre com o “oi” já escrito — é só enviar. O número é internacional porque a Stevi está em beta; <a href="/verificar">confira aqui quem responde por ela</a>.</p>
           </div>
+          <figure class="cartaz reveal" data-delay="1" role="figure" aria-label="Cartaz de balcão em A4: um QR que abre a conversa com a Stevi no WhatsApp, com canhotos destacáveis.">
+            <div class="cartaz__folha">
+              <p class="cartaz__marca">Stevi<span class="ponto"></span></p>
+              <p class="cartaz__linha">Manda a foto da folha.</p>
+              <img class="cartaz__qr" src="/api/qr" width="720" height="720" alt="QR code que abre o WhatsApp da Stevi com o oi já escrito" loading="lazy" />
+              <a class="cartaz__toque" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">Abrir no WhatsApp <span aria-hidden="true">↗</span></a>
+              <p class="cartaz__pe"><span>Aponta a câmera</span><span>Abre no WhatsApp</span></p>
+              <p class="cartaz__canhotos" aria-hidden="true"><span>Stevi · WhatsApp</span><span>Stevi · WhatsApp</span><span>Stevi · WhatsApp</span><span>Stevi · WhatsApp</span></p>
+            </div>
+            <figcaption class="ledger"><span>A4</span><span>O cartaz do balcão</span><span>Impressão em preto</span></figcaption>
+          </figure>
         </div>
+      </div>
+    </section>
+
+    <!-- 05 — PERGUNTAS: a pergunta do produtor em display, a resposta da Stevi em mono -->
+    <section class="secao" id="perguntas" data-theme="light" aria-labelledby="faq-title">
+      <div class="container">
+        <p class="rotulo reveal"><span class="num">05</span>Perguntas · Antes da primeira foto</p>
+        <h2 id="faq-title" class="sr">Perguntas</h2>
+        <dl class="regras regras--faq reveal" data-delay="1">
+          <div><dt>É de graça?</dt><dd>É. No beta sou gratuita. Quando quiser ir além da triagem, te conecto a um agrônomo.</dd></div>
+          <div><dt>Aqui a internet é ruim.</dt><dd>Sem problema. Respondo em texto, que é leve. Funciona em conexão de campo.</dd></div>
+          <div><dt>E os meus dados?</dt><dd>Guardo o mínimo: o pin e o histórico. Peço permissão uma vez. “Apaga meus dados” funciona.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- FECHO -->
+    <section class="secao escuro fecho" data-theme="dark" aria-labelledby="fecho-title">
+      <div class="container">
+        <h2 id="fecho-title"><span class="mask"><span>Triagem,</span></span><span class="mask"><span>não <span class="fim">prescrição<span class="ponto"><span class="sr">.</span></span></span></span></span></h2>
+        <a class="barra reveal" data-delay="1" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">O WhatsApp abre com o “oi” já escrito</span><span class="barra__seta" aria-hidden="true">↗</span></a>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer" data-theme="light">
-    <div class="container">
-      <div class="site-footer__grid">
-        <div>
-          <a class="wordmark" href="#topo">Stevi<span class="wordmark__dot" aria-hidden="true"></span></a>
-          <p class="site-footer__tagline">Triagem,<br />não prescrição.</p>
-          <p class="site-footer__blurb">Assistente agronômica no WhatsApp. Feita no Brasil, para o produtor brasileiro, com fonte oficial e respeito à LGPD.</p>
-        </div>
-        <nav class="site-footer__col" aria-labelledby="f-site">
-          <h2 id="f-site">Site</h2>
-          <ul>
-            <li><a href="#casos">O que ela vê</a></li>
-            <li><a href="#como">Como funciona</a></li>
-            <li><a href="#porque">Por quê</a></li>
-            <li><a href="#perguntas">Perguntas</a></li>
-          </ul>
-        </nav>
-        <nav class="site-footer__col" aria-labelledby="f-contato">
-          <h2 id="f-contato">Contato</h2>
-          <ul>
-            <li><a href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">WhatsApp</a></li>
-            <li><a href="/verificar">Quem responde</a></li>
-            <li><a href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Sou%20de%20cooperativa%20e%20quero%20conversar." rel="noopener">Cooperativas</a></li>
-          </ul>
-        </nav>
-        <div class="site-footer__col">
-          <h2>Privacidade</h2>
-          <ul>
-            <li><span>Só o necessário</span></li>
-            <li><span>Consentimento na 1ª conversa</span></li>
-            <li><span>“Apaga meus dados” funciona</span></li>
-          </ul>
-        </div>
+  <footer class="site-footer" data-theme="dark">
+    <div class="container site-footer__grid">
+      <div class="doc doc--claro site-footer__doc">
+        <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Quem responde</span><span class="doc__quando">/verificar</span></p>
+        <p class="doc__texto">Responsável técnico, CREA do engenheiro agrônomo e contato LGPD ficam numa página pública: <a href="/verificar">/verificar</a>.</p>
+        <p class="doc__pe">Número de teste, em beta. Feita no Brasil.</p>
       </div>
-      <p class="site-footer__fontes">
-        <span>Fontes: EMBRAPA</span><span>Agrofit / MAPA</span><span>FRAC-BR</span><span>SoilGrids (ISRIC)</span><span>Open-Meteo</span><span>INPE Queimadas</span><span>Portaria SDA/MAPA nº 1.579/2026</span><span>© 2026 Stevi</span>
-      </p>
+      <nav class="site-footer__col" aria-label="Links do rodapé">
+        <ul>
+          <li><a href="/verificar">Quem responde</a></li>
+          <li><a href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">WhatsApp</a></li>
+          <li><span>© 2026 Stevi</span></li>
+        </ul>
+      </nav>
     </div>
   </footer>
 

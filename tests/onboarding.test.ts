@@ -5,6 +5,8 @@
  * curto até o pin e o que ele devolve.
  */
 import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { asksForPin, PIN_ASK_MARK, CROP_BUTTONS } from '../api/_lib/onboarding';
 import { saudacaoDeEntrada } from '../api/_lib/growth';
 import { parseCrops, isCropsOnlyMessage } from '../api/_lib/tools/crops';
@@ -51,5 +53,34 @@ describe('botões de cultura pós-pin', () => {
   });
   it('café vem primeiro — é o beachhead', () => {
     expect(parseCrops(CROP_BUTTONS[0])).toEqual(['café']);
+  });
+});
+
+/**
+ * Invariante de classe, não de caso: o botão nativo é ligado por uma marca
+ * literal no texto. Qualquer resposta que peça o pin com "📎 → Localização"
+ * mas escreva a marca diferente sai sem botão — e ninguém percebe, porque o
+ * texto continua certo. Foi o que aconteceu com a resposta de "não achei
+ * vegetação" em 03/set. Este teste varre a fonte para que não volte.
+ */
+describe('toda menção ao clipe na fonte usa a marca exata', () => {
+  const raiz = join(process.cwd(), 'api', '_lib') + '/';
+
+  function arquivos(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? arquivos(join(dir, e.name)) : e.name.endsWith('.ts') ? [join(dir, e.name)] : []
+    );
+  }
+
+  it('nenhum "📎 → Localização" aparece sem o "clipe" na frente', () => {
+    const infratores: string[] = [];
+    for (const f of arquivos(raiz)) {
+      for (const [i, linha] of readFileSync(f, 'utf8').split('\n').entries()) {
+        if (linha.includes('📎 → Localização') && !linha.includes(PIN_ASK_MARK)) {
+          infratores.push(`${f.slice(raiz.length)}:${i + 1}`);
+        }
+      }
+    }
+    expect(infratores).toEqual([]);
   });
 });

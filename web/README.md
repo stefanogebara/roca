@@ -1,4 +1,4 @@
-# Stevi — site e sistema de design (v2, set/2026)
+# Stevi — site e sistema de design (v2.6, set/2026)
 
 > Refeito do zero em 02/09/2026. Referência estudada a fundo (Playwright +
 > espelho local + leitura de CSS/JS): **zipline.com**. O que se trouxe de lá é
@@ -30,81 +30,124 @@ dirigido pelo scroll; um vídeo por seção-chave; acento gasto uma vez.
 CSS + um driver de scroll de 60 linhas, porque o público abre isto em Android
 barato, no meio da lavoura, e cada kilobyte é fricção.
 
-## Conceito: "Manda a foto."
+## Conceito: "Manda a foto." — o caderno de campo
 
-O gesto do produto é mandar uma foto da folha pelo WhatsApp. O site inteiro é
-esse gesto: o hero é um cafeicultor virando uma folha com ferrugem pra luz, o
-h1 é a instrução, e cada seção mostra o que acontece depois. A honestidade
-("quem receita é o agrônomo") não é rodapé jurídico: aparece no hero, na
-seção "por quê" e nos números (**0 receitas**).
+O gesto do produto é mandar uma foto da folha pelo WhatsApp, e o que volta é
+um documento: um cartão, um alerta, uma resposta, uma conversa. O site é esse
+caderno. Papel creme, tinta, duas famílias tipográficas, fios de 1px. Cada
+seção abre com o título em largura cheia e desce para uma grade de duas
+colunas: **prosa à esquerda, um documento datado à direita**. Nada é "card":
+os documentos são cabeça + texto + pé, separados por fios, como impresso.
 
-Ancorado no assunto: as fotos e vídeos são do Sul de Minas — arábica em curva
-de nível, Latossolo vermelho, geada de madrugada, armazém de cooperativa. Os
-dados exibidos são os que o produto de fato manda (`phraseSpray`, a saudação
-de entrada, o formato do veredito Delta T).
+A honestidade ("quem receita é o agrônomo") não é rodapé jurídico: é a seção
+03 (Lei 14.785), a resposta que a Stevi dá quando perguntam "e o que eu passo
+nela?", e o fecho ("Triagem, não prescrição."). Os textos dos documentos são
+os que o produto de fato manda (`api/_lib/alerts.ts`, `growth.ts`) e o QR do
+cartaz vem do endpoint real (`/api/qr`).
 
 ## Cor
 
-Duas cores fazem 95% do site. O acento aparece **uma vez por dobra**, no
-máximo.
+Duas cores fazem 98% do site. O acento aparece **três vezes** na página
+inteira: o ponto do wordmark, a marca da Stevi na cabeça dos documentos e o
+ponto final da última linha. Não entra em botão, fio, hover de texto corrido.
 
 | Token | Hex | Uso |
 |---|---|---|
-| `--creme` | `#F4F0E4` | Fundo claro. Palha de chapéu, saca de juta. |
-| `--creme-2` | `#EAE4D2` | Faixa alternada, fundo de chip. |
-| `--tinta` | `#15130F` | Fundo escuro e texto. Café torrado, não preto puro. |
-| `--tinta-2` | `#2A2620` | Superfície sobre a tinta (balão de chat). |
-| `--cinza` | `#6D675C` | Texto secundário. Cinza com viés quente. |
-| `--linha` | `rgba(21,19,15,.14)` | Fios sobre claro. `--linha-escura` sobre escuro. |
-| `--cereja` | `#D6321B` | **O acento.** Cereja madura do café. Um uso por dobra. |
-| `--folha` | `#2E6E3C` | Semântico "pode" (veredito Delta T). Nunca decorativo. |
+| `--creme` | `#F4F0E4` | Fundo. Palha de chapéu, saca de juta. |
+| `--papel` | `#FBF8EF` | A folha do cartaz (um tom mais claro que o fundo). |
+| `--tinta` | `#15130F` | Texto, barras, a seção escura. Café torrado, não preto puro. |
+| `--cinza` | `#5F5A50` | Texto secundário e a fala do produtor. |
+| `--cinza-claro` | `#A9A292` | Secundário sobre a tinta. |
+| `--linha` | `rgba(21,19,15,.18)` | Fios fracos. `--linha-escura` sobre a tinta. Fios fortes são `--tinta` sólido. |
+| `--cereja` | `#D6321B` | **O acento.** Cereja madura do café. Três usos por página. |
 
 Sobre escuro, o texto é `--creme`; sobre claro, `--tinta`. Contraste AA em
-todos os pares. `color-scheme: light` — o site não tem tema escuro porque as
-seções escuras **são** o desenho.
+todos os pares. `color-scheme: light` — a seção escura **é** o desenho, não
+um tema.
 
-## Tipografia (Google Fonts, `display=swap`, com fallback `size-adjust`)
+## Tipografia (Google Fonts, `display=swap`)
 
-- **Display — Big Shoulders Display 800/900.** Condensada, pesada, caixa-alta,
-  `line-height: .86`, `letter-spacing: -.01em`. É a voz do site. h1
-  `clamp(4rem, 12vw, 11rem)`; h2 `clamp(3rem, 8vw, 7rem)`; h3
-  `clamp(2.25rem, 5vw, 4.25rem)`. Nunca em minúsculas, nunca abaixo de 32px.
-- **Corpo — Hanken Grotesk 400/500/600.** Lede 22px/1.4 (500); corpo 17px/1.55;
-  UI 14–15px/500. Largura de leitura ≤ 62ch.
-- **Rótulos** — Hanken 600, 12.5px, caixa-alta, `letter-spacing: .12em`.
-- **Dados — IBM Plex Mono 500** nos chips de leitura (`Delta T 6.0 °C`,
-  `pH 5.2`). Piso de 14px (`.tag--data`), porque é o conteúdo que mais importa.
+Uma display e a superfamília Plex. Duas vozes de texto, decididas por quem
+escreve: **a máquina escreve em mono, a pessoa lê em serifa.**
 
-## Espaço, forma, componentes
+- **Display — Big Shoulders Display 900.** Condensada, caixa-alta,
+  `line-height: .88`, `letter-spacing: -.03em`. h1 `--h1` (`clamp(5rem, 15.5vw,
+  13rem)`), só no hero. **Todo h2 tem o mesmo tamanho**, `--h2`
+  (`clamp(2.5rem, 7.5vw, 7rem)`), em largura cheia — inclusive "1,2 °C" e o
+  fecho. Quebras de linha marcadas à mão por breakpoint (`<br class="d">` só
+  no desktop, `<br class="m">` só no celular): condensada não pode quebrar no
+  meio da frase. Aparece também na marca dos documentos (1.5rem), nas
+  coordenadas do cartão (~2.5rem) e nas perguntas da 05 (~3rem).
+- **Serifa — IBM Plex Serif 400/500/600** é a fonte do `body` (17px/1.6): o
+  lede, a prosa das seções, as explicações das regras, o texto dentro dos
+  documentos e as respostas (`--doc-s`, 18px/1.5). É o que uma pessoa lê.
+- **Mono — IBM Plex Mono 400/500/600** para tudo o que a máquina escreve:
+  rótulo, legenda-ledger, cabeça e pé de documento, tabela, notas, navegação,
+  rodapé, a barra. Dois tamanhos: **rótulo** (`--meta`, 13px, 500, caixa-alta,
+  `letter-spacing: .1em`) e **nota** (`--mono-s`, 14px). A lista de seletores
+  que recebem mono está num único bloco no topo de `styles.css`.
 
-- Container 1320px, gutter 24px (20px no mobile). Grade de 8px.
-- Seção: `padding-block: clamp(4rem, 10vw, 8rem)`. Seções pinadas: wrapper de
-  `300–400vh` com filho `position: sticky; top: 0; height: 100svh`.
-- **Botão-pílula** (`.btn`): 44px de altura mínima, `border-radius: 999px`,
-  1px de borda na cor do texto, 15px/500, seta `↗` à direita. Sólido = fundo
-  na cor do texto invertida. Variante `.btn--sm` herda o piso de 44px.
-- **Cartão de conversa**: fundo `--tinta-2`, balões com radius 18px, texto real
-  do produto, timestamp em mono.
-- **Máscara de lente**: `clip-path` com duas curvas convexas (ver `.lente`),
-  usada na seção escura. É o único ornamento do site.
-- Raio: 0 em blocos, 20px em painéis de mídia, 999px em pílulas. Sem sombras
-  — profundidade vem de contraste e escala.
+## Componentes
+
+- **Rótulo** (`.rotulo`): numeral, régua de 28px, texto. Abre toda seção.
+- **Ledger** (`.ledger`): a legenda de três células em mono, sem fio. Só sob
+  o cartaz ("A4 · O cartaz do balcão · Impressão em preto"). Coordenadas só no
+  cartão, onde são evidência.
+- **Lâmina** (`.lamina` + `.foto`): uma foto, sem legenda. As fotos são
+  geradas; legenda com hora e coordenada fingiria proveniência numa página
+  que vive de proveniência — por isso não têm ledger e o `aria-label` diz
+  "ilustração". Duas na página, mesmo tratamento (preto e branco, contraste
+  1.15, grão SVG em `multiply`), dentro da coluna: a mão fotografando a
+  folha (1:1, hero) e o talhão com geada (21:9, fechando a 02).
+- **Documento** (`.doc`, `.cartao`): a "tira" — o que a Stevi manda tem a
+  mesma forma: caixa de 1px em `--papel`, cabeça (marca Stevi + tipo + data,
+  fio forte embaixo), texto em serifa a 18px, pé em mono 15px com fio fraco.
+  Variante `.doc--claro` sobre a tinta. São três na página: o cartão (01), o
+  alerta (02) e "Quem responde" no rodapé. Sem sombra: sombra vira mockup.
+- **Citação** (`.citacao`): a resposta da Stevi na 03 é uma citação, não uma
+  tira — pergunta do produtor em itálico, resposta em serifa, a lei como nota.
+- **Carimbos** (`.carimbos`): "Não receita. / Não inventa. / Mostra a fonte."
+  em display (~4rem) com a definição ao lado, em linhas com fio.
+- **Cartão** (`.cartao`): documento com as coordenadas em display e uma
+  `table.tabela` Leitura/Valor/Fonte, tudo alinhado à esquerda, sem quebra de
+  linha no desktop; no mobile some a coluna Fonte.
+- **Curva** (`.curva`): o instrumento da página. SVG inline da temperatura
+  horária prevista (18h→08h) em largura cheia; a linha de 3 °C tracejada em
+  cereja; a faixa sombreada cobre exatamente o trecho abaixo de 3 °C; o
+  "1,2 °C" em display senta em cima da mínima, com uma linha até o ponto.
+  Dois SVGs (desktop 1280×480, celular 400×300) porque texto em SVG não
+  escala bem. Dado, não ornamento: o papel milimetrado foi removido por isso.
+- **Perguntas** (`.regras--faq`): pergunta em serifa itálica, resposta em
+  serifa, em linhas com fio. Sem carimbo de hora: não é uma conversa, é uma
+  lista. Três perguntas; a de "receita defensivo?" a 03 já responde.
+- **Cartaz** (`.cartaz`): folha A4 (`aspect-ratio: 1/1.4142`) em `--papel`,
+  fio de 1px, QR real com `mix-blend-mode: multiply`, canhotos destacáveis em
+  `writing-mode` vertical. Na 04 fica ao lado do título e do texto, na mesma
+  altura. No celular o QR encolhe e ganha um toque "Abrir no WhatsApp"
+  (`.cartaz__toque`): o telefone não lê o próprio QR; os canhotos somem.
+- **Barra** (`.barra`): a ação. Faixa com o rótulo em display (`--display-s`),
+  a nota em mono e a seta, numa linha só. **A mesma no hero (preta) e no fecho
+  (creme sobre tinta)**; hover vai a cereja. É o único lugar em que o acento
+  entra como fundo.
+- **Link do header** (`.site-header__wa`): texto mono sublinhado, 44px de
+  altura mínima. O `.btn` continua no CSS para as páginas internas.
+- Container 1360px, gutter 32px (20px no mobile). Raio 0 em tudo salvo o
+  botão. Sem sombras, salvo a do cartaz.
 
 ## Movimento
 
 - Easing única: `cubic-bezier(.32,.72,0,1)`. Duração `.35s` em hover,
   `.7s` em revelação.
-- **Driver de scroll** (`app.js`): para cada `[data-pin]`, calcula o progresso
-  0→1 do wrapper na viewport e escreve `--p` no elemento. O CSS deriva tudo de
-  `--p` com `calc()` e `clamp()` — escala da imagem, opacidade dos títulos,
-  translação dos painéis. Sem biblioteca, sem `requestAnimationFrame` solto:
-  um listener passivo de scroll com `ticking`.
-- **Revelação** (`.reveal`): opacidade + 24px de subida, via
-  `IntersectionObserver`. Títulos display usam máscara de linha
-  (`.mask > span` sobe de 100%).
-- **Contadores** sobem de 0 quando entram na viewport (só números inteiros).
-- **Header** troca de claro/escuro por seção (`data-theme` observado).
-- `prefers-reduced-motion: reduce` desliga tudo e revela tudo; `--p` vira 1.
+- **Revelação** (`.reveal`): opacidade + 18px de subida, via
+  `IntersectionObserver`, com `data-delay` 1–3. Títulos display usam máscara
+  de linha (`.mask > span` sobe de 110%); a máscara tem padding no topo para
+  não cortar acentos (Ô, Á, Ç).
+- **Header** troca de claro/escuro por seção (`data-theme` observado) e fica
+  sólido depois de 8px de scroll. Seções têm `scroll-margin-top` do header.
+- `app.js` ainda carrega o driver de `[data-pin]`, contadores e vídeo do
+  hero — nada na página atual usa; ficam para o painel e para as páginas
+  internas.
+- `prefers-reduced-motion: reduce` desliga tudo e revela tudo.
 
 ## Regra anti-página-em-branco (tests/landing-sem-js.test.ts)
 
@@ -114,19 +157,16 @@ O inline no `<head>` seta `.js` e, se `app.js` não sinalizar
 
 ## Mídia
 
-`web/media/`: `hero-desktop.{mp4,webm}` (1600px, 1,5 MB), `hero-mobile.mp4`
-(720px, 0,5 MB), `rows-desktop.mp4`, posters `.jpg`, fotos `.jpg` + `.webp`
-(1920px; 720px nas verticais do telefone). **Cada imagem aparece uma vez só
-na página** — ferrugem, geada e fileiras na seção "ela vê"; mão com celular,
-áudio e drone nos painéis do telefone; noite estrelada na faixa; agrônoma,
-retrato e aérea na lente; terreiro nos números; armazém nas cooperativas.
-Repetir foto entre seções é regra quebrada (Stefano, 02/09). Vídeos são `autoplay muted loop playsinline` com `poster`; o mobile
-recebe a versão 9:16. Gerados no Higgsfield (Kling 3.0 pro / Nano Banana Pro /
-Soul v2) em 02/09/2026 e transcodificados com libx264 crf 27 / VP9 crf 34.
+`web/media/`: fotos `.jpg` + `.webp` (1920px). **Na landing entram três, uma
+vez cada**: `leaf-rust` (hero), `frost` (seção escura), `coop` (04). Repetir
+foto entre seções é regra quebrada (Stefano, 02/09). As demais (aérea, noite,
+terreiro, agrônoma, retrato, vídeos do hero) ficam para o painel, o
+`/verificar` e os cards. Geradas no Higgsfield (Nano Banana Pro / Soul v2) em
+02/09/2026. O QR do cartaz é `/api/qr` (gerado no servidor com o número
+público), não um PNG estático.
 
 ## Acessibilidade
 
 Skip-link, um `<h1>`, hierarquia correta, foco visível (anel `--cereja`),
-alvos de toque ≥ 44px (tests/landing-alvos-de-toque.test.ts), `<details>` no
-FAQ, `alt` em toda imagem, vídeo decorativo `aria-hidden`. Sem overflow
+alvos de toque ≥ 44px (tests/landing-alvos-de-toque.test.ts), `alt` em toda imagem, vídeo decorativo `aria-hidden`. Sem overflow
 horizontal de 320px a 1440px.

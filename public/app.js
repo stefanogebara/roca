@@ -200,6 +200,7 @@
       if (r.top <= linha && r.bottom > linha) { atual = temas[i].getAttribute('data-theme'); break; }
     }
     header.classList.toggle('is-light', atual === 'light');
+    header.classList.toggle('is-dark', atual === 'dark');
   }
 
   var ticking = false;
