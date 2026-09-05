@@ -67,52 +67,63 @@ um tema.
 
 ## Tipografia (Google Fonts, `display=swap`)
 
-Duas famílias, três vozes de mono. Não existe terceira família.
+Uma display e a superfamília Plex. Duas vozes de texto, decididas por quem
+escreve: **a máquina escreve em mono, a pessoa lê em serifa.**
 
 - **Display — Big Shoulders Display 900.** Condensada, caixa-alta,
   `line-height: .88`, `letter-spacing: -.03em`. h1 `--h1` (`clamp(5rem, 15.5vw,
-  15rem)`), só no hero. **Todo h2 tem o mesmo tamanho**, `--h2`
-  (`clamp(3.25rem, 7.5vw, 7rem)`), em largura cheia — inclusive "1,2 °C",
-  "Lei 14.785" e o fecho. Aparece também na marca dos documentos (1.5rem), nas
-  coordenadas do cartão e nos `dt` das regras (~2.25rem). Nunca em minúsculas.
-- **Mono — IBM Plex Mono 400/500/600**, para tudo o mais, em três tamanhos:
-  - **Rótulo** (`--meta`, 12px, 500, caixa-alta, `letter-spacing: .1em`): o
-    número da seção, a legenda-ledger, a cabeça do documento, quem falou, o
-    cabeçalho da tabela. Uma classe de voz, sempre igual.
-  - **Corpo** (16px/1.55): prosa das seções, `dd` das regras, tabela (15px).
-  - **Documento** (`--doc-s`, 18px/1.5): o texto dentro do cartão, do alerta,
-    da resposta e das falas. É o que o produtor recebe; é o maior texto corrido.
-  - O lede do hero é `--lede` (20–26px, 500). Notas e rodapé, 13px.
+  13rem)`), só no hero. **Todo h2 tem o mesmo tamanho**, `--h2`
+  (`clamp(2.5rem, 7.5vw, 7rem)`), em largura cheia — inclusive "1,2 °C" e o
+  fecho. Quebras de linha marcadas à mão por breakpoint (`<br class="d">` só
+  no desktop, `<br class="m">` só no celular): condensada não pode quebrar no
+  meio da frase. Aparece também na marca dos documentos (1.5rem), nas
+  coordenadas do cartão (~2.5rem) e nas perguntas da 05 (~3rem).
+- **Serifa — IBM Plex Serif 400/500/600** é a fonte do `body` (17px/1.6): o
+  lede, a prosa das seções, as explicações das regras, o texto dentro dos
+  documentos e as respostas (`--doc-s`, 18px/1.5). É o que uma pessoa lê.
+- **Mono — IBM Plex Mono 400/500/600** para tudo o que a máquina escreve:
+  rótulo, legenda-ledger, cabeça e pé de documento, tabela, notas, navegação,
+  rodapé, a barra. Dois tamanhos: **rótulo** (`--meta`, 13px, 500, caixa-alta,
+  `letter-spacing: .1em`) e **nota** (`--mono-s`, 14px). A lista de seletores
+  que recebem mono está num único bloco no topo de `styles.css`.
 
 ## Componentes
 
 - **Rótulo** (`.rotulo`): numeral, régua de 28px, texto. Abre toda seção.
 - **Ledger** (`.ledger`): a legenda de três células — *quem · quando · onde* —
-  sob toda foto, sob a curva e sob o cartaz. Mesmo tamanho, mesma posição.
+  sob toda foto, sem fio. Coordenadas só no cartão, onde são evidência;
+  nas legendas entra outra coisa (a altitude, o aparelho, o lugar).
 - **Lâmina** (`.lamina` + `.foto`): uma foto com o ledger. **Uma série só**:
   todas em preto e branco, contraste 1.15, grão (SVG `feTurbulence` em
-  `multiply`). Três na página: folha (1:1, hero), talhão com geada (4:5, seção
-  escura, `.foto--noite` mais fechada), balcão da cooperativa (3:2, 04).
-- **Documento** (`.doc`): cabeça (marca Stevi + tipo + data, fio forte
-  embaixo), texto a 18px, pé em 13px com fio fraco. Variante `.doc--claro`
-  sobre a tinta. A pergunta do produtor entra como `.doc__pergunta`.
+  `multiply`). Duas escalas apenas: a coluna (folha 1:1 no hero, sangrando à
+  direita; balcão 4:5 na 04) e a faixa sangrada de borda a borda (talhão com
+  geada 21:9 fechando a seção escura, `.lamina--sangria`).
+- **Documento** (`.doc`, `.cartao`): a "tira" — tudo que a Stevi manda tem a
+  mesma forma: caixa de 1px, cabeça (marca Stevi + tipo + data, fio forte
+  embaixo), texto em serifa a 18px, pé em mono 14px com fio fraco. Variante
+  `.doc--claro` sobre a tinta. A pergunta do produtor entra como
+  `.doc__pergunta`. Na 02 a tira senta em cima da curva (`.curva__slip`).
 - **Cartão** (`.cartao`): documento com as coordenadas em display e uma
   `table.tabela` Leitura/Valor/Fonte, tudo alinhado à esquerda, sem quebra de
   linha no desktop; no mobile some a coluna Fonte.
-- **Curva** (`.curva`): SVG inline da temperatura horária prevista (18h→08h),
-  eixos em fio fraco, mínima marcada com o único círculo cereja da página.
-  Dado, não ornamento: o papel milimetrado foi removido por isso.
+- **Curva** (`.curva`): o instrumento da página. SVG inline da temperatura
+  horária prevista (18h→08h) em largura cheia, com a linha de 3 °C (risco de
+  geada) tracejada em cereja, a janela de geada sombreada, a mínima marcada.
+  Dois SVGs (desktop 1280×560, celular 400×300) porque texto em SVG não
+  escala bem. Dado, não ornamento: o papel milimetrado foi removido por isso.
 - **Regras** (`.regras`): três linhas `dt` display / `dd` corpo, com fios.
-- **Fio** (`.fio--chat`): a conversa numa coluna de 640px, Stevi à esquerda,
-  produtor à direita (`.fala--eu`, em cinza). Só aparece uma vez (05).
+- **Perguntas** (`.regras--faq`): a pergunta do produtor em display, a
+  resposta da Stevi em serifa, em linhas com fio. Sem carimbo de hora: não é
+  uma conversa, é uma lista.
 - **Cartaz** (`.cartaz`): folha A4 (`aspect-ratio: 1/1.4142`) em `--papel`,
-  marcas de corte nos cantos, sombra curta de objeto impresso, QR real com
-  `mix-blend-mode: multiply`, canhotos destacáveis em `writing-mode` vertical.
+  fio de 1px e marcas de corte nos cantos (sem sombra — sombra vira mockup),
+  QR real com `mix-blend-mode: multiply`, canhotos destacáveis em
+  `writing-mode` vertical. Na 04 fica lado a lado com a foto do balcão.
 - **Barra** (`.barra`): a ação. Faixa preta com o texto a 17–22px, a nota em
   rótulo e a seta. **A mesma no hero e no fecho**; hover vai a cereja. É o
   único lugar em que o acento entra como fundo.
-- **Botão** (`.btn`): só no header. 44px de altura mínima, raio 2px, 1px de
-  borda. `.btn--sm` herda o piso de 44px.
+- **Link do header** (`.site-header__wa`): texto mono sublinhado, 44px de
+  altura mínima. O `.btn` continua no CSS para as páginas internas.
 - Container 1360px, gutter 32px (20px no mobile). Raio 0 em tudo salvo o
   botão. Sem sombras, salvo a do cartaz.
 
