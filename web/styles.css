@@ -250,7 +250,7 @@ br.d { display: none; }
 .lamina__foto--alta img { aspect-ratio: 4 / 5; object-position: 62% 50%; }
 .lamina__foto--faixa img { aspect-ratio: 21 / 9; }
 .lamina__foto--balcao img { aspect-ratio: 4 / 3; object-position: 62% 50%; }
-.lamina--faixa { margin-top: clamp(3rem, 6vw, 5rem); }
+.lamina--faixa { margin-top: clamp(2.5rem, 5vw, 4rem); }
 .alerta { padding-bottom: 40px; }
 @media (max-width: 767.98px) { .lamina__foto--faixa img { aspect-ratio: 4 / 3; } }
 @media (min-width: 992px) { .hero .lamina__foto { margin-right: calc(-1 * (max(0px, (100vw - var(--container)) / 2) + var(--gutter))); } }
@@ -261,6 +261,8 @@ br.d { display: none; }
 .foto::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .22; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E"); }
 .foto--noite::after { mix-blend-mode: screen; opacity: .12; }
+.foto--cor img { filter: none; }
+.foto--cor::after { display: none; }
 
 /* O fio: a conversa, numa coluna. Stevi à esquerda, produtor à direita. */
 .fio { margin: 0; width: 100%; max-width: var(--col); }
