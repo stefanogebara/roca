@@ -80,21 +80,21 @@
 
     <!-- 00 — HERO: a afirmação, a barra, a foto com a legenda-ledger -->
     <section class="secao hero" id="como" data-theme="light" aria-labelledby="hero-title">
-      <div class="container secao__grid">
-        <div>
-          <p class="rotulo reveal"><span class="num">00</span>Agronomia no WhatsApp</p>
-          <h1 id="hero-title"><span class="mask"><span>Manda</span></span><span class="mask"><span>a foto</span></span></h1>
+      <div class="container">
+        <p class="rotulo reveal"><span class="num">00</span>Agronomia no WhatsApp</p>
+        <h1 id="hero-title"><span class="mask"><span>Manda<br class="m" /> a foto</span></span></h1>
+        <div class="secao__grid hero__grid">
           <div class="reveal hero__acao" data-delay="2">
             <p class="lede">A folha, o áudio, o pin. A Stevi diz o que vê, de onde tirou, e onde ela para.</p>
-            <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">O “oi” já vem escrito</span><span class="barra__seta" aria-hidden="true">↗</span></a>
+            <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">Sem app, sem cadastro</span><span class="barra__seta" aria-hidden="true">↗</span></a>
           </div>
-        </div>
-        <figure class="lamina hero__foto reveal" data-delay="1" role="figure" aria-label="Ilustração: a folha com ferrugem, virada para a luz.">
+          <figure class="lamina hero__foto reveal" data-delay="1" role="figure" aria-label="Ilustração: a folha com ferrugem, virada para a luz.">
           <picture class="foto lamina__foto">
             <source srcset="media/leaf-rust.webp" type="image/webp" />
             <img src="media/leaf-rust.jpg" width="1920" height="1072" alt="Folha de café virada para a luz, com pústulas alaranjadas de ferrugem no verso" loading="eager" />
           </picture>
         </figure>
+        </div>
       </div>
     </section>
 
@@ -104,7 +104,7 @@
         <p class="rotulo reveal"><span class="num">01</span>O que ela lê</p>
         <div class="secao__grid secao__grid--lado">
           <div>
-            <h2 id="casos-title" class="h2--multi reveal" data-delay="1">Você larga o pin<br /> uma vez. Ela<br /> devolve a lavoura<br /> em um cartão.</h2>
+            <h2 id="casos-title" class="h2--multi reveal" data-delay="1">Você larga o pin<br /> uma vez. Ela devolve<br /> a lavoura em um cartão.</h2>
             <div class="tres reveal" data-delay="2">
             <p><strong>Da foto,</strong> a praga ou a doença, e o quanto ela confia no que viu.</p>
             <p><strong>Do áudio,</strong> a pergunta transcrita e respondida por escrito.</p>
@@ -145,12 +145,13 @@
             <g class="curva__num">
               <text x="0" y="412">0 °C</text><text x="0" y="285">5 °C</text><text x="0" y="159">10 °C</text><text x="0" y="32">15 °C</text>
               <text x="0" y="464">18h</text><text x="365.7" y="464" text-anchor="middle">22h</text><text x="731.4" y="464" text-anchor="middle">02h</text><text x="1097.1" y="464" text-anchor="middle">06h</text><text x="1280" y="464" text-anchor="end">08h</text>
-              <text class="curva__num--risco" x="8" y="336">3 °C · abaixo disso, risco de geada</text>
-              <text class="curva__num--banda" x="788" y="412">abaixo de 3 °C</text>
+              <text class="curva__num--risco" x="8" y="326">3 °C · abaixo disso, risco de geada</text>
+              <text class="curva__num--banda" x="794" y="406">abaixo de 3 °C</text>
             </g>
             <path class="curva__linha" d="M0.0 45.1 L91.4 93.2 L182.9 136.3 L274.3 176.8 L365.7 214.8 L457.1 250.3 L548.6 283.2 L640.0 311.1 L731.4 333.9 L822.9 354.1 L914.3 371.9 L1005.7 384.5 L1097.1 389.6 L1188.6 374.4 L1280.0 321.2"/>
             <circle class="curva__min" cx="1097.1" cy="389.6" r="7"/>
             <path class="curva__eixo curva__eixo--min" d="M1097.1 382V226"/>
+            <rect class="curva__fundo" x="940" y="48" width="320" height="170"/>
             <text class="curva__grau" x="1097.1" y="160" text-anchor="middle">1,2 °C</text>
             <text class="curva__num curva__num--min" x="1097.1" y="200" text-anchor="middle">mínima prevista · 06h</text>
           </svg>
@@ -172,7 +173,7 @@
           <div class="doc doc--claro reveal" data-delay="2" role="figure" aria-label="O alerta de geada que a Stevi manda na véspera.">
             <p class="doc__cabeca"><span class="doc__marca">Stevi<span class="ponto"></span></span><span>Alerta de geada</span><span class="doc__quando">ter, 3 set · 22:00</span></p>
             <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET). Previsão de ponto tem incerteza.</p>
-            <p class="doc__pe">Previsão horária do ponto: Open-Meteo. Com o pin, ela olha todo dia e avisa na véspera — geada, fogo perto. Só quando muda o risco.</p>
+            <p class="doc__pe">Previsão horária do ponto: Open-Meteo. Ela olha todo dia e avisa na véspera.</p>
           </div>
         </div>
       </div>
