@@ -79,147 +79,177 @@
 
   <main id="conteudo">
 
-    <!-- Toda seção: afirmação à esquerda, evidência à direita. A evidência é
-         sempre um documento datado: a foto anotada, o cartão, o alerta, a
-         conversa, o cartaz. -->
-
-    <!-- 00 — HERO: a instrução; a folha como lâmina, com o diagnóstico anotado -->
+    <!-- 00 — HERO: a afirmação, a barra, a foto com a legenda-ledger -->
     <section class="secao hero" id="como" data-theme="light" aria-labelledby="hero-title">
       <div class="container secao__grid">
-        <div class="secao__lado">
+        <div>
           <p class="rotulo reveal"><span class="num">00</span>Assistente agronômica no WhatsApp</p>
           <h1 id="hero-title"><span class="mask"><span>Manda</span></span><span class="mask"><span>a foto</span></span></h1>
           <div class="reveal" data-delay="2">
             <p class="lede">A folha, o áudio, o pin. A Stevi diz o que vê, de onde tirou, e onde ela para.</p>
-            <div class="acoes">
-              <a class="btn btn--solid btn--lg" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener">Falar com a Stevi</a>
-            </div>
+            <a class="barra barra--hero" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Quero%20testar." rel="noopener"><span>Falar com a Stevi</span><span class="barra__nota">O WhatsApp abre com o “oi” já escrito</span><span class="barra__seta" aria-hidden="true">↗</span></a>
             <p class="nota">Sem app, sem cadastro. Número de teste, em beta. <a href="/verificar">Quem responde pela Stevi.</a></p>
           </div>
         </div>
-        <figure class="lamina reveal" data-delay="1" role="figure" aria-label="A foto que o produtor mandou, com o diagnóstico da Stevi anotado por cima.">
+        <figure class="lamina reveal" data-delay="1" role="figure" aria-label="A foto que o produtor mandou: folha de café com ferrugem.">
           <picture class="foto lamina__foto">
             <source srcset="media/leaf-rust.webp" type="image/webp" />
             <img src="media/leaf-rust.jpg" width="1920" height="1072" alt="Folha de café virada para a luz, com pústulas alaranjadas de ferrugem no verso" loading="eager" />
           </picture>
-          <dl class="anota">
-            <div><dt>Produtor · ter, 3 set · 08:11</dt><dd>que que é isso? tá se alastrando</dd></div>
-            <div><dt><span class="stevi">Stevi</span> · 08:12</dt><dd>Pela foto, tem muita cara de <strong>ferrugem do cafeeiro</strong> — confiança média. Pra confirmar, uma foto do verso da folha ajuda: é onde saem as pústulas. Qual produto e qual dose, quem define é o engenheiro agrônomo, no receituário.</dd></div>
-          </dl>
+          <figcaption class="ledger"><span>Produtor</span><span>ter, 3 set · 08:11</span><span>−21.42, −45.94</span></figcaption>
         </figure>
       </div>
     </section>
 
-    <!-- 01 — O QUE ELA LÊ: três linhas; o cartão como laudo -->
+    <!-- 01 — O QUE ELA LÊ -->
     <section class="secao" id="casos" data-theme="light" aria-labelledby="casos-title">
-      <div class="container secao__grid">
-        <div class="secao__lado">
-          <p class="rotulo reveal"><span class="num">01</span>O que ela lê</p>
-          <h2 id="casos-title" class="afirma reveal" data-delay="1">Você larga o pin uma vez. Ela devolve a lavoura em um cartão e passa a vigiar o ponto.</h2>
+      <div class="container">
+        <p class="rotulo reveal"><span class="num">01</span>O que ela lê</p>
+        <h2 id="casos-title" class="reveal" data-delay="1">Você larga o pin uma vez. Ela devolve a lavoura em um cartão.</h2>
+        <div class="secao__grid secao__grid--baixo">
           <div class="tres reveal" data-delay="2">
             <p><strong>Da foto,</strong> a praga ou a doença, e o quanto ela confia no que viu.</p>
             <p><strong>Do áudio,</strong> a pergunta transcrita e respondida por escrito.</p>
             <p><strong>Do pin,</strong> o solo, o clima do ponto, o calendário sanitário e o vigor por satélite.</p>
           </div>
+          <figure class="cartao reveal" data-delay="1" role="figure" aria-label="Cartão da lavoura que a Stevi manda depois do pin.">
+            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Cartão da lavoura</span><span class="doc__quando">qua, 4 set · 07:40</span></p>
+            <p class="cartao__ponto"><span class="cartao__coord">−21.42</span><span class="cartao__coord">−45.94</span></p>
+            <table class="tabela">
+              <thead><tr><th scope="col">Leitura</th><th scope="col">Valor</th><th scope="col">Fonte</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Solo</th><td>Argiloso · pH 5,2 · ácido</td><td>SoilGrids</td></tr>
+                <tr><th scope="row">Pulverizar</th><td>Pode · ΔT 6,5 °C · 7 km/h</td><td>Open-Meteo</td></tr>
+                <tr><th scope="row">Calendário</th><td>Vazio sanitário da soja ativo</td><td>Portaria 1.579/26</td></tr>
+                <tr><th scope="row">Vigor</th><td>NDVI 0,62 · vigorosa</td><td>Sentinel-2 30/08</td></tr>
+              </tbody>
+            </table>
+            <p class="doc__pe">Leituras aproximadas pra orientar. Não substituem o agrônomo.</p>
+          </figure>
         </div>
-        <figure class="cartao reveal" data-delay="1" role="figure" aria-label="Cartão da lavoura que a Stevi manda depois do pin.">
-          <p class="doc__cabeca"><span class="doc__marca">Stevi<span class="ponto"></span></span><span>Cartão da lavoura</span><span class="doc__quando">qua, 4 set · 07:40</span></p>
-          <p class="cartao__ponto"><span class="cartao__coord">−21.42</span><span class="cartao__coord">−45.94</span><span class="cartao__uf">MG</span></p>
-          <dl class="cartao__linhas">
-            <div><dt>Solo</dt><dd>Argiloso (terra pesada) · pH ~5.2 · ácido, calagem comum</dd></div>
-            <div><dt>Pulverização agora</dt><dd>Pode pulverizar · Delta T 6.5 °C · vento 7 km/h</dd></div>
-            <div><dt>Calendário sanitário</dt><dd>Vazio sanitário da soja ativo</dd></div>
-            <div><dt>Vigor por satélite</dt><dd>NDVI 0.62 · lavoura vigorosa · Sentinel-2, 30/08</dd></div>
-            <div><dt>Fontes</dt><dd>SoilGrids · Open-Meteo · Portaria SDA/MAPA 1.579/2026 · Sentinel-2</dd></div>
-          </dl>
-          <p class="doc__pe">Leituras aproximadas pra orientar. Não substituem o agrônomo.</p>
-        </figure>
       </div>
     </section>
 
-    <!-- 02 — ANTES DE ACONTECER: o momento mais alto da página -->
+    <!-- 02 — ANTES DE ACONTECER: preto chapado, a curva da noite, a madrugada, o aviso -->
     <section class="secao escuro alerta" id="alerta" data-theme="dark" aria-labelledby="alerta-title">
-      <picture class="alerta__foto foto" aria-hidden="true">
-        <source srcset="media/aerial.webp" type="image/webp" />
-        <img src="media/aerial.jpg" width="1920" height="1072" alt="" loading="lazy" />
-      </picture>
-      <div class="container secao__grid">
-        <div class="secao__lado">
-          <p class="rotulo rotulo--claro reveal"><span class="num">02</span>Antes de acontecer</p>
-          <h2 id="alerta-title" class="alerta__grau"><span class="mask"><span>1,2 °C</span></span></h2>
-          <p class="alerta__quando reveal" data-delay="1">Mínima prevista pra madrugada de qua, 4 set, no ponto do pin. Aviso mandado ter, 3 set, às 22:00. Ninguém pediu.</p>
+      <div class="container">
+        <p class="rotulo rotulo--claro reveal"><span class="num">02</span>Antes de acontecer</p>
+        <h2 id="alerta-title" class="alerta__grau"><span class="mask"><span>1,2 °C</span></span></h2>
+        <div class="secao__grid secao__grid--baixo">
+          <div>
+            <p class="alerta__quando reveal" data-delay="1">Mínima prevista pra madrugada de qua, 4 set, no ponto do pin. Aviso mandado na véspera, às 22:00. Ninguém pediu.</p>
+            <figure class="curva reveal" data-delay="2" role="figure" aria-label="Curva da temperatura prevista das 18h às 8h, com mínima de 1,2 °C às 6h.">
+              <svg viewBox="0 0 640 236" aria-hidden="true">
+                <g class="curva__eixo">
+                  <path d="M0 200H640M0 143.8H640M0 87.5H640M0 31.3H640"/>
+                  <path d="M182.9 200v6M365.7 200v6M548.6 200v6"/>
+                </g>
+                <g class="curva__num">
+                  <text x="0" y="195">0 °C</text><text x="0" y="139">5</text><text x="0" y="83">10</text><text x="0" y="27">15</text>
+                  <text x="0" y="226">18h</text><text x="182.9" y="226" text-anchor="middle">22h</text><text x="365.7" y="226" text-anchor="middle">02h</text><text x="548.6" y="226" text-anchor="middle">06h</text><text x="640" y="226" text-anchor="end">08h</text>
+                </g>
+                <path class="curva__linha" d="M0.0 33.5 L45.7 54.9 L91.4 74.0 L137.1 92.0 L182.9 108.9 L228.6 124.6 L274.3 139.3 L320.0 151.6 L365.7 161.8 L411.4 170.8 L457.1 178.6 L502.9 184.3 L548.6 186.5 L594.3 179.8 L640.0 156.1"/>
+                <circle class="curva__min" cx="548.6" cy="186.5" r="5"/>
+                <text class="curva__num curva__num--min" x="536" y="170" text-anchor="end">1,2 °C · 06h</text>
+              </svg>
+              <figcaption class="ledger ledger--claro"><span>Previsão horária</span><span>ter, 3 set · 22:00</span><span>Open-Meteo</span></figcaption>
+            </figure>
+            <figure class="doc doc--claro reveal" data-delay="2" role="figure" aria-label="O alerta de geada que a Stevi manda na véspera.">
+              <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Alerta de geada</span><span class="doc__quando">ter, 3 set · 22:00</span></p>
+              <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET). Previsão de ponto tem incerteza.</p>
+              <p class="doc__pe">Com o pin, ela olha a previsão do ponto todo dia e avisa na véspera — geada, fogo perto. Só quando muda o risco.</p>
+            </figure>
+          </div>
+          <div class="alerta__lado">
+            <figure class="lamina reveal" data-delay="1" role="figure" aria-label="O talhão baixo na madrugada seguinte, com geada nas folhas.">
+              <picture class="foto foto--noite lamina__foto lamina__foto--alta">
+                <source srcset="media/frost.webp" type="image/webp" />
+                <img src="media/frost.jpg" width="1920" height="1080" alt="Lavoura de café com geada nas folhas ao amanhecer, névoa no vale e um produtor andando entre as ruas" loading="lazy" />
+              </picture>
+              <figcaption class="ledger ledger--claro"><span>Talhão baixo</span><span>qua, 4 set · 06:10</span><span>−21.42, −45.94</span></figcaption>
+            </figure>
+          </div>
         </div>
-        <figure class="doc doc--claro reveal" data-delay="1" role="figure" aria-label="O alerta de geada que a Stevi manda na véspera.">
-          <p class="doc__cabeca"><span class="doc__marca">Stevi<span class="ponto"></span></span><span>Alerta de geada</span><span class="doc__quando">ter, 3 set · 22:00</span></p>
-          <p class="doc__texto">Alerta de geada: a previsão pro ponto da sua fazenda indica mínima de <strong>1,2 °C</strong> na madrugada de 04/09 — geada provável na sua região. Vale proteger mudas e talhões baixos e confirmar com fontes locais (INMET). Previsão de ponto tem incerteza.</p>
-          <p class="doc__pe">Com o pin, ela olha a previsão do ponto todo dia e avisa na véspera — geada, fogo perto. Só quando muda o risco.</p>
-        </figure>
       </div>
     </section>
 
-    <!-- 03 — ONDE ELA PARA: a lei como número; a conversa em que ela para -->
-    <section class="secao" id="porque" data-theme="light" aria-labelledby="porque-title">
-      <div class="container secao__grid">
-        <div class="secao__lado">
-          <p class="rotulo reveal"><span class="num">03</span>Onde ela para</p>
-          <h2 id="porque-title" class="lei"><span class="mask"><span>Lei</span></span><span class="mask"><span>14.785</span></span></h2>
+    <!-- 03 — ONDE ELA PARA: a lei, três regras em linhas, a resposta como documento -->
+    <section class="secao limites" id="porque" data-theme="light" aria-labelledby="porque-title">
+      <div class="container">
+        <p class="rotulo reveal"><span class="num">03</span>Onde ela para</p>
+        <h2 id="porque-title"><span class="mask"><span>Lei 14.785</span></span></h2>
+        <div class="secao__grid secao__grid--baixo">
           <dl class="regras reveal" data-delay="1">
             <div><dt>Não receita.</dt><dd>Produto e dose são ato do engenheiro agrônomo, no receituário. Ela para nessa linha de propósito.</dd></div>
             <div><dt>Não inventa.</dt><dd>Sem base sólida, diz que não sabe e manda pro agrônomo.</dd></div>
             <div><dt>Mostra a fonte.</dt><dd>Cada frase diz de onde veio. Dá pra conferir.</dd></div>
           </dl>
+          <figure class="doc reveal" data-delay="2" role="figure" aria-label="O produtor pergunta que produto passar e a Stevi encaminha para o agrônomo.">
+            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Resposta</span><span class="doc__quando">ter, 3 set · 08:14</span></p>
+            <p class="doc__pergunta"><span>Produtor · 08:14</span>e o que eu passo nela?</p>
+            <p class="doc__texto">Isso é do engenheiro agrônomo, no receituário — é ele que assina a responsabilidade técnica. O que dá pra fazer agora: monitorar talhão a talhão, agir cedo e rotacionar os modos de ação (FRAC-BR). Leva essa suspeita pra ele que você já chega com a conversa pronta.</p>
+            <p class="doc__pe">A pergunta que mais chega. A resposta é sempre a mesma.</p>
+          </figure>
         </div>
-        <figure class="fio reveal" data-delay="1" role="figure" aria-label="O produtor pergunta que produto passar e a Stevi encaminha para o agrônomo.">
-          <p class="doc__cabeca"><span class="doc__marca">Stevi<span class="ponto"></span></span><span>Conversa</span><span class="doc__quando">ter, 3 set</span></p>
-          <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>08:14</span></p><p class="fala__texto">e o que eu passo nela?</p></div>
-          <div class="fala fala--ultima"><p class="fala__quem"><span class="stevi">Stevi</span><span>08:14</span></p><p class="fala__texto">Qual produto e qual dose, <strong>quem define é o engenheiro agrônomo</strong>, no receituário — é ele que assina a responsabilidade técnica. O que dá pra fazer agora: monitorar talhão a talhão, agir cedo e rotacionar os modos de ação (FRAC-BR). Leva essa suspeita pra ele que você já chega com a conversa pronta.</p></div>
-        </figure>
       </div>
     </section>
 
-    <!-- 04 — COOPERATIVAS: o cartaz do balcão -->
-    <section class="secao" id="coop" data-theme="light" aria-labelledby="coop-title">
-      <div class="container secao__grid">
-        <div class="secao__lado">
-          <p class="rotulo reveal"><span class="num">04</span>Para cooperativas e revendas</p>
-          <h2 id="coop-title" class="afirma reveal" data-delay="1">O dado é do produtor. A cooperativa vê o que ele autorizar. Nada sai do Brasil.</h2>
-          <div class="tres reveal" data-delay="2">
-            <p>O cooperado manda a foto pra Stevi, no WhatsApp que já usa.</p>
-            <p>O técnico recebe a triagem pronta, com o caderno de aplicações montado, e visita quem precisa primeiro.</p>
-            <p><a class="link" href="https://wa.me/19705509125?text=Oi%2C%20Stevi!%20Sou%20de%20cooperativa%20e%20quero%20conversar." rel="noopener">Falar com a Stevi sobre a cooperativa ↗</a></p>
+    <!-- 04 — COOPERATIVAS: o balcão e o cartaz impresso -->
+    <section class="secao coop" id="coop" data-theme="light" aria-labelledby="coop-title">
+      <div class="container">
+        <p class="rotulo reveal"><span class="num">04</span>Para cooperativas e revendas</p>
+        <h2 id="coop-title" class="reveal" data-delay="1">O dado é do produtor. A cooperativa vê o que ele autorizar.</h2>
+        <div class="secao__grid secao__grid--baixo">
+          <div>
+            <div class="tres reveal" data-delay="2">
+              <p>O cooperado manda a foto pra Stevi, no WhatsApp que já usa.</p>
+              <p>O técnico recebe a triagem pronta, com o caderno de aplicações montado, e visita quem precisa primeiro.</p>
+              <p>Nada sai do Brasil. Um número, um cartaz no balcão.</p>
+            </div>
+            <figure class="lamina lamina--coop reveal" data-delay="2" role="figure" aria-label="Técnico da cooperativa e cooperado no armazém, conferindo a prancheta.">
+              <picture class="foto lamina__foto lamina__foto--larga">
+                <source srcset="media/coop.webp" type="image/webp" />
+                <img src="media/coop.jpg" width="1920" height="1075" alt="Técnico agrícola com prancheta conversa com um produtor de chapéu, entre sacas de café no armazém da cooperativa" loading="lazy" />
+              </picture>
+              <figcaption class="ledger"><span>Balcão</span><span>qui, 5 set · 09:30</span><span>Armazém da cooperativa</span></figcaption>
+            </figure>
           </div>
+          <figure class="cartaz reveal" data-delay="1" role="figure" aria-label="Cartaz de balcão: um QR que abre a conversa com a Stevi no WhatsApp, com canhotos destacáveis.">
+            <div class="cartaz__folha">
+              <p class="cartaz__marca">Stevi<span class="ponto"></span></p>
+              <p class="cartaz__linha">Manda a foto da folha.</p>
+              <img class="cartaz__qr" src="/api/qr" width="720" height="720" alt="QR code que abre o WhatsApp da Stevi com o oi já escrito" loading="lazy" />
+              <p class="cartaz__pe"><span>Aponta a câmera</span><span>Abre no WhatsApp</span></p>
+              <p class="cartaz__canhotos" aria-hidden="true"><span>Stevi · WhatsApp</span><span>Stevi · WhatsApp</span><span>Stevi · WhatsApp</span><span>Stevi · WhatsApp</span></p>
+            </div>
+            <figcaption class="ledger"><span>A4</span><span>Impressão em preto</span><span>O cartaz que a cooperativa imprime</span></figcaption>
+          </figure>
         </div>
-        <figure class="cartaz reveal" data-delay="1" role="figure" aria-label="Cartaz de balcão: um QR que abre a conversa com a Stevi no WhatsApp, com canhotos destacáveis com o número.">
-          <div class="cartaz__folha">
-            <p class="cartaz__marca">Stevi<span class="ponto"></span></p>
-            <p class="cartaz__linha">Manda a foto da folha. Quem receita é o agrônomo.</p>
-            <img class="cartaz__qr" src="/api/qr" width="720" height="720" alt="QR code que abre o WhatsApp da Stevi com o oi já escrito" loading="lazy" />
-            <p class="cartaz__pe"><span>Aponta a câmera</span><span>Abre no WhatsApp</span></p>
-            <p class="cartaz__canhotos" aria-hidden="true"><span>+1 970 550-9125</span><span>+1 970 550-9125</span><span>+1 970 550-9125</span><span>+1 970 550-9125</span></p>
-          </div>
-          <figcaption class="rotulo"><span class="num">Balcão</span>O cartaz que a cooperativa imprime</figcaption>
-        </figure>
       </div>
     </section>
 
-    <!-- 05 — PERGUNTAS, como conversa -->
+    <!-- 05 — PERGUNTAS: a conversa numa coluna, a margem à esquerda -->
     <section class="secao" id="perguntas" data-theme="light" aria-labelledby="faq-title">
-      <div class="container secao__grid">
-        <div class="secao__lado">
-          <p class="rotulo reveal"><span class="num">05</span>Perguntas</p>
-          <h2 id="faq-title" class="afirma reveal" data-delay="1">O que perguntam antes de mandar a primeira foto.</h2>
+      <div class="container">
+        <p class="rotulo reveal"><span class="num">05</span>Perguntas</p>
+        <h2 id="faq-title" class="reveal" data-delay="1">Antes da primeira foto.</h2>
+        <div class="secao__grid secao__grid--baixo">
+          <div class="margem reveal" data-delay="2">
+            <p>As quatro perguntas que chegam antes de qualquer foto, respondidas do jeito que ela responde: curto, em texto, sem prometer o que não faz.</p>
+            <p class="ledger ledger--solto"><span>Conversa</span><span>qui, 5 set · 06:40</span><span>Número de teste</span></p>
+          </div>
+          <figure class="fio fio--chat reveal" data-delay="1" role="figure" aria-label="Perguntas frequentes, respondidas pela Stevi na conversa.">
+            <p class="doc__cabeca"><span class="doc__marca">Stevi</span><span>Conversa</span><span class="doc__quando">qui, 5 set</span></p>
+            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:40</span></p><p class="fala__texto">é de graça?</p></div>
+            <div class="fala"><p class="fala__quem"><span>Stevi</span><span>06:40</span></p><p class="fala__texto">É. No beta sou gratuita. Quando quiser ir além da triagem, te conecto a um agrônomo.</p></div>
+            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:41</span></p><p class="fala__texto">você receita defensivo?</p></div>
+            <div class="fala"><p class="fala__quem"><span>Stevi</span><span>06:41</span></p><p class="fala__texto">Não. Isso é do agrônomo. Eu faço a triagem e encaminho.</p></div>
+            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:43</span></p><p class="fala__texto">aqui a internet é ruim</p></div>
+            <div class="fala"><p class="fala__quem"><span>Stevi</span><span>06:43</span></p><p class="fala__texto">Sem problema. Respondo em texto, que é leve. Funciona em conexão de campo.</p></div>
+            <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:44</span></p><p class="fala__texto">e os meus dados?</p></div>
+            <div class="fala fala--ultima"><p class="fala__quem"><span>Stevi</span><span>06:44</span></p><p class="fala__texto">Guardo o mínimo: o pin e o histórico. Peço permissão uma vez. “Apaga meus dados” funciona.</p></div>
+          </figure>
         </div>
-        <figure class="fio reveal" data-delay="1" role="figure" aria-label="Perguntas frequentes, respondidas pela Stevi na conversa.">
-          <p class="doc__cabeca"><span class="doc__marca">Stevi<span class="ponto"></span></span><span>Conversa</span><span class="doc__quando">qui, 5 set</span></p>
-          <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:40</span></p><p class="fala__texto">é de graça?</p></div>
-          <div class="fala"><p class="fala__quem"><span class="stevi">Stevi</span><span>06:40</span></p><p class="fala__texto">É. No beta sou gratuita. Quando quiser ir além da triagem, te conecto a um agrônomo.</p></div>
-          <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:41</span></p><p class="fala__texto">você receita defensivo?</p></div>
-          <div class="fala"><p class="fala__quem"><span class="stevi">Stevi</span><span>06:41</span></p><p class="fala__texto">Não. Produto e dose são do engenheiro agrônomo, no receituário. Eu faço a triagem e encaminho.</p></div>
-          <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:43</span></p><p class="fala__texto">aqui a internet é ruim</p></div>
-          <div class="fala"><p class="fala__quem"><span class="stevi">Stevi</span><span>06:43</span></p><p class="fala__texto">Sem problema. Respondo em texto, que é leve. Funciona em conexão de campo.</p></div>
-          <div class="fala fala--eu"><p class="fala__quem"><span>Produtor</span><span>06:44</span></p><p class="fala__texto">e os meus dados?</p></div>
-          <div class="fala fala--ultima"><p class="fala__quem"><span class="stevi">Stevi</span><span>06:44</span></p><p class="fala__texto">Guardo o mínimo: o pin e o histórico. Peço permissão uma vez. “Apaga meus dados” funciona.</p></div>
-        </figure>
       </div>
     </section>
 
