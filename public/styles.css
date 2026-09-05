@@ -75,6 +75,7 @@ h1, h2, h3, .display {
 }
 h1 { font-size: var(--h1); letter-spacing: -.025em; }
 h2, h3 { font-size: var(--h2); line-height: .94; }
+.h2--multi { font-size: clamp(2.25rem, 4.4vw, 4.25rem); }
 p { margin: 0; }
 strong { font-weight: 600; }
 :focus-visible { outline: 3px solid var(--cereja); outline-offset: 3px; }
@@ -121,7 +122,7 @@ br.d { display: none; }
 .lede { font-size: var(--lede); line-height: 1.3; font-weight: 400; max-width: 30ch; text-wrap: pretty; }
 .tres { display: grid; gap: 18px; max-width: 34ch; font-size: var(--lede); line-height: 1.3; }
 .tres p { color: var(--tinta); text-wrap: pretty; }
-.tres strong { font-weight: 600; }
+.tres strong { font-family: var(--mono); font-weight: 600; font-size: .78em; letter-spacing: .08em; text-transform: uppercase; }
 .margem p:first-child { color: var(--cinza); max-width: 40ch; text-wrap: pretty; }
 .nota { font-size: var(--mono-s); line-height: 1.6; color: var(--cinza); max-width: 46ch; margin-top: 20px; }
 .nota a { color: var(--tinta); }
@@ -156,7 +157,7 @@ br.d { display: none; }
 
 /* ── A barra: a ação com o peso do título. A mesma no hero e no fecho. ── */
 .barra { display: grid; grid-template-columns: 1fr auto auto; gap: 24px; align-items: center; padding: clamp(18px, 2.4vw, 24px) clamp(20px, 3vw, 32px); background: var(--tinta); color: var(--creme); text-decoration: none; transition: background-color var(--t-hover) var(--ease), color var(--t-hover) var(--ease); }
-.barra > span:first-child { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.02em; line-height: 1; font-size: var(--display-s); }
+.barra > span:first-child { white-space: nowrap; font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.02em; line-height: 1; font-size: var(--display-s); }
 .barra:hover { background: var(--cereja); }
 .barra__nota { font-size: var(--meta); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--cinza-claro); line-height: 1.5; }
 .barra:hover .barra__nota { color: #fff; }
@@ -192,8 +193,11 @@ br.d { display: none; }
 @media (min-width: 992px) { .hero .secao__grid { align-items: stretch; } .hero .secao__grid > div:first-child { justify-content: space-between; } .hero__foto { display: grid; } .hero__foto .lamina__foto { height: 100%; } .hero__foto .lamina__foto img { height: 100%; aspect-ratio: auto; } }
 @media (max-width: 991.98px) { .hero .secao__grid > div:first-child { display: contents; } .hero .rotulo { order: 1; } .hero h1 { order: 2; } .hero__foto { order: 3; margin-inline: calc(-1 * var(--gutter)); } .hero__acao { order: 4; } .hero .secao__grid { gap: 28px; } .hero__foto .lamina__foto img { aspect-ratio: 4 / 3; transform: none; } }
 .secao__grid--baixo { margin-top: clamp(2rem, 4vw, 3.5rem); }
+@media (min-width: 992px) { .secao__grid--lado { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
+.secao__grid--lado .tres { margin-top: clamp(1.5rem, 3vw, 2.5rem); }
 @media (min-width: 992px) {
   .secao__grid { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 80px; }
+  .hero .secao__grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; }
 }
 .hero { padding-top: calc(var(--header-h) + 24px); padding-bottom: 0; }
 @media (min-width: 992px) { .hero .secao__grid > div:first-child { padding-bottom: var(--pad); } }
@@ -208,6 +212,7 @@ br.d { display: none; }
 .doc, .cartao { margin: 0; border: 1px solid var(--tinta); padding: 20px 24px 22px; background: var(--papel); }
 .doc__cabeca { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; color: var(--cinza); padding-bottom: 12px; border-bottom: 1px solid var(--tinta); }
 .doc__marca { font-family: var(--display); font-weight: 900; font-size: 1.5rem; letter-spacing: -.02em; color: var(--tinta); line-height: 1; }
+.doc__marca .ponto { width: .2em; height: .2em; margin-left: .06em; }
 .doc__quando { margin-left: auto; }
 .doc__pergunta { display: grid; gap: 6px; margin-top: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--linha); font-size: var(--doc-s); line-height: 1.5; color: var(--cinza); }
 .doc__pergunta span { font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
@@ -285,13 +290,14 @@ br.d { display: none; }
 .curva svg { display: block; width: 100%; height: auto; overflow: visible; }
 .curva__eixo { stroke: var(--creme); stroke-opacity: .32; fill: none; vector-effect: non-scaling-stroke; }
 .curva__risco { stroke: var(--cereja); stroke-width: 1.5; stroke-dasharray: 4 5; fill: none; vector-effect: non-scaling-stroke; }
-.curva__banda { fill: var(--creme); fill-opacity: .14; }
-.curva__num { font-family: var(--mono); font-size: 21px; letter-spacing: .06em; fill: var(--cinza-claro); }
+.curva__banda { fill: var(--cereja); fill-opacity: .18; }
+.curva__eixo--min { stroke-opacity: .7; stroke-dasharray: 3 4; }
+.curva__num { font-family: var(--mono); font-size: 24px; letter-spacing: .06em; fill: var(--cinza-claro); }
 .curva .curva__svg--m { display: none; }
 @media (max-width: 767.98px) { .curva .curva__svg--d { display: none; } .curva .curva__svg--m { display: block; } .curva__num { font-size: 12px; } }
 .curva__num--min { fill: var(--creme); font-weight: 500; }
 .curva__num--risco { fill: var(--creme); }
-.curva__num--banda { fill: var(--cinza-claro); }
+.curva__num--banda { fill: var(--creme); }
 .curva__linha { fill: none; stroke: var(--creme); stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .curva__min { fill: var(--tinta); stroke: var(--cereja); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
@@ -314,9 +320,9 @@ br.d { display: none; }
 .regras dt { font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta); line-height: 1.5; padding-top: .2em; }
 .regras--faq div { padding: 18px 0 20px; }
 .regras--faq.secao__grid--baixo { display: grid; }
-.regras--faq dt { font-family: var(--serif); font-style: italic; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.3; font-size: var(--lede); padding-top: 0; color: var(--tinta); }
+.regras--faq dt { font-family: var(--serif); font-style: italic; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.35; font-size: var(--lede); padding-top: 0; color: var(--cinza); }
 .regras__quem { display: block; margin-bottom: 8px; font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--cinza); }
-.regras--faq dd { color: var(--tinta); font-size: var(--doc-s); line-height: 1.5; max-width: 60ch; }
+.regras--faq dd { color: var(--tinta); font-size: var(--lede); line-height: 1.35; max-width: 44ch; }
 .regras dd { margin: 0; color: var(--cinza); text-wrap: pretty; }
 
 /* ── O cartaz: uma folha A4 impressa, com marcas de corte e canhotos ──── */
