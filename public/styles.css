@@ -32,7 +32,7 @@
   --header-h: 72px;
 
   --h1: clamp(5rem, 15.5vw, 13rem);
-  --h2: clamp(2.5rem, 7.5vw, 7rem);
+  --h2: clamp(2.25rem, 7.5vw, 7rem);
   --corpo-s: 1.0625rem;
   --doc-s: 1.125rem;
   --lede: clamp(1.25rem, 1.8vw, 1.625rem);
@@ -116,15 +116,12 @@ br.d { display: none; }
 .ledger--claro { color: var(--cinza-claro); }
 .ledger--claro span:first-child { color: var(--creme); }
 .ledger--solto { border-bottom: 0; border-top: 1px solid var(--tinta); margin-top: 28px; }
-@media (max-width: 767.98px) { .ledger span:last-child { margin-left: 0; flex-basis: 100%; } }
 
 /* Vozes: a afirmação (lede), a prosa, a margem, a nota. */
 .lede { font-size: var(--lede); line-height: 1.3; font-weight: 400; max-width: 30ch; text-wrap: pretty; }
-.tres { display: grid; gap: 16px; max-width: 46ch; }
-.tres--linha { max-width: none; margin-top: clamp(2rem, 4vw, 3rem); }
-@media (min-width: 768px) { .tres--linha { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; } }
-.tres p { color: var(--cinza); text-wrap: pretty; }
-.tres strong { color: var(--tinta); }
+.tres { display: grid; gap: 18px; max-width: 34ch; font-size: var(--lede); line-height: 1.3; }
+.tres p { color: var(--tinta); text-wrap: pretty; }
+.tres strong { font-weight: 600; }
 .margem p:first-child { color: var(--cinza); max-width: 40ch; text-wrap: pretty; }
 .nota { font-size: var(--mono-s); line-height: 1.6; color: var(--cinza); max-width: 46ch; margin-top: 20px; }
 .nota a { color: var(--tinta); }
@@ -201,7 +198,6 @@ br.d { display: none; }
 }
 .hero { padding-top: calc(var(--header-h) + 24px); }
 .hero .lede { margin-top: 28px; }
-.hero .nota { margin-top: 18px; }
 @media (max-width: 767.98px) {
   .hero { padding-top: calc(var(--header-h) + 24px); }
   .hero h1 { font-size: clamp(5rem, 26vw, 8rem); }
@@ -209,7 +205,7 @@ br.d { display: none; }
 }
 
 /* Documento: cabeça com marca, título e data; texto; pé. */
-.doc, .cartao { margin: 0; border: 1px solid var(--tinta); padding: 20px 24px 22px; background: var(--papel); box-shadow: 8px 8px 0 var(--tinta); }
+.doc, .cartao { margin: 0; border: 1px solid var(--tinta); padding: 20px 24px 22px; background: var(--papel); }
 .doc__cabeca { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; color: var(--cinza); padding-bottom: 12px; border-bottom: 1px solid var(--tinta); }
 .doc__marca { font-family: var(--display); font-weight: 900; font-size: 1.5rem; letter-spacing: -.02em; color: var(--tinta); line-height: 1; }
 .doc__quando { margin-left: auto; }
@@ -217,7 +213,7 @@ br.d { display: none; }
 .doc__pergunta span { font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
 .doc__texto { margin-top: 18px; font-size: var(--doc-s); line-height: 1.5; text-wrap: pretty; }
 .doc__pe { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--linha); font-size: var(--mono-s); line-height: 1.55; color: var(--cinza); }
-.doc--claro { color: var(--creme); border-color: var(--creme); background: var(--tinta); box-shadow: 8px 8px 0 var(--cinza); }
+.doc--claro { color: var(--creme); border-color: var(--creme); background: var(--tinta); }
 .doc--claro .doc__cabeca { color: var(--cinza-claro); border-color: var(--creme); }
 .doc--claro .doc__marca { color: var(--creme); }
 .doc--claro .doc__pe { color: var(--cinza-claro); border-color: var(--linha-escura); }
@@ -277,13 +273,10 @@ br.d { display: none; }
 
 /* ── O alerta: preto chapado, a curva da noite, a madrugada, o aviso ───── */
 .escuro { background: var(--tinta); color: var(--creme); }
-.alerta__topo { display: grid; gap: 24px 80px; align-items: end; }
-@media (min-width: 992px) { .alerta__topo { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); } .alerta__quando { padding-bottom: .6em; } }
-.alerta__grau { font-size: var(--h1); }
-.alerta__quando { font-size: var(--doc-s); line-height: 1.5; color: var(--cinza-claro); max-width: 36ch; text-wrap: pretty; }
-.alerta__quando .rotulo { display: flex; margin-bottom: 16px; }
-.alerta__par { display: grid; gap: 40px; margin-top: clamp(2.5rem, 5vw, 4rem); align-items: end; }
-@media (min-width: 992px) { .alerta__par { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: 64px; } }
+.alerta__quando { font-size: var(--lede); line-height: 1.3; color: var(--cinza-claro); max-width: 30ch; text-wrap: pretty; }
+.alerta .secao__grid--baixo { margin-top: clamp(2.5rem, 5vw, 4rem); }
+.curva__grau { font-family: var(--display); font-weight: 900; font-size: 150px; letter-spacing: -.03em; fill: var(--creme); }
+.curva__svg--m .curva__grau { font-size: 92px; }
 
 .curva { margin: 0; color: var(--creme); }
 .curva svg { display: block; width: 100%; height: auto; overflow: visible; }
@@ -299,22 +292,35 @@ br.d { display: none; }
 .curva__linha { fill: none; stroke: var(--creme); stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .curva__min { fill: var(--tinta); stroke: var(--cereja); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
-/* ── Onde ela para: três regras em linhas, a resposta como documento ──── */
+/* ── Onde ela para: três carimbos, a definição ao lado ─────────────────── */
+.carimbos { margin: 0; display: grid; border-top: 1px solid var(--tinta); }
+.carimbos div { display: grid; gap: 12px 80px; padding: 26px 0 30px; border-bottom: 1px solid var(--tinta); align-items: baseline; }
+@media (min-width: 992px) { .carimbos div { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); } }
+.carimbos dt { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.03em; line-height: .9; font-size: clamp(2.5rem, 5.5vw, 5.25rem); }
+.carimbos dd { margin: 0; font-size: var(--lede); line-height: 1.3; max-width: 30ch; text-wrap: pretty; }
+.limites .lede { color: var(--cinza); max-width: 32ch; }
 .regras { margin: 0; display: grid; border-top: 1px solid var(--tinta); }
 .regras div { padding: 20px 0 22px; border-bottom: 1px solid var(--linha); display: grid; gap: 8px 32px; }
 .regras div:last-child { border-bottom: 1px solid var(--tinta); }
 @media (min-width: 768px) { .regras div { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: baseline; } }
 .regras dt { font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta); line-height: 1.5; padding-top: .2em; }
-.regras--faq div { padding: 28px 0 30px; }
+.regras--faq div { padding: 18px 0 20px; }
 .regras--faq dt { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -.02em; line-height: .95; font-size: var(--display-s); padding-top: 0; }
 .regras__quem { display: block; margin-bottom: 8px; font-size: var(--meta); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--cinza); }
 .regras--faq dd { color: var(--tinta); font-size: var(--doc-s); line-height: 1.5; max-width: 60ch; }
 .regras dd { margin: 0; color: var(--cinza); text-wrap: pretty; }
 
 /* ── O cartaz: uma folha A4 impressa, com marcas de corte e canhotos ──── */
-.coop__par { display: grid; gap: 48px; margin-top: clamp(2rem, 4vw, 3rem); align-items: start; }
-@media (min-width: 768px) { .coop__par { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; } .coop__par .lamina { grid-column: 1 / 3; } }
+.coop__par { display: grid; gap: 48px; margin-top: clamp(2rem, 4vw, 3.5rem); align-items: start; }
+@media (min-width: 768px) { .coop__par { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: 64px; } }
 .cartaz { margin: 0; width: min(100%, 440px); }
+.cartaz__toque { display: none; }
+@media (max-width: 767.98px) {
+  .cartaz__qr { display: none; }
+  .cartaz__folha { aspect-ratio: auto; }
+  .cartaz__toque { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding: 18px 0; border-top: 1px solid var(--tinta); font-weight: 600; text-decoration: none; min-height: 44px; }
+  .cartaz__pe { display: none; }
+}
 .cartaz__folha { position: relative; aspect-ratio: 1 / 1.4142; display: flex; flex-direction: column; background: var(--papel); padding: clamp(24px, 3vw, 36px) clamp(24px, 3vw, 36px) 0; box-shadow: inset 0 0 0 1px var(--tinta); }
 .cartaz__marca { font-family: var(--display); font-weight: 900; font-size: 2.75rem; letter-spacing: -.02em; text-transform: uppercase; line-height: 1; }
 .cartaz__marca .ponto { width: .2em; height: .2em; }
