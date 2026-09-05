@@ -200,6 +200,8 @@ br.d { display: none; }
 .fio--hero .fala--eu { justify-self: stretch; text-align: left; }
 .fio--hero .fala--eu .fala__quem { flex-direction: row; justify-content: space-between; }
 .fio--hero .fala__foto { margin: 6px 0 10px; }
+.fio--hero .fala__foto img { filter: none; }
+.fio--hero .fala__foto::after { display: none; }
 .fio--hero .fala__foto img { aspect-ratio: 16 / 10; }
 .fio--hero .fala__texto { max-width: none; }
 .fio--hero .fala__quem .ponto { width: .5em; height: .5em; margin-left: .25em; }
