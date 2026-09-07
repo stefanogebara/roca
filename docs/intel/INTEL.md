@@ -26,53 +26,103 @@
 > Um deles saiu com **correção factual**: o registro de 31/08 dizia que o estudo da FDC
 > "nomeia, com dirigente e faturamento", e o PDF mostra que ele anonimiza — a diferença
 > mudava o que a Vitória pode dizer, então virou trava no prompt. Restam **10 dias**.
+>
+> **Quarta passada (2026-09-07) — restam 4 dias.** Feed veio vazio de novo (mesmo JSON
+> de 22/08, `roca: candidates: []`); cinco scouts, ~35 candidatos brutos, seis lidos a
+> fundo. **Três DISCUTIR, quatro REGISTRAR, dezenove DESCARTAR** — nenhum PROTOTIPAR,
+> nenhum IMPLEMENTAR, sexta semana seguida sem spike. O achado mais forte não veio da
+> busca: o `STATE.md` desta rodada mede a semana de **58 commits** (a mais commitada da
+> campanha) contra **zero mensagens do único produtor da base** — e 25 desses commits são
+> vinte e três iterações visuais da mesma landing page (v9→v30). O tripwire dispara pela
+> quarta rodada seguida, agora na forma mais literal do "conserto nunca é mais código": o
+> excesso não é nem feature, é design. A pergunta da Fecon (aberta 24/08) fechou sozinha —
+> a feira aconteceu 1–3/09 e gerou zero cadastros via `#fecon`/`#fecon-cartaz` — e foi
+> movida pro Arquivo como resultado, não como decisão.
 
 ## Em aberto — precisa de decisão do Stefano
 
+### [DISCUTIR 11/15] Prompt logging na OpenRouter está desligado nas duas contas?
+**Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E3 L2
+**Fonte primária:** [OpenRouter Terms of Service, Seção 6.1–6.5](https://openrouter.ai/terms)
 
-### [DISCUTIR 10/15] Você vai à Fecon, de 1 a 3 de setembro?
-**Data:** 2026-08-24 · **Eixos:** P3 A2 D1 E1 L3
-> **01/09:** a feira começou HOJE e fecha em 03/09. Esta pergunta expira em dois dias — e
-> era a única do Arquivo inteiro capaz de gerar coorte com leitura D7 dentro do voo.
-> Continua sem decisão registrada.
-**Fonte:** [21ª Feira Cocatrel de Negócios](https://equipepositiva.com/21a-feira-cocatrel-de-negocios-sera-de-1o-a-3-de-setembro/)
+**O que é:** a Seção 6.2 do ToS, atualizada em 31/08, diz — citação literal — que **se**
+"prompt logging" estiver habilitado nas configurações da conta, a OpenRouter ganha
+licença mundial, perpétua e irrevogável para hospedar, reproduzir, adaptar e distribuir
+o conteúdo do usuário; a 6.1 estende isso a **venda em forma anonimizada**. É opt-in e
+desligado por padrão — não é uma reivindicação automática, ao contrário do que a
+manchete sugere.
 
-**O que é:** a Cocatrel — 2ª maior cooperativa de café do Brasil, atendendo cafeicultores
-em 125 municípios do Sul de Minas — roda a 21ª Fecon de 1 a 3/09 no Espaço Cocatrel em
-Três Pontas e, simultaneamente, em todas as filiais. O formato não é palco, é **balcão**:
-agrônomos e técnicos da própria cooperativa fazendo atendimento um a um, ao lado de
-atualização cadastral, compra de máquina com condição especial e estandes de banco.
+**Por que toca este projeto:** o único ponto de chamada do gateway principal de LLM
+(`api/_lib/llm.ts`) não tem nenhum controle de política de dados — nenhuma referência a
+`logging`/`privacy`/`retention` no repo inteiro. E desde #14 existem **duas** contas
+OpenRouter em produção: a principal e a chave reserva (`OPENROUTER_FALLBACK_API_KEY`,
+do projeto twin-me), cada uma com sua própria configuração de conta. Mensagens reais de
+produtor passam por aqui — texto, foto descrita, dúvida agronômica.
 
-**Por que toca este projeto:** é o beachhead declarado — café, Sul de Minas — e a Cocatrel
-já é fixture nominal de ICP no repo (`tests/prospect-icp.test.ts` usa a cooperativa como
-caso que **não** se descarta). E o `STATE.md` registra 190 commits em 30 dias contra zero
-conversas de produtor externo. É o único encontro do beachhead dentro da janela de decisão,
-e o último capaz de gerar leitura D7 — uma coorte de 1–3/09 fecha D7 em 8–10/09.
+**Por que isso não vira código:** a mitigação inteira é entrar no dashboard de duas
+contas e confirmar (ou desligar) uma opção. Nenhuma linha de `api/_lib/llm.ts` muda por
+causa disso — por isso o veredito trava em DISCUTIR mesmo com score bruto de 11 (que
+cairia em PROTOTIPAR): a `verdict_note` exige que PROTOTIPAR/IMPLEMENTAR ajudem a
+CONVERSAR ou ALERTAR via mudança no repositório, e aqui não há o que mudar no repositório.
 
-**Por que NÃO virou spike, e isso importa:** o kit de aquisição já está inteiro e sem uso.
-`api/qr.ts` gera pôster com `?text=` customizável, `api/_lib/growth.ts` já lê `#fecon` de
-material impresso, `api/vcard.ts` entrega o cartão, `users.kind` já nasce `produtor`. O
-único ajuste de código concebível é cosmético: `fecon` não está em `ORIGEM_SEM_NOME`, então
-a saudação sairia "Que bom que o Fecon te mandou aqui". Uma linha. **Escrever essa linha e
-chamar de progresso seria o tripwire exatamente de novo.**
+**A pergunta:** as duas contas OpenRouter (a principal do projeto e a reserva do
+twin-me usada como `OPENROUTER_FALLBACK_API_KEY`) têm "prompt logging" desligado? Se sim
+— que é o padrão — o risco já está mitigado e este item pode ir pro Arquivo na próxima
+rodada. Se não, foi checado quando a chave reserva foi configurada em #14, ou fica em
+aberto até alguém confirmar manualmente?
 
-**O que a fonte não prova:** `cocatrel.com.br/fecon` devolveu 403 em duas tentativas —
-programação, horário, credenciamento e abertura a não-cooperado **não estão confirmados**.
-Zero público declarado, zero número auditável.
+---
 
-**A pergunta:** você vai? E antes disso, duas travas de porta que só se resolvem por
-telefone hoje:
-1. Ligar na Cocatrel e confirmar se não-cooperado entra e se dá pra circular com cartão e
-   QR sem ser expositor.
-2. Decidir se entrega cartão com o **+1** — `api/_lib/waNumber.ts` ainda tem
-   `DEFAULT_PUBLIC_WA_NUMBER = '19705509125'`, e o pós-mortem de 04/ago culpou
-   "+1 desconhecido" pelo padrão de golpe. Cartão com número americano para cafeicultor de
-   60 anos é a fricção que o próprio repo nomeou.
+### [DISCUTIR 9/15] Um projeto universitário gratuito já roda o mesmo mecanismo do Stevi — em cacau
+**Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E1 L2
+**Fonte:** [App do Cacau — Revista Cacau & Chocolate](https://www.cacauechocolate.com.br/v1/2026/08/26/app-do-cacau-a-inteligencia-artificial-aplicada-a-lavoura/)
 
-E a pergunta de fundo, que muda o que o memo do dia 60 tem direito de afirmar: um produtor
-que escaneia o QR no seu estande conta como **vouchado** na coorte do gate (que precisa de
-n≥15 e hoje tem n=1), ou como a "população separada de cartão/armazém" que o flight plan
-pré-registrou em 13/jul? Se for população separada, a Fecon não move o número que decide.
+**O que é:** a UESC (Bahia), com parceiros do Peru e da Holanda e financiamento do
+Instituto Arapyaú, lançou na ExpoCacau 2026 um serviço gratuito por WhatsApp que recebe
+texto, áudio ou foto da lavoura de cacau e devolve diagnóstico preliminar de 8 doenças,
+11 pragas e deficiências nutricionais — com a mesma postura de triagem-não-prescrição da
+Stevi, no mesmo texto: "não substitui o trabalho do agrônomo ou técnico agrícola, mas
+ajuda a identificar problemas que exigem um profissional qualificado".
+
+**Por que toca este projeto:** é literalmente o mesmo mecanismo (`api/_lib/pipeline.ts`,
+`api/_lib/compliance.ts`, `api/_lib/reason.ts`) — WhatsApp, multimodal, triagem, sem dose
+— só que como projeto universitário gratuito financiado por fundação, hoje em cacau na
+Bahia. Nenhum número de usuários foi divulgado.
+
+**O que a fonte não prova:** se esse padrão institucional (universidade + fundação, sem
+necessidade de monetizar) já está se movendo para café em Minas.
+
+**A pergunta:** vale checar se algum programa estadual, EPAMIG ou a própria Embrapa tem
+um movimento equivalente nascendo para café? Se esse modelo (universidade financiada,
+gratuito pra sempre) se replicar no beachhead, muda como a Stevi precisa se posicionar
+ou monetizar — não é ameaça hoje, mas é o tipo de concorrente que nenhuma rodada
+`prospect/*` está olhando.
+
+---
+
+### [DISCUTIR 8/15] Um app pago com IA agronômica no seu beachhead tem 100 downloads — vale citar isso?
+**Data:** 2026-09-07 · **Eixos:** P2 A1 D1 E2 L2
+**Fonte:** [Café 360 Premium — Zavarise Apps](https://www.zavarise.com.br/cafe360/)
+
+**O que é:** app pago (R$19,90/mês) de gestão de lavoura de café com "consultor
+agrônomo com IA" (manuais EPAMIG/EMATER, diagnóstico por foto de folha), cobrindo
+explicitamente Sul de Minas, Cerrado Mineiro, Matas de Minas, Mogiana — sobreposição
+geográfica direta com o beachhead. Confirmado na Play Store: **100+ downloads**. O
+desenvolvedor (Zavarise Apps) também publica "Fazenda 360", "Pecuária 360" e um app de
+áudio de conteúdo religioso — perfil de fábrica de apps de nicho pequena, não agtech
+financiada.
+
+**Por que toca este projeto:** o `README.md` do flight plan argumenta que apps de agro
+falham porque pedem que o produtor trabalhe (download, cadastro, dashboard vazio) — essa
+é exatamente a tese de `bets[0]` ("WhatsApp é a única interface viável — não construir
+app"). O Café 360 é esse padrão exato — e com IA embutida, cobertura geográfica idêntica
+e mensalidade baixa, ainda assim tração desprezível. É evidência de campo a favor da
+aposta, não contra.
+
+**A pergunta:** vale citar o Café 360 (app pago, mesma região, IA embutida, 100+
+downloads) como exemplo concreto no README de posicionamento — ou n=1 concorrente
+pequeno é fraco demais pra virar argumento citável, e a melhor ação é só arquivar como
+mais um data point?
 
 ---
 
@@ -148,12 +198,17 @@ dos 18 dias que restam. *(Rebaixado de PROTOTIPAR pela `verdict_note`: 01/10 cai
 
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada, pela segunda semana seguida._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Terceira rodada seguida (24/08,
+31/08, 07/09) e sexto veredito sem spike na campanha._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
-produtor** ou a **disparar alerta**. Dos oito itens lidos a fundo em 31/08, os quatro que
-tocavam de perto o produto eram observação de mercado ou risco de plataforma sem ação de
-código exigida agora — nenhum virou spike. O resto era capacidade ou contexto.
+produtor** ou a **disparar alerta**. Dos seis itens lidos a fundo em 07/09, o item de maior
+score (OpenRouter ToS, 11/15) bateria PROTOTIPAR pelo score bruto — mas a única ação
+possível é checar uma configuração de conta, não mudar código, então trava em DISCUTIR por
+regra explícita. Os outros dois DISCUTIR são leitura de mercado (concorrentes), não spike de
+produto. Nesta semana em especial isso importa mais que de costume: o `STATE.md` mede 58
+commits contra zero mensagens de produtor — o projeto não precisa de mais uma fila de
+trabalho de código agora, precisa de conversa.
 
 **Adendo de 01/09:** os quatro itens de 31/08 foram decididos pelo Stefano no mesmo dia e
 viraram código — três PRs mesclados (#13, #14, #15). Estão no Arquivo, cada um com o que
@@ -165,6 +220,10 @@ por que o código existe.
 
 ## Radar
 
+- `2026-09-07` **DigiFarmz relançou "Daz" — mas é feature dentro de SaaS B2B de soja/trigo, não concorrente direto.** A data original parecia 22/09/2026 (futura); confirmada no HTML: é notícia de **set/2025**, republicada. O Daz é a camada WhatsApp de uma plataforma paga (Cropper/Linkage) de uma agtech de Champaign-IL com operação BR/EUA/Paraguai, focada em manejo fitossanitário de soja/trigo em fazendas comerciais grandes — sem café, sem gratuidade, sem sobreposição de segmento com o beachhead. Valida que "alerta proativo por WhatsApp" é padrão de indústria, não ensina mecanismo novo. [Global Crop Protection](https://globalcropprotection.com/noticias/novas-tecnologias/digifarmz-apresenta-daz-assistente-virtual-que-leva-inteligencia-artificial-ao-dia-a-dia-do-produtor-rural/) · 7/15
+- `2026-09-07` **Agro Amazônia triplica conversas com o Meta Business Agent (via Zenvia) em uma semana.** Distribuidora de insumos (subsidiária Sumitomo) roda piloto do agente nativo da Meta no WhatsApp — de 420 para 1.400+ conversas/semana. É SDR de vendas, não conselho agronômico, mas mostra a velocidade com que fornecedores de insumo estão automatizando o mesmo canal — e que a Meta já oferece agente nativo, baixando a barreira para qualquer revenda/cooperativa montar o próprio bot. [RBTV](https://rbtv.com.br/noticia/7058/agroamazonia-triplica-conversas-com-agente-de-ia) · 5/15
+- `2026-09-07` **FAIRY: motor agentic orientado a evento para soja full-season, implantado numa fazenda real.** Orquestra maquinário/drone/sensor/clima sob paradigma "tudo é evento", avaliado com 9 controladores sobre 100 safras simuladas (SIGSPATIAL 2026). Não fala de timing de notificação a humano (não duplica o item já aberto sobre horário de alerta) e exige hardware que o Stevi não tem e não vai ter neste voo. [arXiv](https://arxiv.org/abs/2609.00106) · 6/15
+- `2026-09-07` **EGT-KG: grafo de conhecimento tipado melhora QA científico em modelo pequeno — mas em domínio distante e sem transferência clara.** +12-15% sobre RAG denso em corpus de 30 papers de materiais de construção (não agronomia), ganho inconsistente entre modelos, sem código liberado. O grounding do Stevi (`api/_lib/tools/agrofit.ts`) não tem o problema que este paper resolve — é lookup determinístico sobre registro estruturado, não retrieval fragmentado. O gap real de cobertura (`reason.ts:253`, só 5 culturas) fecha com curadoria de dados, não arquitetura de retrieval. [arXiv](https://arxiv.org/abs/2609.00479) · 5/15
 - `2026-08-31` **CooperRita já tem vendor de IA (Crawly) — e é prospect nomeado do ICP do Stevi.** O iUai, lançado em jan/2026, é chatbot de marca sobre café e queijo regional, não conselho agronômico — mas mostra que uma cooperativa de café do Sul de Minas, dentro do beachhead, já assinou com um fornecedor de IA. Gancho de prospecção, não ameaça de produto. [Itatiaia](https://www.itatiaia.com.br/agro/ia-mineira-cooperativa-lanca-ferramenta-que-entende-de-queijo-e-cafe) · 6/15
 - `2026-08-31` **Preço do Claude Sonnet 5 não sobe.** A Anthropic tornou permanente o preço introdutório ($2/$10 por MTok) e cancelou o aumento pra $3/$15 que estava marcado pra 01/09 — custo do modelo de raciocínio da Stevi via OpenRouter fica igual. [Anthropic](https://platform.claude.com/docs/en/about-claude/pricing) · 6/15
 - `2026-08-31` **AgriRegion confirma a tese, mas o Stevi já resolveu melhor.** Paper de RAG geoespacial (Carolina do Norte, sem código liberado) valida "conselho agrícola precisa ser regional" — mas o vazio sanitário de SP, o bug real da semana, foi fechado com lookup determinístico de município (`vazioRegiao.ts`), não com retrieval. Generalizar pro método do paper seria trocar solução exata por probabilística sem necessidade. [arXiv](https://arxiv.org/abs/2512.10114) · 5/15
@@ -174,6 +233,7 @@ por que o código existe.
 
 ## Arquivo
 
+- `2026-09-07` **[era DISCUTIR 10/15] A Fecon aconteceu 1–3/09 — e gerou zero cadastros, apesar do kit pronto.** O kit (`64152d6`) e a regra de vouch (`527120b`, token `#fecon` vs. `#fecon-cartaz`) foram shipados dias antes da feira. Medição de 07/09 no banco: `users.source ilike '%fecon%'` retorna **zero linhas**; só 1 usuário novo entrou no banco desde 31/08 (`kind='empresa'`, não produtor). O repositório não registra se o Stefano foi e não usou o kit, ou não foi — mas o resultado é o mesmo: a única janela de campo dentro do voo de 60 dias não converteu ninguém. Movido pro Arquivo como resultado, não como decisão pendente — a pergunta original ("você vai?") não faz mais sentido perguntar, a janela fechou.
 - `2026-09-01` **[era DISCUTIR 10/15] A OpenRouter virou parte da Stripe — decidido: diversificar em duas camadas, sem esperar mudança de termos.** O Stefano mandou ir fundo e liberou trocar modelo. Confirmado com as fontes primárias que a aquisição foi anunciada pelas DUAS partes em 19/08 ("same product, same roadmap", closing pendente) — promessa, não contrato. Entraram: fallback direto por chave (`api/_lib/llmDirect.ts`, Anthropic Messages API e endpoint OpenAI-compat do Google AI Studio) em #13, e chave RESERVA do OpenRouter — conta separada, a do projeto twin-me — como camada 1 em #14, já configurada em produção (`OPENROUTER_FALLBACK_API_KEY`) com redeploy feito. O gateway deixou de ser ponto único. [Stripe](https://stripe.com/newsroom/news/stripe-agrees-to-acquire-openrouter) · [OpenRouter](https://openrouter.ai/blog/announcements/openrouter-is-joining-stripe/)
 - `2026-09-01` **[era DISCUTIR 10/15] O Google já tem data pra desligar o Gemini 2.5 — decidido: pinar `google-ai-studio` agora, sem esperar a data oficial.** A checagem nas páginas do Google fechou a dúvida das duas datas: 16/10/2026 está confirmado nos release notes do **Vertex**; a página de model-versions cita 20/10 e o Google não resolveu a contradição (planejamos pelo 16). O que decide é outra coisa: a **API pública segue "no shutdown date announced"**, então o pin desacopla a transcrição do prazo do Vertex inteiro. Implementado em #13 (`ROCA_TRANSCRIBE_PROVIDER`, default `google-ai-studio`, `any` desliga), com o canário pingando o tier de transcrição pelo MESMO pin — senão validaria caminho que o produtor não usa. Modelo mantido: `gemini-2.5-flash-lite` seria mais barato em áudio (US$0,30/M vs 1,00) mas ninguém mediu transcrição PT-BR de voz de roça nele; trocar default sem golden de transcrição fica em aberto. [Vertex release notes](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/release-notes) · [deprecations da API pública](https://ai.google.dev/gemini-api/docs/deprecations)
 - `2026-09-01` **[era DISCUTIR 8/15] O JoIA da CNA — decidido: citar a base pública, e ela ancora uma resposta que saía rasa.** A leitura a fundo confirmou o desenho do concorrente (WhatsApp, gratuito, número (61) 99844-8367, lançado 25/08, rollout na Expointer) e, mais útil, o **status legal da base**: os boletins mensais do Campo Futuro (CNA/Senar; café elaborado pelo CIM/UFLA) trazem impresso "Reprodução permitida desde que citada a fonte". Não é território deles — é fonte pública. Implementado em #13: `api/_lib/tools/custos.ts` detecta pergunta de custo (que não é cotação e caía no caminho `general` sem base nenhuma) e injeta estrutura COE/COT, a citação, e a honestidade de que o número público é da propriedade MODAL da região, não da lavoura dele — com o gancho pro caderno, que é o dado que só a Stevi tem. Nenhum número embutido no código: boletim é mensal. Caso novo no goldenset (`custo-producao-cafe`). Confirmado também que o JoIA é **só reativo** — nenhuma fonte menciona alerta proativo, o que mantém a `bets[1]` de pé. [CNA](https://cnabrasil.org.br/noticias/sistema-cna-senar-leva-joia-projeto-comprador-e-produtos-artesanais-a-expointer) · [boletim Ativos Café](https://www.cnabrasil.org.br/storage/arquivos/icones/Ativos-Cafe-Campo-futuro-Agosto-2024-CNA.pdf)
