@@ -5,6 +5,139 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 10/ago — dia 29 de 60
+
+*Covariável sazonal: ainda janela de colheita/pós-colheita do café em Minas —
+mesmo contexto das duas semanas anteriores. Hoje é também a data do gate S4
+(~10/ago) pré-registrado em 13/jul: ver "Calendário" abaixo, é o item mais
+importante deste memo.*
+
+**TRIPWIRE DISPARADO** — **54 commits** (`git log --since="7 days ago"`) ×
+**0 conversas reais de produtor externo**. 3ª semana seguida disparado (27/jul:
+51×0 · 03/ago: 50×0 · hoje: 54×0) — não é mais pico, é regime confirmado. A
+query bruta de "ativos 7d" devolve 12, mas a decomposição por `users.kind`
+mostra: 11 são `empresa` (prospects B2B — coop/revenda/consultoria — que
+responderam e foram promovidos a usuário) e 1 é o próprio Stefano
+(`kind=produtor`, founder). Zero produtor externo real escreveu para a Stevi
+esta semana.
+
+**Calendário:** dia **29 de 60** · **32 dias** até 11/set · **gate S4 é HOJE**
+(~10/ago, pré-registrado 13/jul). O gate exige coorte D7 vouchada com n≥15;
+o valor real é **n=1** (Gaia Tech, mesmo usuário desde 25/jul, nenhum produtor
+vouchado novo em nenhuma das últimas 4 semanas medidas). **O gate não tem
+número para ler no piso pré-registrado — isso não é uma leitura ruim, é
+ausência de leitura.** As duas semanas anteriores já sinalizaram isso
+chegando; hoje é o dia em que a decisão não pode mais ser adiada: os founders
+precisam decidir explicitamente entre (a) declarar "n insuficiente" e
+estender o prazo do gate, ou (b) aceitar que a métrica pré-registrada
+(D7 vouchado de PRODUTOR) mede uma tese que o pivô B2B2C de 27/jul já não
+persegue como caminho principal — e reescrever o scorecard para refletir
+isso, em vez de deixá-lo apontando para um número que a estratégia atual não
+tenta mais produzir.
+
+**Tração (total / externos reais):**
+
+| Métrica | Total | Externos reais |
+|---|---|---|
+| Usuários | **29** (+11 vs 03/ago) | por `kind`: 19 `empresa`, 8 `teste` (6 Simulador Roca + 1 sistema +1646 + 1 outro), **2 `produtor`** (Gaia Tech + Stefano founder) |
+| Ativos 7 dias | 12 | **0** (11 `empresa` + 1 founder; nenhum produtor externo) |
+| Caderno de aplicações | 0 | 0 (inalterado desde sempre) |
+| Alertas proativos (vida toda) | 0 | 0 (inalterado desde sempre) |
+| `triage_events` | 0 | — segue vazia |
+| `ndvi_readings` | 0 | — segue vazia |
+| Coorte D7 vouchada | n=1, D7=0% | **n insuficiente** (piso: 15) — inalterado desde 25/jul |
+| Coorte nova (semana 03/ago) | 12 novos, 1 D7, 0 vouchados | são os mesmos `empresa` promovidos; **não é coorte de produtor** |
+| Referrals paradas (`partner_notified_at` null) | 5 | inalteradas — mesmas 5 de teste interno (correção 25/jul) |
+| Prospects por status | discovered 136 · ready 113 · contacted 52 · discarded 46 · stale 13 · **replied 7** | ver "Lead quente" |
+| Prospecção enviados (14d, por status) | ~62 eventos: 16 delivered · 16 read · 15 failed · 8 replied · 2 sent | **n insuficiente** por segmento (piso: 100/segmento) para qualquer leitura de reply-rate |
+
+**Lead quente:** **GA Agrosoluções** (software de gestão agrícola, Alfenas/MG,
+`kind=software`, template `stevi_parceria_v3`) — inbound humano real em
+06/ago: "vou passar para vocês o contato da [nome], ela está responsável por
+marcar as reuniões referente à parceria... apresenta o nosso sistema para
+vocês". É pedido explícito de reunião de parceria — o sinal mais forte que a
+prospecção B2B produziu desde o início da campanha. Precisa de follow-up
+humano IMEDIATO, não da Vitória. Segundo sinal, mais fraco: **Agro Rossim**
+(revenda, Boa Esperança/MG) tem qualificação estruturada com
+`accepts_leads: true` e cultura café — vale confirmar se foi conversa humana
+ou só extração automática antes de tratar como lead. **Aviso da mesma
+decomposição por identidade que salvou o memo de 25/jul:** dos 7
+`status='replied'`, ao menos 2 (Minas Cafeeira, Conntacta Agronegócios) são
+confirmados por nota própria do sistema como **atendimento automático**
+("agradece seu contato"), sem humano — não são leads. Não trate os 7 como
+sinal uniforme.
+
+**Mudou no repo (54 commits, 03-10/ago):** quase todo o volume foi voz da
+Vitória (integração ElevenLabs completa, clone de voz, latência/naturalidade,
+correções de turno/desfecho de ligação) e prospecção (enriquecimento por
+bio-link/Instagram/Facebook, dedup por nome+cidade, UF corrigida no
+enriquecimento, remoção do rótulo "assistente digital" das superfícies,
+correção da citação CBPC 2026, smoke e2e do painel). Zero commit tocou o
+produto que um produtor sente diretamente. Mesmo padrão que o tripwire existe
+para pegar, 3ª semana seguida: motor de prospecção e voz cada vez mais
+blindados, zero produtor conversando.
+
+**⚠️ Achado crítico de infraestrutura (fora do escopo de tração, mas bloqueia
+prioridade):** o `master` atual (`467ee13`, linha "voz") e a branch
+`claude/xenodochial-moore-9dc540` divergiram no MESMO dia, 03/ago, e desde
+então não têm nenhum ancestral comum recente — são 54 commits à frente e 54
+atrás uma da outra, sem PR aberto nunca para reconciliar. A branch órfã
+carrega uma semana inteira de trabalho que nunca chegou a produção,
+incluindo dois fixes que tocam diretamente decisões já listadas neste memo:
+`fix(alert): o alarme da empresa estava morto — e-mail vira o degrau
+confiável` (relacionado ao item "envs `FOUNDER_NOTIFY_TO`" abaixo — o código
+existe, só não está em produção) e `fix(retencao): a poda de farmer_alerts
+nunca rodou`. Também carrega um memo de 03/ago com uma nota
+("registra decisão de contato pessoal com Michel") que confirma a decisão foi
+tomada, mas não se a ligação aconteceu. **Não tentei mesclar as branches —
+é decisão de engenharia com risco real de conflito, fora do meu papel.**
+Só registro o achado: os founders (ou quem estiver de plantão de engenharia)
+precisam decidir se esse trabalho é resgatado ou descartado, antes que mais
+uma semana de divergência torne o merge ainda mais caro.
+
+**Decisões abertas dos founders (dias parados, silêncio não é decisão):**
+- CNPJ — "iniciar esta semana" listado em 25/jul, sem evidência de início em
+  nenhum commit ou lesson até hoje → **16 dias**.
+- Acordo escrito com Michel + assinatura dos 36 casos golden — sem evidência
+  de progresso no repo desde a decisão de retomar contato em 03/ago (esse
+  contato seria pelo WhatsApp pessoal do founder, fora do banco — **não
+  medido** se aconteceu) → **16 dias** sem confirmação.
+- Envs `FOUNDER_NOTIFY_TO` e `WHATSAPP_TEMPLATE_ALERT` na Vercel — sem
+  ferramenta neste memo para ler env vars de produção → **16 dias, não
+  medido**. Agravado pelo achado acima: o fix do alarme de e-mail existe
+  desde 03/ago mas está numa branch nunca mesclada — mesmo que os envs
+  estivessem certos, o código que os usa não está rodando em produção.
+- Follow-up humano no único usuário externo real (Gaia Tech) — última
+  mensagem no canal Stevi segue em 17/jul, sem nenhuma linha nova desde então
+  → **24 dias** parado no canal mensurável (o contato pessoal decidido em
+  03/ago, se ocorreu, foi fora do WhatsApp da Stevi — não medido).
+- **Nova, e é a mais urgente: leitura do gate S4 (hoje) não decidida pelos
+  founders** — 0 dias parada, mas sem decisão até o fim do dia o gate expira
+  em silêncio, que é o pior resultado possível.
+
+**As 3 prioridades da semana:**
+1. **Decidir a leitura do gate S4 hoje — não deixar expirar em silêncio.**
+   Escolher entre estender o prazo (n insuficiente, formal) ou reabrir o
+   scorecard para medir o que o pivô B2B2C realmente persegue. É decisão de
+   founder, registrada, não uma nota de rodapé.
+2. **Responder GA Agrosoluções hoje.** É o primeiro pedido explícito de
+   reunião de parceria da campanha inteira — deixá-lo esfriar depois de já
+   ter deixado o Gaia Tech esfriar 24 dias repete o mesmo erro duas vezes.
+3. **Decidir o destino da branch órfã `claude/xenodochial-moore-9dc540`**
+   (54 commits de 03/ago, nunca mesclada, inclui o fix do alarme de e-mail e
+   da poda do `farmer_alerts`) — junto com as 3 decisões humanas que já
+   passam de 16 dias paradas (CNPJ, acordo Michel, envs Vercel). Nenhuma se
+   resolve com mais código na frente errada; a branch em si já é o código
+   certo, só precisa de alguém decidir mesclar ou descartar.
+
+**O que NÃO fazer:** mais nenhum commit em voz/prospecção esta semana — o
+volume de engenharia já provou (3 semanas seguidas) que não é o gargalo.
+Nenhuma "otimização" nova do funil de cold-B2B antes de ler o gate S4 com os
+founders: mexer no motor enquanto a decisão estratégica está em aberto é o
+mesmo movimento que os dois memos anteriores já pediram para parar.
+
+---
+
 ## Semana de 03/ago — dia 22 de 60
 
 *Covariável sazonal: início de agosto cai na janela de colheita/pós-colheita do
