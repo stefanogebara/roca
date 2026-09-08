@@ -5,6 +5,131 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 07/set — dia 57 de 60
+
+*Nota de processo, antes dos números: este memo não roda há 5 semanas — a
+última leitura foi 03/ago (dia 22). Nesse intervalo o gate S4 (~10/ago) veio e
+foi embora **sem nenhuma medição registrada**, e o voo inteiro está a 4 dias
+do fim sem que o scorecard tenha sido consultado uma única vez no meio do
+caminho. Isso por si só é o achado mais importante desta semana: o instrumento
+que existe para frear a campanha ficou 5 semanas sem rodar bem no momento em
+que mais precisava rodar.*
+
+**TRIPWIRE DISPARADO** — **58 commits** (7 dias, `git log --since="7 days
+ago"`) × **0 conversas reais de produtor externo**. A query bruta de "ativos
+7d" devolve 2, mas os dois são o próprio Stefano testando (`kind='produtor'`
+só tem 1 linha no banco inteiro — Gaia Tech — e ela não tem mensagem nova).
+Zero produtor externo escreveu para a Stevi esta semana. É a mesma leitura das
+duas últimas medições (27/jul: 51×0; 03/ago: 50×0) — três leituras seguidas,
+agora espaçadas por 5 semanas sem olhar, sempre o mesmo veredito.
+
+**Calendário:** dia **57 de 60** · **4 dias** até 11/set · gate S4 (~10/ago)
+ficou **28 dias no passado sem leitura** — passou inteiro dentro do apagão de
+medição. Não há mais janela para gerar uma coorte D7 nova dentro do voo: até
+mesmo um produtor que chegasse hoje só fecharia D7 depois de 11/set.
+
+**Tração (total / externos reais):**
+
+| Métrica | Total | Externos reais |
+|---|---|---|
+| Usuários | **30** (`kind`: 20 empresa · 9 teste · 1 produtor) | **1** (Gaia Tech — inalterado desde 17/jul, **52 dias** sem retorno) |
+| Ativos 7 dias | 2 | **0** (os 2 são o founder testando) |
+| Caderno de aplicações | 0 | 0 (inalterado desde sempre) |
+| Alertas proativos (vida toda) | 2 | **0** — os 2 foram enviados a números `Simulador Roca` (teste) em 14/ago |
+| `triage_events` | 0 | — segue vazia |
+| `ndvi_readings` | 2 | não decomposto por identidade; n≤2, ilegível de qualquer forma |
+| Coorte D7 vouchada | n=1, D7=0% | **n insuficiente** (piso: 15) — mesmo n de 25/jul, 7 semanas atrás |
+| Prospecção: enviados vida toda | 75 | 29 delivered · 16 read · 15 failed · 2 sent · 5 null · **8 replied** |
+
+**Achado crítico novo — a prospecção está parada, não pausada:** o último
+envio de qualquer tipo foi em **07/ago**. São **31 dias sem 1 mensagem de
+prospecção sair.** Os 8 `replied` que existem são todos de 05-06/ago (nenhum
+novo desde a última leitura) e nenhum é produtor: são revenda/consultoria/
+software recusando ("agrícola não trabalhamos"), atendimento automático de
+bot, ou 1 conversa real que migrou para o WhatsApp pessoal do Stefano (Duda,
+GA Agrosoluções — modelo de distribuição, não lead-gen) e está **parada com
+ele há mais de 30 dias sem fechamento**, não com a Vitória.
+
+**Achado crítico novo — a Fecon (1-3/set, a única chance de coorte D7 dentro
+do voo) parece ter passado sem conversão.** O código chegou a tempo (`#fecon`
+vouch mesclado 01-02/09, antes da feira), mas a decisão "você vai?" registrada
+em `docs/intel/INTEL.md` em 24/08 **nunca saiu de "Em aberto"** — não há
+atualização depois de 01/09 confirmando presença, e o banco mostra **zero
+usuário novo com `kind='produtor'`** desde 17/jul. Ou o founder não foi, ou
+foi e não gerou um scan sequer. De qualquer forma: a última janela do voo
+capaz de alimentar o scorecard fechou sem dado novo, e ninguém escreveu isso
+em lugar nenhum até agora.
+
+**Achado operacional retroativo (não é desta semana, mas nunca foi relatado):**
+o usuário "Corpal Tratores" trocou **836 mensagens de entrada com 836 de
+saída em 4 horas**, em 03/ago — assinatura de loop bot-a-bot (provável
+autoresponder de terceiro ecoando a própria Stevi). Não é uma prioridade agora
+(está morto desde então), mas é o tipo de coisa que um guard-rail de rate
+por conversa deveria ter pego, e ninguém percebeu por um mês.
+
+**Lead quente:** nenhum NOVO esta semana. O mais promissor que existe (GA
+Agrosoluções/Duda) já está com o founder — ver acima — e é decisão dele
+fechar ou soltar, não trabalho de prospecção.
+
+**Mudou no repo (58 commits, 31/ago-07/set):** a esmagadora maioria (30+) é
+redesign da landing page (`landing v9` até `v30`, quase todos entre 05 e
+07/set) — puro trabalho visual, zero linha tocando retenção ou aquisição.
+O resto que toca produto: kit/vouch da Fecon (a tempo, mas sem conversão
+confirmada — ver acima), onboarding com botão nativo de pin, card
+"quem responde", e diversificação do gateway de LLM (OpenRouter/Stripe,
+resgate avisando founders). Nada disso muda a foto: zero produtor novo
+conversando, pelo 3º ciclo de medição seguido.
+
+**Decisões abertas dos founders (dias parados, silêncio não é decisão):**
+- ~~Memo tese + beachhead~~ — **resolvido em 27/jul** (café, Sul de Minas).
+- ~~Chip +55~~ — **resolvido em 26/jul.**
+- Error code de 21/jul no WhatsApp Manager (discrimina #131049 de #130497) —
+  sem evidência de checagem direta no painel → **48 dias parado**, embora a
+  operação já tenha seguido em frente assumindo #131049 por assinatura
+  indireta (mesma classe de erro observada em ago).
+- CNPJ — "iniciar esta semana" listado em 25/jul, sem qualquer evidência de
+  início desde então → **44 dias parado**.
+- Acordo escrito com Michel + assinatura dos 36 casos golden — 0/36 seguem
+  sem `verified_by`, sem evidência de sessão marcada → **44 dias parado**.
+- Envs `FOUNDER_NOTIFY_TO` e `WHATSAPP_TEMPLATE_ALERT` na Vercel — sem acesso
+  para confirmar valor em produção → **44 dias, não medido**.
+- Follow-up humano no único usuário externo real (Gaia Tech) — decidido fazer
+  em 03/ago (contato pessoal do Stefano), mas a conta não recebeu nenhuma
+  mensagem nova desde 17/jul → **52 dias parado**, e a tentativa de 03/ago
+  (se aconteceu, por fora do número da Stevi) não gerou retorno visível.
+- **Nova:** decisão "ir à Fecon" (24/08) nunca fechada; janela já passou sem
+  sinal de conversão — não há mais o que decidir sobre ela, só reconhecer que
+  passou em branco.
+
+**As 3 prioridades da semana (só restam 4 dias até 11/set):**
+1. **Fechar a leitura do dia 60 agora, não no dia 11.** Com n=1 na coorte
+   vouchada — abaixo do próprio piso mínimo de leitura (15) — o scorecard não
+   tem como decidir Venture/Negócio/Matar pelos critérios pré-registrados. A
+   decisão que falta não é tática, é: declarar "dado insuficiente para ler o
+   scorecard" com honestidade, e decidir o que vem depois (estender, pivotar
+   o método de aquisição, ou encerrar o experimento) — isso é decisão de
+   founder, preparável mas não tomável por este memo.
+2. **Zero commit novo de landing/cards/design até o dia 60.** É o 3º ciclo
+   seguido em que o tripwire dispara com o mesmo padrão (motor de engenharia
+   rodando, zero produtor conversando) — os últimos 4 dias não deveriam virar
+   mais rodadas de redesign visual.
+3. **Fechar Gaia Tech e o golden set do Michel antes do fim do voo.** São as
+   duas únicas ações que sobrevivem independente do veredito do scorecard:
+   Gaia Tech é o único dado de produtor real que existe (52 dias parado); o
+   golden set assinado transforma a métrica de qualidade de opinião-de-LLM em
+   fato verificável — vale para QUALQUER caminho que a empresa tome depois de
+   11/set.
+
+**O que NÃO fazer:** nenhuma tentativa de "reanimar" a prospecção fria nos
+4 dias finais — 31 dias parada, reply-rate histórico ~10% e nenhum produtor
+nela; não dá tempo de gerar leitura nova de qualquer jeito. Nenhum experimento
+de aquisição de última hora tentando forçar n≥15 antes do dia 60 — um número
+inflado nos últimos 4 dias seria exatamente o tipo de dado que a regra de
+25/jul (decompor por identidade antes de usar em estratégia) existe para
+descartar.
+
+---
+
 ## Semana de 03/ago — dia 22 de 60
 
 *Covariável sazonal: início de agosto cai na janela de colheita/pós-colheita do
