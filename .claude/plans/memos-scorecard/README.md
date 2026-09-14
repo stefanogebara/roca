@@ -5,6 +5,90 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 14/set — dia 64 de 60 (3 dias após o fechamento)
+
+*Nota de processo: esta é a primeira leitura desde o memo de FECHAMENTO
+(11/set, dia 60, commit `a01212c`). O voo de 60 dias já foi encerrado e
+julgado — este memo NÃO reabre o veredito, só confirma se algo mudou nos
+3 dias desde então. Nada mudou.*
+
+**Tripwire:** **DISPARADO** — 4 commits (7 dias) × 0 conversas de produtor
+externo. Leitura honesta, porém: **0 dos 4 commits são posteriores ao
+fechamento** — todos datam de 07/set a 12/set (o próprio commit do memo de
+fechamento), e não houve NENHUM commit nos 2 dias entre o fechamento e hoje.
+A recomendação "não fazer mais nenhuma engenharia" do memo de fechamento
+está, até aqui, sendo respeitada — não por disciplina declarada, por
+ausência total de atividade.
+
+**Calendário:** dia **64 de 60** · **3 dias depois** de 11/set (janela
+encerrada) · gate S4 (~10/ago) passou há **35 dias**. Não há mais janela à
+frente — o que resta é decisão dos founders sobre o veredito já entregue.
+
+**Tração (total / externos reais):** idêntica ao fechamento, zero variação
+em 3 dias — `users` total **30**, produtor externo real **1** (Gaia Tech,
+vouchado pelo Michel, 17/jul, `msgs_in=1`, nenhuma mensagem nova). Ativos 7d:
+**0**. Caderno de aplicações: **0**. `farmer_alerts`: **2** (ambas teste,
+14/08, inalteradas). `triage_events`: **0**. `ndvi_readings`: **2** (não
+decomposto, provavelmente teste). Prospects: 8 `replied` — todos de
+empresa (revenda/consultoria/software), nenhum novo desde 03/09, nenhum é
+produtor, nenhum virou parceiro pagante.
+
+**Lead quente:** nenhum. `prospects.status='replied'` segue nas mesmas 8
+linhas do fechamento — todas já lidas e descartadas como não-lead
+(recusa/administrativo). O único contato externo real (Gaia Tech) segue sem
+resposta.
+
+**Mudou no repo:** nada desde o commit do próprio memo de fechamento
+(`a01212c`, 12/set). Os 4 commits que aparecem na janela de 7 dias são
+todos anteriores ao fechamento e já foram descritos naquele memo (limpeza
+de imagens da landing, ajuste de copy da geada, rodada de intel de 07/09).
+
+**Decisões abertas** (dias parados contados a partir de hoje, 14/set):
+- Memo de tese de receita + beachhead — **resolvida** 27/jul (B2B2C
+  institucional, café). Fora da lista.
+- Chip +55 / número verificado — **resolvida**: registrado e verificado
+  segundo o memo de fechamento ("funcionou tecnicamente"). Fora da lista.
+- Error code de 21/jul (#131049 vs #130497 no WhatsApp Manager) —
+  **superado pela resolução do +55**: a distinção só importava para decidir
+  se cold-WA no número antigo tinha futuro; com +55 ativo, a pergunta
+  perdeu o efeito prático. Não vale mais como decisão pendente — arquivo.
+- **CNPJ** — aberta desde 25/jul, **51 dias parada**. Sem evidência de
+  conclusão no repositório.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **51 dias parada**. `verified_by` = 0/38, confirmado agora.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **51 dias, segue não medido** (sem acesso ao painel
+  Vercel neste papel).
+- **Follow-up humano com Gaia Tech (único contato externo real)** — aberta
+  desde 17/jul, **59 dias parada**. É a decisão mais velha da lista e a que
+  o memo de fechamento pediu explicitamente: reengajar ou declarar encerrada.
+
+**As 3 prioridades da semana:**
+1. **Decisão explícita dos founders sobre Gaia Tech/Michel — 59 dias
+   parada, é a mais velha da casa.** O memo de fechamento já pediu isso;
+   3 dias depois, nada mudou no banco. Ou o Stefano liga/visita esta
+   semana, ou declara a parceria encerrada em voz alta. Silêncio continua
+   não sendo decisão.
+2. **CNPJ e assinatura do golden set com o Michel — 51 dias parados cada,
+   sem depender de mais nenhum código.** São as duas dependências humanas
+   que sobreviveram ao fechamento sem virar ação.
+3. **Decidir o destino desta própria rotina.** O veredito do voo já foi
+   entregue (MATAR/PIVOTAR qualitativo, N insuficiente pelo piso literal).
+   Rodar este memo toda semana daqui pra frente, sem nenhum dado novo pra
+   medir, é o mesmo tipo de ruído que o memo de fechamento criticou no
+   próprio silêncio de 5 semanas — só que na direção oposta. Recomendo:
+   cadência mensal (ou disparada por evento — resposta nova de produtor,
+   decisão sobre Gaia Tech, ou início formal de um recomeço) até que os
+   founders decidam se a campanha recomeça do zero ou fica oficialmente
+   encerrada.
+
+**O que NÃO fazer:** nenhuma linha nova de código, nenhuma iteração de
+landing, nenhum disparo de prospecção — a pausa total dos últimos 2 dias é
+a primeira semana em 60 dias que cumpriu essa regra por completo, e é o
+comportamento certo enquanto as 3 decisões acima não saem do papel.
+
+---
+
 ## FECHAMENTO — Dia 60 de 60 (11/set/2026) — Veredito do Scorecard Pré-Registrado
 
 *Nota de processo, antes de tudo: esta é a primeira leitura deste memo desde
