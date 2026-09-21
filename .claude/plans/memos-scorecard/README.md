@@ -5,6 +5,79 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 21/set — dia 71 de 60 (10 dias após o fechamento)
+
+*Nota de processo: segunda leitura pós-fechamento. O memo de 14/set já
+recomendou reduzir a cadência desta rotina para mensal ou disparada por
+evento (resposta nova de produtor, decisão sobre Gaia Tech, início de
+recomeço) — nada disso ocorreu nos 7 dias seguintes. Este memo confirma
+zero variação e mantém a recomendação, agora com uma semana adicional de
+evidência de que ela estava certa.*
+
+**Tripwire:** **não disparado** — 0 commits (7 dias, confirmado por `git log
+--since='7 days ago'`, range 14–21/set) × 0 conversas de produtor externo.
+Primeira semana da campanha inteira em que o tripwire não dispara — não por
+disciplina de campo, mas porque não há mais nenhuma atividade de nenhum dos
+dois lados. É o mesmo silêncio total, só que agora simétrico.
+
+**Calendário:** dia **71 de 60** · **10 dias** após o fechamento de 11/set
+(janela encerrada) · gate S4 (~10/ago) passou há 42 dias. Sem janela à
+frente; segue sendo decisão dos founders, não medição.
+
+**Tração (total / externos reais):** idêntica à semana passada, zero
+variação em 7 dias. `users` total **30**, produtor externo real **1** (Gaia
+Tech, vouchado pelo Michel, última mensagem 17/jul, nenhuma nova). Ativos
+7d: **0**. Caderno de aplicações: **0**. `farmer_alerts`: **2** (teste,
+14/08, inalteradas). `triage_events`: **0**. `ndvi_readings`: **2** (não
+decomposto, provavelmente teste). `referral_requests` pendentes: **5**
+(mesmas de teste interno de 25/jul). Prospects: 136 discovered · 113 ready ·
+64 stale · 46 discarded · **8 replied** — mesmas 8 linhas de empresa
+(revenda/consultoria) da semana passada, nenhuma nova, nenhuma é produtor.
+Golden set: **0/38** `verified_by` (conferido agora, arquivo local).
+
+**Lead quente:** nenhum. Mesmas 8 linhas `replied` já lidas e descartadas
+como não-lead. Gaia Tech segue sem resposta.
+
+**Mudou no repo:** nada. Zero commits desde `e01bf5d` (12/set→14/set, o
+próprio commit do memo passado). Primeira semana inteira sem nenhuma linha
+de código tocada desde o início da campanha em 13/jul.
+
+**Decisões abertas** (dias parados a partir de hoje, 21/set):
+- **CNPJ** — aberta desde 25/jul, **58 dias parada**. Sem evidência de
+  conclusão no repositório.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **58 dias parada**. `verified_by` = 0/38, confirmado agora.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **58 dias, segue não medido** (sem acesso ao painel
+  Vercel neste papel).
+- **Follow-up humano com Gaia Tech (único contato externo real)** — aberta
+  desde 17/jul, **66 dias parada**. Segue sendo a decisão mais velha da
+  lista.
+- **Destino desta rotina** — aberta desde 14/set, **7 dias parada**: a
+  recomendação de reduzir a cadência para mensal/evento não foi respondida
+  nem seguida (esta é a 2ª leitura semanal consecutiva sem nenhum dado
+  novo).
+
+**As 3 prioridades da semana:**
+1. **Mesma de 14/set, agora com mais evidência: decisão explícita sobre
+   Gaia Tech/Michel — 66 dias parada.** Ou contato (telefone/presencial)
+   esta semana, ou declarar a parceria encerrada em voz alta.
+2. **CNPJ e assinatura do golden set — 58 dias parados cada,** sem
+   depender de código.
+3. **Responder a decisão sobre esta própria rotina.** Duas semanas seguidas
+   de "zero variação" confirmam que rodar isso semanalmente, sem gatilho de
+   evento, é ruído — o mesmo tipo que os memos de fechamento criticaram no
+   silêncio original, agora na forma oposta (medir o vazio repetidamente em
+   vez de deixar de medir). Recomendo suspender a próxima leitura automática
+   e retomar apenas quando um dos gatilhos já listados ocorrer (mensagem
+   nova de produtor, decisão sobre Gaia Tech, ou início formal de recomeço).
+
+**O que NÃO fazer:** nada de novo a evitar — não houve nenhuma atividade de
+engenharia ou campo para conter. O ponto de atenção não é ação em excesso,
+é decisão em falta.
+
+---
+
 ## Semana de 14/set — dia 64 de 60 (3 dias após o fechamento)
 
 *Nota de processo: esta é a primeira leitura desde o memo de FECHAMENTO
