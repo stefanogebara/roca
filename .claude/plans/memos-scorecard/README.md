@@ -5,6 +5,88 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 28/set — dia 78 de 60 (17 dias após o fechamento)
+
+*Nota de processo: terceira leitura desde o FECHAMENTO (11/set, dia 60,
+veredito MATAR/PIVOTAR qualitativo). Catorze dias se passaram desde o último
+memo (14/set) — o próprio memo anterior já recomendava cadência mensal ou
+disparada por evento, já que não há mais janela nem dado novo para medir
+semana a semana. Segui a query fresca mesmo assim (regra de casa: nunca herdar
+número). **Nada mudou de novo.**
+
+**Tripwire:** **não disparado** — 0 commits (7 dias) × 0 conversas de produtor
+externo. Primeira vez em meses que a leitura não é "disparado", só porque não
+houve NENHUMA atividade de nenhum lado — nem código, nem campo. É o estado que
+o fechamento pediu (parar de rodar engenharia sem sinal de campo), mas
+zero-contra-zero não é sinal de saúde, é confirmação de pausa total. Desde
+14/set, só 1 commit em todo o repositório: o próprio commit do memo anterior.
+
+**Calendário:** dia **78 de 60** · **17 dias** depois de 11/set (janela
+encerrada) · gate S4 (~10/ago) passou há **49 dias**. Não há voo em curso —
+o que resta é decisão dos founders sobre o veredito já entregue há 17 dias.
+
+**Tração (total / externos reais):** idêntica ao fechamento e ao memo de
+14/set, zero variação em 14 dias. `users` total **30**, produtor externo real
+**1** (Gaia Tech, vouchado pelo Michel, última mensagem 17/jul, seguem **0**
+mensagens novas — 73 dias de silêncio). Ativos 7d: **0**. Caderno de
+aplicações: **0**. `farmer_alerts`: **2** (ambas `kind='teste'`, 14/08,
+inalteradas). `triage_events`: **0**. `ndvi_readings`: **2** (não
+decomposto). Prospects `status='replied'`: **8**, mesmas 8 linhas de sempre
+(todas empresa — revenda/consultoria/software — nenhuma produtor, nenhuma
+virou parceiro pagante). Golden set: **38/38 casos ainda com `verified_by`
+nulo** — confirmado agora, arquivo `knowledge/goldenset/goldenset.jsonl`.
+
+**Lead quente:** nenhum. As mesmas 8 linhas `replied` do fechamento, já lidas
+e descartadas como não-lead. O único contato externo real (Gaia Tech) segue
+sem resposta há 73 dias.
+
+**Mudou no repo:** nada além do próprio commit do memo de 14/set — zero
+commits novos em 14 dias. Item novo checado nesta rodada: tentei ler as envs
+`FOUNDER_NOTIFY_TO`/`WHATSAPP_TEMPLATE_ALERT` direto na Vercel (MCP
+disponível agora) — API devolveu `403 Forbidden` (sem permissão de listagem
+neste papel). Não resolve a pendência, mas troca "não medido por falta de
+acesso à ferramenta" por "não medido por falta de permissão confirmada" —
+só um founder com acesso ao painel resolve isso em 2 minutos.
+
+**Decisões abertas** (dias parados a partir de hoje, 28/set):
+- **Follow-up humano com Gaia Tech (único contato externo real)** — aberta
+  desde 17/jul, **73 dias parada**. A mais velha da casa, pedida
+  explicitamente em dois memos anteriores (fechamento e 14/set). Continua
+  sem decisão em voz alta: nem reengajamento, nem encerramento declarado.
+- **CNPJ** — aberta desde 25/jul, **65 dias parada**. Sem evidência de
+  conclusão no repositório.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **65 dias parada**. `verified_by` = 0/38, confirmado agora.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **65 dias parada**, agora com confirmação técnica de
+  que este papel não tem permissão para checar sozinho (ver acima).
+- **Decidir o destino desta própria rotina** — o memo de 14/set já pediu
+  cadência mensal ou disparada por evento; esta é a segunda semana seguida
+  rodando no ritmo antigo sem que essa decisão tenha sido tomada. A rotina
+  está, ela mesma, virando o tipo de ruído que o scorecard existe para
+  travar.
+
+**As 3 prioridades da semana:**
+1. **Gaia Tech/Michel — 73 dias parada, decisão em voz alta esta semana.**
+   Ligar/visitar, ou declarar a parceria encerrada. Nenhuma prioridade nova
+   substitui esta enquanto ela não sai do papel — é a mesma peça há 3 memos.
+2. **CNPJ e assinatura do golden set — 65 dias cada, zero dependência de
+   código.** Duas assinaturas/documentos que não precisam de nenhuma
+   engenharia para destravar.
+3. **Reduzir a cadência desta rotina (mensal ou por evento) — a própria
+   recomendação de 14/set não foi executada.** Rodar toda semana medindo os
+   mesmos zeros não ajuda os founders a decidir mais rápido; ajuda a gastar
+   a atenção deles em repetição. Recomendo desarmar o gatilho semanal e
+   substituir por: (a) checagem mensal, ou (b) disparo manual quando algo
+   mudar de fato (resposta nova de produtor/Gaia Tech, decisão sobre Michel,
+   início formal de um recomeço).
+
+**O que NÃO fazer:** nenhuma linha de código, nenhuma iteração de landing,
+nenhum disparo de prospecção, e — pela segunda vez seguida — nenhum memo
+semanal a mais sem que a cadência seja formalmente reduzida.
+
+---
+
 ## Semana de 14/set — dia 64 de 60 (3 dias após o fechamento)
 
 *Nota de processo: esta é a primeira leitura desde o memo de FECHAMENTO
