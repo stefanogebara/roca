@@ -38,8 +38,243 @@
 > excesso não é nem feature, é design. A pergunta da Fecon (aberta 24/08) fechou sozinha —
 > a feira aconteceu 1–3/09 e gerou zero cadastros via `#fecon`/`#fecon-cartaz` — e foi
 > movida pro Arquivo como resultado, não como decisão.
+>
+> **Quinta passada (2026-09-21) — primeira depois do fechamento do voo de 60
+> dias.** O voo fechou em 11/set com veredito qualitativo MATAR/PIVOTAR (memo
+> `a01212c`); desde então o repositório ficou em silêncio quase total — zero
+> commits nos últimos 7 dias, última mensagem de qualquer usuário no sistema
+> em 03/set (18 dias). Feed do resumo matinal veio vazio de novo (mesmo JSON
+> de 22/08, `roca: candidates: []`); cinco scouts, ~40 candidatos brutos
+> depois de dedup contra `seen.jsonl`, nove lidos a fundo por um analista
+> cada. **Cinco DISCUTIR (quatro novos + um item de 24/08 atualizado com
+> achado novo), nove REGISTRAR, dezoito DESCARTAR — zero PROTOTIPAR, zero
+> IMPLEMENTAR, quinta rodada seguida sem spike.** Dois achados de leitura
+> mais forte: um estudo (mesmo que simulado, não de campo) que ecoa
+> a leitura que o próprio memo de fechamento já tinha sozinho — adoção,
+> não acurácia de algoritmo, é o gargalo — e um concorrente institucional
+> (Sicoob SuperApp com IA generativa) que ataca uma premissa do próprio
+> README de posicionamento: "o produtor não tem app". Dois itens abertos
+> desde 24/08 passaram dos 21 dias sem decisão; um foi mantido aberto por
+> ter recebido achado novo (opt-out de alerta), o outro foi mantido aberto
+> por decisão editorial — o prazo que ele descreve (01/10) vence em 10 dias
+> e arquivá-lo sem resposta do founder pareceu pior que quebrar a regra de
+> hygiene. Ver nota na própria entrada.
 
 ## Em aberto — precisa de decisão do Stefano
+
+### [DISCUTIR 8/15] O Sicoob acabou de rachar a premissa "o produtor não tem app"?
+**Data:** 2026-09-21 · **Eixos:** P1 A1 D2 E2 L2
+**Fonte primária:** [Sicoob — lançamento do Assistente Inteligente no SuperApp](https://www.sicoob.com.br/web/sicoob/noticias/-/asset_publisher/xAioIawpOI5S/content/id/199170100) · [cobertura](https://cooperativismodecredito.coop.br/2026/09/sicoob-lanca-nova-geracao-do-superapp-com-open-finance-e-inteligencia-artificial/)
+
+**O que é:** em 01/09/2026 o Sicoob (8-10,3 milhões de cooperados, 85% das
+transações do banco, 7 milhões de acessos diários ao app) lançou um
+Assistente Inteligente por IA generativa dentro do próprio SuperApp —
+aceita texto/áudio/imagem para Pix, boleto e Open Finance. Rollout gradual,
+interface clássica ainda coexiste. Nenhuma menção a crédito rural,
+agronegócio ou Funcafé no anúncio — é 100% bancário, o Sicoob mantém uma
+seção "Para o Agronegócio" separada e sem relação com este lançamento.
+
+**Por que toca este projeto:** o README do flight-plan (`.claude/plans/2026-07-13-flight-plan/README.md`,
+linhas 18-48) argumenta "vs. apps de agro" partindo de uma premissa
+factual: o produtor "não tem" app — todo app de agro faz ele trabalhar
+(download, cadastro, dashboard vazio), por isso WhatsApp vence. Mas se o
+produtor-alvo (5-50ha de café, Caparaó/Sul de Minas) É cooperado de banco
+cooperativo, ele provavelmente JÁ tem um app — só que bancário, não
+agronômico — e agora esse app está ganhando IA conversacional embutida.
+A premissa "ele não tem app" e a premissa "esse app específico não faz o
+que a Stevi faz" são duas afirmações diferentes; só a segunda é
+defensável, e o README hoje usa a primeira.
+
+**O que a fonte não prova:** que o produtor do beachhead da Stevi de fato
+abre o app do Sicoob/Sicredi/Cresol pra além de checar saldo, nem qual
+fração dele é cooperado versus cliente de banco tradicional. Sem esse
+dado, a pergunta é hipótese, não fato estabelecido.
+
+**A pergunta:** do universo de produtores-alvo do beachhead, quantos são
+cooperados de banco cooperativo (Sicoob/Sicredi/Cresol) vs. clientes de
+banco tradicional — e, entre os cooperados, eles abrem o app pra algo além
+de Pix/saldo? Isso decide se "o produtor não tem app" (linha 24 do README)
+ainda é a formulação certa, ou se precisa virar "o produtor tem um app
+bancário, e a Stevi não compete com ele — se pluga onde o banco não
+chega" (mesma lógica que já se aplica ao técnico/vizinho/rádio).
+
+---
+
+### [DISCUTIR 10/15] A verificação por rubrica em VLM ataca o gap de cobertura do goldenset?
+**Data:** 2026-09-21 · **Eixos:** P2 A2 D2 E2 L2
+**Fonte primária:** [arXiv 2609.09417](https://arxiv.org/abs/2609.09417)
+
+**O que é:** benchmark de 116 datasets / 8.324 imagens mostra que VLMs
+(ex. Gemma 4 E4B-it) já codificam features agrícolas quase tão separáveis
+quanto embeddings DINOv3, mas falham em conectar isso a conhecimento de
+domínio quando perguntados direto. Um verificador com rubrica de
+diagnóstico fixa por tarefa leva o F1 de identificação de doença de um
+teto single-shot de 0,60 para 0,71 — mas o próprio paper admite que a
+maior parte do ganho vem de a rubrica já estar embutida no PROMPT de
+geração, não da comparação par-a-par mais cara que dá nome ao método.
+
+**Por que toca este projeto:** ataca de frente o `known_gap` já registrado
+no config — "os 37 casos do `knowledge/goldenset/goldenset.jsonl` têm
+`verified_by=null`, e o grounding cobre só cinco culturas" — e mira
+`api/_lib/reason.ts` (identificação por foto), não RAG denso (que o
+projeto já decidiu não usar). Dá pra rodar um spike real e barato: colocar
+uma rubrica fixa no prompt de identificação e medir F1 contra os 37 casos
+existentes, sem construir o torneio completo do paper.
+
+**O que a fonte não prova:** que o ganho (0,60→0,71) generaliza das cinco
+tarefas do benchmark pras culturas específicas do Stevi, nem que o
+componente caro (K candidatos + torneio) vale o custo de latência frente a
+só colocar a rubrica no prompt único.
+
+**A pergunta:** o gargalo real hoje não é a arquitetura de verificação —
+é que ninguém revisou os 37 casos do goldenset e a cobertura para em cinco
+culturas. Vale gastar um spike de prompt (rubrica fixa, sem torneio) pra
+melhorar F1 de diagnóstico visual, ou isso é exatamente "mais código"
+enquanto zero produtor conversa há 18 dias e o voo de 60 dias já fechou
+com veredito MATAR/PIVOTAR?
+
+---
+
+### [DISCUTIR 11/15] A transcrição de voz cai até 41 pontos com fala real — o Stevi tem golden set disso?
+**Data:** 2026-09-21 · **Eixos:** P3 A2 D2 E2 L2
+**Fonte primária:** [arXiv 2608.06027 — FormBharo](https://arxiv.org/abs/2608.06027)
+
+**O que é:** agente de voz por telefone que combina LLM com validação
+determinística pra preencher formulários com mães de baixa renda na
+Índia rural — mesmo padrão arquitetural que `api/_lib/compliance.ts` já
+aplica (LLM + camada determinística de controle). Benchmark de 3.760
+testes/960 ligações com áudio real em hindi, mais piloto de campo com a
+ONG ARMMAN: a acurácia de preenchimento cai até **41 pontos percentuais**
+entre transcrição ideal e transcrição de fala real — e performance de
+componente isolado não prediz performance fim-a-fim.
+
+**Por que toca este projeto:** o `known_gap` já registrado no config diz
+"trocar o default de transcrição [gemini-2.5-flash] sem golden de
+transcrição fica em aberto" — ninguém mediu a qualidade real de
+transcrição PT-BR de voz de roça. `api/_lib/transcribe.ts` alimenta
+`api/_lib/tools/applicationParse.ts` sob o mesmo padrão que este paper
+descreve. A queda de 41pp é em hindi/população específica — não
+transfere direto — mas o MECANISMO (erro de transcrição se propaga e só
+validação determinística recupera parte) é genérico o bastante pra valer
+a pena verificar se o Stevi tem a mesma vulnerabilidade sem saber.
+
+**O que a fonte não prova:** que a mesma curva de degradação se aplica ao
+padrão de ruído de campo brasileiro nem ao tipo de campo que a Stevi
+extrai (cultura, praga, dose — diferente de formulário de saúde materna).
+
+**A pergunta:** vale montar agora um golden set de transcrição PT-BR
+(mesmo que com áudio sintético/degradado, já que não há voz real de
+produtor pra calibrar — zero mensagem há 18 dias), ou isso é trabalho de
+engenharia adiantado sem sinal de campo, exatamente o tipo que o tripwire
+do voo de 60 dias — encerrado com veredito MATAR/PIVOTAR — pede pra
+evitar até a decisão de recomeço sair?
+
+---
+
+### [DISCUTIR 9/15] Captação de agtech caiu 33% globalmente — isso muda o cálculo pós-voo?
+**Data:** 2026-09-21 · **Eixos:** P2 A1 D2 E2 L2
+**Fonte:** [PitchBook — Q2 2026 Agtech Report](https://pitchbook.brightspotcdn.com/5e/08/bfa17cb444059c50d7a96539baa7/q2-2026-agtech-report-embedded-ai-draws-capital-and-delivers-roi-preview.pdf) (via [The Shift](https://theshift.info/hot/tecnologia-precisao-agro-venture-capital-ia-2026/))
+
+**O que é:** investimento global em agtech caiu de US$3,7bi (H1/2025, 484
+deals) para US$2,4bi (H1/2026, 359 deals) — -33% em valor, -26% em número
+de deals — segundo a PitchBook. Dentro do H1/2026, Agricultura de Precisão
+é a fatia mais fraca por número de deals (US$338,6M/38 deals) entre as
+categorias medidas; o relatório descreve migração de capital de hardware
+pra dados/biologia/IA embarcada.
+
+**Por que toca este projeto:** o voo de 60 dias fechou em 11/set com
+veredito qualitativo MATAR/PIVOTAR, e a decisão que os founders enfrentam
+agora — segundo o próprio README do flight-plan — é "venture vs. negócio
+próprio vs. matar/pivotar". Captação mais difícil é dado direto de
+contexto pra essa decisão, embora não invalide nem confirme sozinho
+nenhuma aposta específica.
+
+**O que a fonte não prova:** o PDF completo não abriu pra leitura (só o
+texto da cobertura secundária foi lido); não há segmentação por estágio
+(seed vs. late-stage) nem por Brasil/LatAm/agtech-conversacional
+especificamente — "Agricultura de Precisão" na taxonomia da PitchBook é
+categoria ampla de hardware/sensor, que pode nem corresponder ao nicho do
+Stevi.
+
+**A pergunta:** com captação agtech em queda e a fatia de precisão sendo a
+mais fraca do trimestre, isso reforça manter a tese B2B2C bootstrapped em
+vez de buscar rodada — ou o pivot que está em cima da mesa já não depende
+de fundraising de qualquer forma, e o dado é só contexto sem ação clara?
+
+---
+
+### [DISCUTIR ~10/15, atualizado] O primeiro alerta sai às 08:00 para todo mundo — e agora falta um segundo mecanismo: opt-out
+**Data original:** 2026-08-24 · **Atualizado:** 2026-09-21 · **Eixos:** P2 A2 D2 E2 L2
+**Fontes:** [STEPS](https://arxiv.org/abs/2608.01949) · [JITAI/OzCHI](https://arxiv.org/abs/2608.09294) · **novo:** [Proactive Service Agents — unified decision framework](https://arxiv.org/abs/2609.03727)
+
+*Nota de processo: este item está aberto há 28 dias — passou dos 21 dias
+que normalmente mandam um item pro Arquivo. Mantido aberto porque recebeu
+achado novo nesta rodada (abaixo), não porque a regra de hygiene foi
+ignorada sem razão.*
+
+**O que já estava registrado (24/08):** `bets[1]` diz que notificação
+proativa no momento certo vale mais que resposta sob demanda; hoje o cron
+dispara `0 11 * * *` (08:00 BRT) pra todo mundo, mesmo horário pros três
+tipos de alerta, enquanto `api/_lib/prospect/core.ts` já tem disciplina de
+horário comercial pro lado empresa. A pergunta original: o primeiro alerta
+de geada sai às 08:00 pra todo mundo, ou o horário é argumentado por tipo
+de alerta (geada na véspera à noite, queimada na hora, vazio em horário
+comercial)?
+
+**O que é novo (21/09):** um survey formaliza proatividade como decisão
+restrita por um ledger de autorização verificável e um teto de risco —
+não é experimento próprio (síntese de ~100 papers/13 benchmarks, nenhum
+combina realismo de implantação alto + desenho causal + horizonte longo ao
+mesmo tempo). O achado que interessa: `api/_lib/prospect/inbound.ts` **já
+implementa**, do lado empresa, exatamente o padrão de "autorização
+verificável + execução recuperável" que este framework descreve —
+`prospect_optouts`, checado antes de reenvio, com o comentário do próprio
+time ("suprimido-e-não-apagado é recuperável"). **`api/_lib/alerts.ts` e
+`api/cron/monitor.ts`, do lado produtor, não têm equivalente** — nenhuma
+referência a optout/consent/blocklist nesses dois arquivos.
+
+**O que as fontes não provam:** nenhum dos mecanismos citados (STEPS,
+JITAI, este framework) roda com n perto de 1, que é o n real do Stevi.
+
+**A pergunta (duas cláusulas agora):** (1) o horário do alerta é único ou
+por tipo, como já perguntado em 24/08; e (2) — novo — hoje um alerta de
+geada/queimada/vazio dispara pra qualquer produtor com pin sem nenhum
+mecanismo de opt-out, ao contrário do lado prospect. Vale portar o padrão
+de `prospect_optouts` pro lado produtor antes ou depois de haver um alvo
+real pra testar (hoje há zero, com as 4 farms com pin todas `kind='teste'`),
+dado que o voo de 60 dias já fechou?
+
+---
+
+### [DISCUTIR 10/15 — mantido aberto, prazo em 10 dias] A partir de 01/10 não sobra caminho gratuito no WhatsApp
+**Data:** 2026-08-24 · **Eixos:** P3 A2 D3 E2 L2
+
+*Nota de processo: este item também está aberto há 28 dias — passaria pro
+Arquivo pela regra dos 21 dias. Não movido: o prazo que ele descreve
+(01/10) vence em **10 dias** a partir de hoje, e nenhuma das duas rodadas
+de scout desta semana (funding, plataforma) trouxe evidência de que a
+forma de pagamento da WABA foi confirmada. Arquivar um risco de
+continuidade financeira não resolvido, dias antes do prazo valer, pareceu
+pior que quebrar a regra de hygiene uma vez — fica registrado como decisão
+consciente, não omissão.*
+
+**Fonte primária:** [Meta, "Pricing for non-template messages"](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages)
+— confirmado de novo nesta rodada (14/09, via scout de plataforma): sem
+forma de pagamento cadastrada até 30/09/2026, a entrega de service
+messages simplesmente **para** a partir de 01/10 — o detalhe operacional
+exato que faltava na rodada de 24/08.
+
+**O que já estava registrado:** o alerta proativo em si não encarece
+(`alertSendPlan()` já cai em `template`, que já é pago hoje) — o risco é
+continuidade de cobrança, não preço. O canal inteiro já morreu uma vez por
+billing (#131042, julho) — não por engajamento.
+
+**A pergunta, sem mudança:** a conta de billing da WABA está com método de
+pagamento válido e fundeado hoje? Faltam 10 dias. Isso é 5 minutos de
+quem tem acesso ao Meta Business Manager — e continua sem resposta
+registrada no repositório há 28 dias.
+
+---
 
 ### [DISCUTIR 11/15] Prompt logging na OpenRouter está desligado nas duas contas?
 **Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E3 L2
@@ -198,17 +433,18 @@ dos 18 dias que restam. *(Rebaixado de PROTOTIPAR pela `verdict_note`: 01/10 cai
 
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Terceira rodada seguida (24/08,
-31/08, 07/09) e sexto veredito sem spike na campanha._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Quinta rodada seguida (24/08,
+31/08, 07/09, 21/09) sem spike na campanha._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
-produtor** ou a **disparar alerta**. Dos seis itens lidos a fundo em 07/09, o item de maior
-score (OpenRouter ToS, 11/15) bateria PROTOTIPAR pelo score bruto — mas a única ação
-possível é checar uma configuração de conta, não mudar código, então trava em DISCUTIR por
-regra explícita. Os outros dois DISCUTIR são leitura de mercado (concorrentes), não spike de
-produto. Nesta semana em especial isso importa mais que de costume: o `STATE.md` mede 58
-commits contra zero mensagens de produtor — o projeto não precisa de mais uma fila de
-trabalho de código agora, precisa de conversa.
+produtor** ou a **disparar alerta**. Nesta rodada, dois itens (VLM rubric-grounded, FormBharo)
+bateriam PROTOTIPAR pelo score bruto (10 e 11) — ambos travam em DISCUTIR pela mesma regra:
+capacidade pura (acurácia de diagnóstico visual, qualidade de transcrição) não é conversa nem
+alerta, mesmo quando ataca um `known_gap` real e nomeado. Isso importa mais que de costume
+agora: o voo de 60 dias fechou em 11/set com veredito qualitativo MATAR/PIVOTAR, e o
+`STATE.md` desta rodada mede zero commits e zero mensagem de qualquer tipo de usuário há 18
+dias — não é hora de abrir fila de trabalho de código, é hora de decisão de founder (Gaia
+Tech, CNPJ, golden set, e agora também: recomeçar ou encerrar).
 
 **Adendo de 01/09:** os quatro itens de 31/08 foram decididos pelo Stefano no mesmo dia e
 viraram código — três PRs mesclados (#13, #14, #15). Estão no Arquivo, cada um com o que
@@ -220,6 +456,18 @@ por que o código existe.
 
 ## Radar
 
+- `2026-09-21` **Xerelia (Colômbia) diagnostica café/cacau/palma em <10s citando as fontes exatas que consultou.** Corpus fechado e datado (Biblioteca Agropecuária Colombiana + Agrosavia), resposta adaptada ao letramento do usuário — mesmo padrão de "triagem com fonte verificável" já visto no App do Cacau (UESC), agora fora do Brasil. Zero métrica de uso divulgada. [Datos Abiertos Colombia](https://herramientas.datos.gov.co/usos/xerelia-asistente-inteligente-para-agricultores-de-colombia) · 7/15
+- `2026-09-21` **Simulação Monte Carlo (não dado de campo) confirma numericamente o que o memo de fechamento do Stevi já tinha sozinho: adoção do produtor, não acurácia do algoritmo, é o gargalo.** Redução de pesticida vai de 20,7% a 49% de probabilidade só variando adoção de baseline a 0,85 — eco quantificado de um achado que o repositório já chegou por conta própria (58 commits numa semana, zero mensagem de produtor). Domínio de IoT em Hainan, sem sobreposição de stack. [arXiv](https://arxiv.org/abs/2609.06740) · 6/15
+- `2026-09-21` **GaIA (Espanha): assistente fitossanitário por WhatsApp que expõe dose — o oposto da postura settled do Stevi.** Lê o vademecum oficial do MAPAMA e devolve dose/período de segurança direto, sem diagnosticar sintoma. Contrasta com `api/_lib/compliance.ts`, que bloqueia exposição de dose mesmo tendo os dados do Agrofit disponíveis. PR de empresa pequena, sem métrica, sem sinal de expansão pro Brasil confirmado (checado e descartado). [Phytoma](https://www.phytoma.com/noticias/noticias-de-empresas/gaia-primer-asistente-fitosanitario-con-inteligencia-artificial-a-traves-de-whatsapp) · 6/15
+- `2026-09-21` **AgrodatAi/"Don Tulio" (Colômbia) alega 318 mil produtores via WhatsApp/SMS — número autodeclarado sem auditoria.** Chatbot desde 2019 com preço, clima, crédito e seguro. Um case da OCDE de 2022 registrava só 57 mil dois anos antes — gap sem reconciliação entre fonte "neutra" e fonte de vendas. Fonte primária designada (Google Cloud) não abriu pra verificação direta. [Google Cloud (case)](https://cloud.google.com/customers/agrodatai) · 7/15, teto por G1 (fonte não verificada)
+- `2026-09-21` **John Deere lança "JD", assistente de IA generativa no Operations Center.** Early access, responde perguntas sobre dados de talhão/máquina; expansão pra web/mobile/cabine ainda em 2026. Concorrente adjacente global — agricultura mecanizada de grande escala, não WhatsApp, não smallholder. [DTN Progressive Farmer](https://www.dtnpf.com/agriculture/web/ag/equipment/article/2026/09/01/john-deere-launches-jd-ai-assistant) · 6/15
+- `2026-09-21` **Pipeline de voz agnóstico a idioma reduz WER 16-23% em ASR agrícola (hindi/telugu/odia) sem retreinar o modelo base.** Realce de áudio + correção com léxico ponderado + quality gate — mesmo tipo de problema que `api/_lib/transcribe.ts` enfrentaria pra vocabulário técnico PT-BR, mas sem golden set de transcrição pra medir se ajudaria aqui. [arXiv](https://arxiv.org/abs/2609.20504) · 6/15
+- `2026-09-21` **Solinftec relançou "Alice" (IA multiagente) com alertas via WhatsApp — achado de abril, nunca triado.** Meta de R$500mi em 2026; foco em operações grandes (clima, manutenção, logística), não triagem conversacional smallholder. [Forbes Brasil](https://forbes.com.br/forbes-agro/2026/04/solinftec-lanca-ia-multiagente-na-agrishow-e-mira-r-500-milhoes-em-2026/) · 5/15
+- `2026-09-21` **Meta Business Agent começa a cobrar por token (US$2/milhão, ~4-5 centavos/conversa) desde 01/08.** Benchmark de custo pra qualquer bot de atendimento no WhatsApp, incluindo o piloto da Agro Amazônia já mapeado. [Enterprise DNA](https://enterprisedna.co/resources/news/meta-business-agent-billing-august-1-token-pricing-2026/) · 5/15
+- `2026-09-21` **Google lança Gemini 3.8 Flash com preço introdutório até dez/2026 ($0,75/$3,75 por milhão de tokens).** Dobra em jan/2027. O Stevi usa `gemini-2.5-flash` pinado pra transcrição — modelo novo não é o default hoje, mas é opção futura se o preço atual do 2.5 mudar. [eesel AI](https://www.eesel.ai/blog/gemini-3-8-flash) · 5/15
+- `2026-09-21` **Anthropic já captou US$130 bi rumo a possível IPO.** Contexto de risco de fornecedor — o LLM de raciocínio do Stevi (via OpenRouter e fallback direto) vem de uma empresa em transição pra capital aberto. Sem ação hoje. [The Motley Fool](https://www.fool.com/investing/2026/09/04/anthropic-has-already-raised-130-billion-ahead-of/) · 5/15
+- `2026-09-21` **OpenRouter lança roteamento de dados in-region (US/EU) — sem opção de Brasil, sem mudança de termos confirmada pós-Stripe.** Relevante como precedente de residência de dados (LGPD), mas nenhuma ação hoje. [OpenRouter](https://openrouter.ai/announcements) · 5/15
+- `2026-09-21` **Semana Internacional do Café 2026 (BH, 11-13/nov) — maior evento de café do Brasil.** Janela de campo futura, se a campanha recomeçar; fora de qualquer decisão imediata com o voo de 60 dias encerrado. [SIC](https://semanainternacionaldocafe.com.br/en/home/) · 4/15
 - `2026-09-07` **DigiFarmz relançou "Daz" — mas é feature dentro de SaaS B2B de soja/trigo, não concorrente direto.** A data original parecia 22/09/2026 (futura); confirmada no HTML: é notícia de **set/2025**, republicada. O Daz é a camada WhatsApp de uma plataforma paga (Cropper/Linkage) de uma agtech de Champaign-IL com operação BR/EUA/Paraguai, focada em manejo fitossanitário de soja/trigo em fazendas comerciais grandes — sem café, sem gratuidade, sem sobreposição de segmento com o beachhead. Valida que "alerta proativo por WhatsApp" é padrão de indústria, não ensina mecanismo novo. [Global Crop Protection](https://globalcropprotection.com/noticias/novas-tecnologias/digifarmz-apresenta-daz-assistente-virtual-que-leva-inteligencia-artificial-ao-dia-a-dia-do-produtor-rural/) · 7/15
 - `2026-09-07` **Agro Amazônia triplica conversas com o Meta Business Agent (via Zenvia) em uma semana.** Distribuidora de insumos (subsidiária Sumitomo) roda piloto do agente nativo da Meta no WhatsApp — de 420 para 1.400+ conversas/semana. É SDR de vendas, não conselho agronômico, mas mostra a velocidade com que fornecedores de insumo estão automatizando o mesmo canal — e que a Meta já oferece agente nativo, baixando a barreira para qualquer revenda/cooperativa montar o próprio bot. [RBTV](https://rbtv.com.br/noticia/7058/agroamazonia-triplica-conversas-com-agente-de-ia) · 5/15
 - `2026-09-07` **FAIRY: motor agentic orientado a evento para soja full-season, implantado numa fazenda real.** Orquestra maquinário/drone/sensor/clima sob paradigma "tudo é evento", avaliado com 9 controladores sobre 100 safras simuladas (SIGSPATIAL 2026). Não fala de timing de notificação a humano (não duplica o item já aberto sobre horário de alerta) e exige hardware que o Stevi não tem e não vai ter neste voo. [arXiv](https://arxiv.org/abs/2609.00106) · 6/15
