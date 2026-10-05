@@ -5,6 +5,114 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 05/out — dia 84 de 60 (24 dias após o fechamento)
+
+*Nota de processo, à frente de tudo: esta é a QUARTA leitura desde o
+FECHAMENTO (11/set, veredito MATAR/PIVOTAR qualitativo). As duas leituras
+anteriores (14/set e 28/set) já recomendaram reduzir a cadência desta rotina
+para mensal ou por evento — recomendação feita duas vezes e não executada.
+Nesta rodada eu fui ver por que, achei a causa técnica e ajo sobre ela
+abaixo (seção "Mudou no repo"). Query fresca rodada mesmo assim, por regra
+da casa — nunca herdar número.*
+
+**Tripwire:** **não disparado** — 0 commits (7 dias, confirmado:
+`git log --since="7 days ago"` e também zero desde o próprio commit do memo
+de 28/set) × **0 conversas de produtor externo real**. A query bruta de
+"ativos 7d" devolve 1, mas decompondo por identidade: a única mensagem
+inbound da janela são **84 mensagens do próprio Stefano** (usuário interno,
+28-30/set), não um produtor. Externo real = 0. Quarta semana seguida de
+zero-contra-zero: não é sinal de saúde, é confirmação de pausa total dos
+dois lados (campo e código).
+
+**Calendário:** dia **84 de 60** · **24 dias** depois de 11/set (janela
+encerrada) · gate S4 (~10/ago) passou há **56 dias**. Nenhuma métrica nova
+para medir — o que resta é decisão dos founders sobre o veredito já
+entregue há 24 dias.
+
+**Tração (total / externos reais):** `users` total **30** (inalterado).
+Produtor externo real: **1** (Gaia Tech, vouchado pelo Michel) — segue com
+exatamente 1 inbound + 1 outbound, ambos de 17/jul, **0 mensagens novas em
+80 dias** (confirmado via `messages`, linha a linha). Ativos 7d (bruto): 1
+— é o próprio Stefano testando algo (84 msgs, 28-30/set), não produtor.
+Caderno de aplicações: **0** (vida toda). `farmer_alerts`: **2** (contagem
+idêntica às 3 últimas leituras; já confirmado antes como `kind='teste'`,
+14/08). `triage_events`: **0**. `ndvi_readings`: **2** (não decomposto).
+`dispatch_pauses`: **0** (número tecnicamente saudável, nunca pausado por
+qualidade). Farms com pin: **4** (mesmo valor desde 25/jul; a mais recente,
+03/09, é uma fazenda de teste do próprio Stefano — 0 fazendas reais de
+produtor com pin). Prospecção: 367 linhas na base (136 discovered / 113
+ready / 64 stale / 46 discarded / 8 replied) — a base de candidatos cresceu
+desde o baseline de 25/jul (192), mas **0 envios desde 07/ago (59 dias)**:
+descoberta/enriquecimento seguem rodando em segundo plano enquanto o
+disparo está parado — inventário se acumulando sem ser usado. Golden set:
+**38/38 casos ainda com `verified_by` nulo** (`knowledge/goldenset/goldenset.jsonl`,
+confirmado agora).
+
+**Lead quente:** nenhum. `prospects.status='replied'` segue em **8** —
+mesmas 8 linhas de sempre, todas empresa (revenda/consultoria/software),
+nenhuma produtor, nenhuma parceiro pagante. Uma delas (`"Contato por voz
++55 11 9****-**21"`, registro de teste de 08/ago sobre o experimento de
+agente de voz) teve o `updated_at` tocado em 30/set — bati na mesma janela
+da atividade do Stefano acima; é toque de teste, não resposta nova. O único
+contato externo real (Gaia Tech) segue sem resposta há 80 dias.
+
+**Mudou no repo:** nada — 0 commits desde 28/set (o repositório está
+literalmente parado há uma semana inteira, e sem nenhum commit de produto
+desde antes do fechamento). Duas coisas novas que achei fora do git:
+1. **Tentei executar a própria recomendação de 14/set e 28/set** (reduzir
+   a cadência desta rotina) — achei a Routine que dispara este memo toda
+   segunda (`trig_01JFWNd7xgBCeJ2sydbZeiss`, cron `0 12 * * 1`) e tentei
+   mudar para mensal. **Bloqueado**: ela foi criada via API/painel
+   (`http_api`), não por um agente — só quem a criou pode editá-la. Link
+   direto para o Stefano resolver em 1 clique:
+   `https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`.
+2. **Achei que a alternativa "por evento" já existe, parcialmente, em
+   produção**: há uma segunda Routine, diária e silenciosa desde 03/ago
+   (`trig_01MFdc59WKNa5xo9p17AxTfW`), que checa se o Michel/Gaia Tech
+   respondeu e dispara notificação IMEDIATA só se houver mensagem nova —
+   sem gerar memo, sem ruído, se não houver novidade. Ou seja: o canal de
+   detecção de evento que os dois memos anteriores pediram **já está
+   rodando** para o sinal mais importante que existe hoje. Isso reforça
+   ainda mais a prioridade 1 abaixo.
+3. Reconfirmado: `FOUNDER_NOTIFY_TO`/`WHATSAPP_TEMPLATE_ALERT` na Vercel
+   seguem **não medidas** — tentei de novo via Vercel MCP
+   (`filter_project_envs`) e recebi `403 Forbidden` de novo, mesmo erro do
+   memo de 28/set. Confirma que não é falta de ferramenta, é permissão —
+   só resolve quem tem acesso ao painel.
+
+**Decisões abertas** (dias parados a partir de hoje, 05/out):
+- **Reduzir a cadência desta rotina (mensal ou por evento)** — pedida em
+  14/set e 28/set, **ainda não executada**, e agora com causa técnica
+  identificada e link de 1 clique acima. Esta é a única peça nova da lista
+  — todas as outras são as mesmas de sempre, só mais velhas.
+- **Follow-up humano com Gaia Tech** — aberta desde 17/jul, **80 dias
+  parada**. A mais velha da casa.
+- **CNPJ** — aberta desde 25/jul, **72 dias parada**.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **72 dias parada**. `verified_by` = 0/38, reconfirmado.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **72 dias parada**, reconfirmado hoje sem permissão
+  de leitura neste papel.
+
+**As 3 prioridades da semana:**
+1. **Editar a Routine semanal para mensal (ou desligá-la) — 1 clique, link
+   acima.** É a única ação nova desta rodada e a mais barata de todas: a
+   detecção de evento real (resposta do Gaia Tech) já roda sozinha e avisa
+   na hora; o memo semanal cheio virou trabalho repetido sem informação
+   nova pela quarta vez seguida.
+2. **Gaia Tech/Michel — 80 dias parada, decisão em voz alta.** Ligar/visitar
+   ou declarar a parceria encerrada. Mesma peça há 4 memos.
+3. **CNPJ e assinatura do golden set — 72 dias cada, zero dependência de
+   código.** Duas assinaturas que não precisam de nenhuma engenharia.
+
+**O que NÃO fazer:** nenhuma linha de código, nenhuma iteração de landing,
+nenhum disparo de prospecção, e nenhum memo semanal a mais no ritmo atual
+até a cadência ser formalmente reduzida — o próprio ato de escrever este
+memo pela quarta vez sem dado novo é o tipo de ruído que o tripwire existe
+para travar.
+
+---
+
 ## Semana de 28/set — dia 78 de 60 (17 dias após o fechamento)
 
 *Nota de processo: terceira leitura desde o FECHAMENTO (11/set, dia 60,
