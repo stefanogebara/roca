@@ -38,6 +38,19 @@
 > excesso não é nem feature, é design. A pergunta da Fecon (aberta 24/08) fechou sozinha —
 > a feira aconteceu 1–3/09 e gerou zero cadastros via `#fecon`/`#fecon-cartaz` — e foi
 > movida pro Arquivo como resultado, não como decisão.
+>
+> **Quinta passada (2026-10-05) — o voo fechou, e o `/intel` não rodava há 28 dias.**
+> Nesse intervalo o voo de 60 dias **terminou** (11/09, veredito qualitativo MATAR/PIVOTAR,
+> `.claude/plans/memos-scorecard/README.md`) e três memos pós-fechamento confirmaram zero
+> movimento desde então — zero commit de produto, zero conversa de produtor, 24 dias de
+> silêncio total (ver `STATE.md`). Feed do resumo matinal veio vazio de novo para este
+> projeto (mesmo JSON de 22/08, nunca atualizado para `roca` desde então); cinco scouts,
+> ~50 candidatos brutos depois de filtrar duplicatas óbvias, sete lidos a fundo por um
+> analista cada. **Todos os quatro itens que estavam em "Em aberto" envelheceram além dos
+> 21 dias sem decisão do Stefano** (o mais novo tinha 28 dias) e foram movidos pro Arquivo
+> nesta rodada — um deles (preço do WhatsApp em outubro) como resultado confirmado, não
+> como esquecimento. Isso não é falha do dedup: é o reflexo direto do projeto ter ficado
+> um mês sem ninguém olhar para o próprio `/intel`, não só sem produtor conversando.
 
 ## Em aberto — precisa de decisão do Stefano
 
