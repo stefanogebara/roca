@@ -51,6 +51,25 @@
 > nesta rodada — um deles (preço do WhatsApp em outubro) como resultado confirmado, não
 > como esquecimento. Isso não é falha do dedup: é o reflexo direto do projeto ter ficado
 > um mês sem ninguém olhar para o próprio `/intel`, não só sem produtor conversando.
+>
+> **Sexta passada (2026-10-12) — o achado da semana é o próprio pipeline, não o mercado.**
+> Esta rodada descobriu, via GitHub (não só `git log`), que as quatro passadas anteriores
+> (14/09, 21/09, 28/09, 05/10) abriram PR e **nenhuma foi revisada ou mesclada** — master
+> ficou congelado em `docs/intel/` desde 07/09 enquanto quatro rodadas inteiras se
+> acumulavam sem dono, cada uma cega às outras porque todas partiram do mesmo master
+> parado. Ver `STATE.md` pra tabela completa (7 PRs abertas, a mais velha com 64 dias,
+> zero revisão de conteúdo humana em qualquer uma). Esta branch parte da mais recente
+> (`intel/2026-10-05`) em vez de `master`, então mesclá-la resolve quatro PRs de uma vez —
+> proposta no corpo da PR. No mercado: feed vazio de novo (mesmo JSON de 22/08); cinco
+> scouts, ~41 candidatos brutos depois de dedup contra o `seen.jsonl` acumulado (120 linhas
+> herdadas + o desta rodada), cinco lidos a fundo por um analista cada, o resto
+> autopontuado pela calibração do rubric.md. **Zero PROTOTIPAR, zero IMPLEMENTAR — oitava
+> rodada seguida sem spike.** Dois DISCUTIR novos: um paper de triagem auditável por
+> WhatsApp (Noora Health, 11/15, capado pela `verdict_note`) e uma correção à leitura de
+> 05/10 sobre o preço do WhatsApp (a fonte oficial da Meta nega a franquia que os BSPs
+> anunciavam, e a pergunta real não é mais preço — é se vale desligar o monitoramento de
+> billing enquanto o voo estiver parado). Os quatro itens abertos em 05/10 continuam de pé
+> (7 dias, não bateram os 21 da regra de envelhecimento).
 
 ## Em aberto — precisa de decisão do Stefano
 
@@ -169,22 +188,85 @@ conversa, contra o tripwire?
 
 ---
 
+### [DISCUTIR 11/15] Um paper mostra que regras determinísticas (não LLM) elevam recall de triagem por WhatsApp — a Stevi está do lado errado desse resultado?
+**Data:** 2026-10-12 · **Eixos:** P2 A2 D3 E2 L2
+**Fonte primária:** [arXiv 2609.09356](https://arxiv.org/abs/2609.09356)
+
+**O que é:** o serviço de WhatsApp da Noora Health (India, >50 mil consultas/mês) trocou um
+LLM opaco ponta-a-ponta por um pipeline de duas etapas — um LLM extrai sintomas num
+vocabulário clínico, e um motor de regras determinístico (derivado de uma árvore de decisão
+antes só implícita) decide o status de emergência, auditável e corrigível regra a regra. Em
+produção, com 152.421 consultas triadas: recall subiu de 0,565 para 0,810, F1 de 0,606 para
+0,702, over-escalation de 17,8% sem aumento de emergência perdida.
+
+**Por que toca este projeto:** `api/_lib/compliance.ts` é um motor de regras determinístico
+— mas só bloqueia a FORMA de uma prescrição no texto de saída (regex sobre dose+produto). A
+decisão real de severidade/encaminhamento em `api/_lib/reason.ts` é outra chamada de LLM em
+texto livre, sem árvore de decisão documentada nem regra separada — mais perto do padrão
+"LLM opaco" que o paper abandonou do que do que ele recomenda. Isso ataca direto um
+`known_gap` já escrito no config: os 37 casos do goldenset têm `verified_by` nulo, nenhum
+revisado por agrônomo — hoje a Stevi nem tem a métrica de recall que a Noora media antes de
+trocar de arquitetura.
+
+**Por que a trava aperta aqui:** score bruto 11 bateria PROTOTIPAR, mas a `verdict_note`
+exige que o item ajude a CONVERSAR COM PRODUTOR ou DISPARAR ALERTA — isto é qualidade/
+auditabilidade de triagem, capacidade pura, não as duas métricas que o scorecard mede.
+"Ajuda a conversar com segurança" seria leitura generosa demais do texto exato da nota.
+Soma-se o tripwire: o voo fechou por falta de tração (n=1), não por erro de triagem
+documentado em produção — nada indica que ESTE seja o gargalo que travou o voo.
+
+**A pergunta:** o goldenset de pragas nunca foi revisado por agrônomo, e a decisão de
+severidade hoje é 100% texto livre de LLM — isso é risco de qualidade que justifica um
+spike pós-voo pra transformar o goldenset numa árvore de decisão auditável com um agrônomo
+(reabrindo o acordo parado com o Michel, 79 dias), ou é polimento de capacidade que não deve
+competir por tempo com a busca por tração real?
+
+---
+
+### [DISCUTIR 9/15] A fonte oficial da Meta nega a franquia que os BSPs anunciavam — e a pergunta real não é mais preço, é se vale desligar o monitoramento de billing
+**Data:** 2026-10-12 · **Eixos:** P3 A0 D2 E3 L1
+**Fonte primária:** [Meta for Developers — non-template messages](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages)
+
+**Correção ao item arquivado em 05/10** ("A partir de 01/10 não sobra caminho gratuito"):
+aquela leitura citou só BSPs (AiSensy, Nexe) pra franquia de 1.000 mensagens grátis/mês/
+número e tarifa de R$0,0350/mensagem. Reabrindo a fonte oficial da Meta agora: ela diz
+verbatim **"Volume tiers: None. Meta does not offer volume tiers for service messages"** —
+contradizendo a franquia que os BSPs anunciavam. A tarifa BR exata continua sem aparecer em
+texto corrido em nenhuma página oficial (só CSV/PDF não abertos nesta leitura) — os números
+de R$0,0350/R$0,3217 do Arquivo seguem sendo estimativa de fornecedor, não confirmação da
+Meta. Fato novo: desde 01/07/2026 contas BR elegíveis podem faturar em BRL, com migração
+obrigatória até **30/06/2027** (corte de entrega pra quem não migrar a partir de 01/07/2027).
+
+**Por que toca este projeto:** `api/_lib/alerts.ts` (`alertSendPlan`) e `api/_lib/pipeline.ts`
+(`adapter.send`) — mesmo mecanismo já mapeado. O custo recalculado continua irrelevante
+(~R$0,75–0,90/produtor/mês no caminho conversacional; alertas caem em `template`, que já era
+pago, delta zero). O que mudou não é o preço — é que a pergunta original ("a conta de
+billing está fundeada?") ficou estruturalmente indetectável: desde 07/ago nenhum template
+sai (`PROSPECT_DAILY_CAP=0`) e há 87 dias nenhum produtor conversa, então uma falha de
+billing hoje não apareceria em métrica nenhuma.
+
+**A pergunta:** dado que o voo fechou (MATAR/PIVOTAR, 31 dias) e a própria rotina de memo
+semanal pede há 4 semanas pra reduzir cadência sem resposta — vale desligar formalmente o
+cron de alertas e declarar o canal pausado (fechando este risco de monitoramento de vez), ou
+o voo ainda pode reativar e por isso vale manter a vigilância semanal de um risco de custo
+que, mesmo reativado, é irrelevante?
+
+---
+
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Quarta rodada seguida (24/08,
-31/08, 07/09, 05/10) e sétimo veredito sem spike na campanha._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Oitava rodada seguida (24/08,
+31/08, 07/09, 05/10, 12/10) e oitavo veredito sem spike na campanha._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
-produtor** ou a **disparar alerta**. Nesta rodada (05/10) isso importa mais do que nunca: o
-voo de 60 dias **fechou em 11/09 com veredito MATAR/PIVOTAR**, e os três memos pós-fechamento
-pedem explicitamente zero linhas de código até os founders decidirem se a campanha recomeça.
-Dos quatro DISCUTIR desta rodada, o de maior score bruto (Sonnet 5.5, 11/15) bateria
-PROTOTIPAR pelo número — mas é pura troca de capacidade/custo num projeto em moratória
-explícita de engenharia, então a trava nem precisa do score pra justificar o teto. Os outros
-três (VLM rubric verifier 9/15, pipeline de 3 estágios 8/15, restrição de acesso Gemini 2.5
-8/15) são a mesma história: capacidade ou risco de plataforma, nenhum ajuda a conversar ou
-alertar via código. O projeto não precisa de mais fila de trabalho — precisa da decisão dos
-founders sobre recomeçar ou encerrar, que já está formulada no fechamento do voo.
+produtor** ou a **disparar alerta**. Nesta rodada (12/10) isso continua valendo: o voo
+fechou MATAR/PIVOTAR há 31 dias, e a decisão de recomeçar ou encerrar ainda não foi tomada.
+Dos seis itens hoje em "Em aberto", o de maior score bruto (Noora Health, 11/15) bateria
+PROTOTIPAR pelo número — mas é qualidade de triagem (capacidade), não as duas métricas que
+o scorecard mede, então a trava segura mesmo com score alto. Os outros cinco são a mesma
+história: capacidade, risco de plataforma ou decisão de agenda do fundador (SIC 2026),
+nenhum ajuda a conversar ou alertar via código. O projeto não precisa de mais fila de
+trabalho — precisa da decisão dos founders sobre recomeçar ou encerrar.
 
 **Adendo de 01/09:** os quatro itens de 31/08 foram decididos pelo Stefano no mesmo dia e
 viraram código — três PRs mesclados (#13, #14, #15). Estão no Arquivo, cada um com o que
@@ -196,6 +278,10 @@ por que o código existe.
 
 ## Radar
 
+- `2026-10-12` **Semana Internacional do Café 2026 (11-13/nov, Expominas BH) é feira institucional de ~27 mil visitantes — diferente de porte da Fecon/Cocatrel.** "300 anos do café no Brasil", sessões técnicas sobre digitalização/IA, estimativa Faemg Senar de safra mineira recorde (33,4 milhões de sacas de arábica). O "Projeto Comprador SIC 2026" da CNA é rodada de negócios pra exportação (inscrição fechou 11/10), não porta de entrada geral — `api/_lib/growth.ts` já suporta token de vouch de feira genérico sem deploy (desde `64152d6`), mas decisão de ir é agenda de fundador, não spike de engenharia, e o voo está em moratória explícita desde o fechamento. [CNA](https://cnabrasil.org.br/eventos/projeto-comprador-sic-2026) · [Forbes](https://forbes.com.br/forbes-agro/2026/10/sic-2026-leva-clima-tecnologia-e-mercado-ao-debate-dos-300-anos-do-cafe-no-brasil/) · 5/15
+- `2026-10-12` **Paper mostra que ganhos de fusão foto+sensor ambiental em datasets de doença são artefato de vazamento de sessão — mas a Stevi não faz essa fusão hoje.** 91,9% das imagens de teste de um benchmark coreano têm réplica exata de leitura de sensor no treino; um classificador por timestamp, sem olhar a foto, empata modelos de fusão state-of-the-art. Verificado em `api/_lib/reason.ts`: `identifyFromPhoto` não recebe clima/solo, e `deps.context` nunca é populado em produção nem no simulador — o problema que o paper ataca simplesmente não existe no repo. Fica como princípio de design a guardar se algum dia alguém tentar enriquecer o diagnóstico por foto com Open-Meteo/SoilGrids na mesma chamada. [arXiv](https://arxiv.org/abs/2610.06369) · 6/15
+- `2026-10-12` **Tool-calling perde de vector RAG numa base comunitária pequena com digitação irregular — reforça a escolha arquitetural já feita pela Stevi, não muda nada.** Base agrícola grega (198 perguntas, nove estilos de digitação): vector RAG acerta 95,3% vs. 71,6% do agente com ferramentas, cujas falhas vêm de busca literal que não tolera variação ortográfica. A Stevi já busca por chave normalizada (`extractPestTarget` + `lookupPest`), não por ferramenta de busca literal nem por embeddings — o achado é consistente com a decisão já `settled` de 24/08 contra RAG denso em fala coloquial, não a contradiz. [arXiv](https://arxiv.org/abs/2610.08205) · 7/15
+- `2026-10-12` **Finches (Alemanha, pre-seed €2M) capta pra IA de alerta antecipado em compras agrícolas — mesmo padrão "clima+IA+alerta proativo" da Stevi, mas B2B2B pra comprador, não pro produtor.** Startup alemã cruza dados de campo/compras/clima pra avisar empresas de alimentos sobre risco em cadeia de suprimento. Valida o padrão de mercado (proatividade por IA vale dinheiro), categoria de cliente totalmente diferente — sem overlap de produto. [EU-Startups](https://www.eu-startups.com/2026/10/bavarias-female-founded-startup-finches-raises-e2-million-to-bring-ai-early-warnings-to-agricultural-procurement/) · 5/15
 - `2026-10-05` **ADAMA Alvo (100 mil+ downloads, cobre café) reforça a mesma leitura do Café 360: app nativo estabelecido, tração modesta.** App de identificação de praga/doença existente desde 2014-15, remodernizado com apoio de IA generativa, cobre soja/milho/algodão/cana/café. Mais um data point de campo a favor de `bets[0]` (apps de agro não vencem o canal) — concorrente de longa data, não ameaça nova. [Agrolink/App Store](https://apps.apple.com/br/app/adama-alvo/id904718051) · 7/15
 - `2026-10-05` **Pesquisa ABMRA (9ª edição, 3.100 produtores, 16 estados): 98% têm internet, 96% usam WhatsApp pra decisão de negócio.** Confirma a tese de canal já `settled`, mas não testa a parte contestável (que o produtor rejeita apps) — é retrato nacional agregado, sem recorte café/MG, publicado por associação de marketing com interesse na narrativa. Munição de radar pra quando/se o posicionamento for reaberto. [RuralZap/ABMRA](https://www.ruralzap.com.br/blog/conectividade-campo-whatsapp-decisoes-negocios) · 8/15, rebaixado de DISCUTIR pelo próprio analista (evidência autodeclarada, sem ação pendente)
 - `2026-10-05` **Dois papers de set/2026 formalizam quando agentes devem agir proativamente — mas resolvem um problema que o loop do Stevi não tem.** Framework 3T/Proactivity-Gym (confiança cai 1,86pt após intervenção desalinhada, n=30) e POMDP com autorização/risco; o loop determinístico do Stevi (`api/_lib/alerts.ts`) já decide por limiar simples (geada, fogo, vazio), e o gargalo documentado é zero produtor-alvo, não a lógica de quando alertar. [arXiv 2609.37267](https://arxiv.org/abs/2609.37267) · [arXiv 2609.03727](https://arxiv.org/abs/2609.03727) · 7/15
