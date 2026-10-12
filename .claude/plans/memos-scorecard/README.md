@@ -5,6 +5,131 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 12/out — dia 91 de 60 (31 dias após o fechamento)
+
+*Nota de processo, à frente de tudo: quinta leitura desde o FECHAMENTO
+(11/set, veredito MATAR/PIVOTAR qualitativo) e quarta semana consecutiva
+pedindo a mesma coisa sem resposta: reduzir a cadência desta rotina para
+mensal ou por evento (pedido em 14/set, 28/set, 05/out — tentativa técnica
+de executar em 05/out ficou **bloqueada** porque a Routine foi criada via
+painel/API, não por um agente, e só quem a criou pode editá-la). Hoje é a
+quinta vez. Query fresca rodada mesmo assim, por regra da casa — nunca
+herdar número de resumo ou de memo anterior.*
+
+**Tripwire — não disparado, mas com uma nuance que registro em vez de
+esconder.** `git log --since="7 days ago" --oneline` devolve **1** commit —
+não zero. Abri esse commit: é `2f9d1c4`, exatamente o commit do **próprio
+memo de 05/out**, datado de 05/out 12:18 UTC, que caiu dentro da janela de
+7 dias contada a partir de agora (12/out ~12:12 UTC) por 6 minutos de
+margem. Não houve nenhum commit NOVO desde então — confirmado com
+`git log --since="2026-09-11"`: os 4 commits inteiros desde o fechamento
+(11/set) são os 4 memos semanais desta própria rotina (FECHAMENTO, 14/set,
+28/set, 05/out), zero linha de produto ou engenharia. Lendo o tripwire pelo
+espírito da regra (commits de ENGENHARIA competindo com campo, não o
+registro do próprio instrumento de medição) — mesma convenção usada em
+14/set, 28/set e 05/out — o veredito é: **engenharia real = 0 × conversas
+de produtor externo real = 0 → tripwire não disparado.** Lido ao pé da
+letra sem esse ajuste, seria 1×0 = disparado; registro os dois números
+para quem quiser aplicar a regra sem a interpretação.
+
+**Calendário:** dia **91 de 60** · **31 dias** depois de 11/set (janela
+encerrada) · gate S4 (~10/ago) passou há **63 dias**. Não há voo em curso —
+o que resta é decisão dos founders sobre o veredito já entregue há 31 dias,
+e esta rotina semanal segue medindo um sistema que não recebeu uma
+mensagem de ninguém (nem produtor, nem teste) na última semana inteira.
+
+**Tração (total / externos reais):** `users` total **30** (inalterado desde
+25/jul). Produtor externo real: **1** (Gaia Tech, vouchado pelo Michel,
+`kind='produtor'`) — confirmado linha a linha (`messages` filtrado por
+`user_id`): exatamente 2 mensagens na vida inteira do contato, 1 inbound +
+1 outbound automático, ambas de 17/jul às 21h07. **0 mensagens novas em 87
+dias.** Ativos 7d: **0** — e aqui uma diferença real vs a semana passada:
+`select count(*) from messages where created_at > now() - interval '7
+days'` devolve **0 no total**, não só para produtor. Nem o próprio Stefano
+testando (que gerou 84 mensagens na janela do memo anterior) mandou nada
+esta semana — é a primeira leitura da história desta rotina com silêncio
+absoluto dos dois lados ao mesmo tempo (nenhum produtor, nenhum teste,
+nenhum commit de engenharia). Caderno de aplicações: **0** (vida toda).
+`farmer_alerts`: **2** (reconfirmado `kind='teste'`, 14/08, inalterado).
+`triage_events`: **0**. `ndvi_readings`: **2** (não decomposto por
+identidade). `dispatch_pauses`: **0**. Farms com pin: **4**, reconfirmado
+por identidade via join com `users` — 2 de "Simulador Roca" (teste), 1 de
+"Stefano Gebara" (`kind='empresa'`, farm de 08/jul) e 1 de "Stefano Gebara"
+(`kind='teste'`, farm de 03/09). **0 fazendas de produtor real com pin** —
+Gaia Tech nunca cadastrou pin. Decomposição completa dos 30 `users` por
+identidade (join `users`×`messages`): 6 "Simulador Roca" (teste, jul) + 2
+"Stefano Gebara" (founder, teste) + 1 "Vitória" (teste) + 1 "WhatsApp
+Business" (número de sistema) + **1 Gaia Tech (produtor real)** + **19
+"empresa"** (revendas/consultorias/software que responderam a templates de
+prospecção B2B entre 28/jul-06/ago — não são produtores, são o lado B2B do
+funil de prospecção aparecendo como `users` porque abriram conversa).
+Prospecção: **367** linhas (136 discovered / 113 ready / 64 stale / 46
+discarded / 8 replied) — idêntico ao baseline de 05/out; confirmado **0
+envios desde 07/ago** (66 dias) via funil por template — descoberta roda em
+segundo plano, disparo continua parado. Golden set: **38/38 casos com
+`verified_by` nulo**, reconfirmado agora lendo o arquivo
+`knowledge/goldenset/goldenset.jsonl` linha a linha (0 verificados).
+Referrals (`referral_requests`): **5**, reconfirmado por identidade via
+join — 1 "Simulador Roca" + 4 "Stefano Gebara", **0 vinculadas a parceiro**
+(`partner_notified_at` nulo nas 5) — as mesmas 5 de teste interno
+identificadas em 25/jul, sem nenhuma referral real em 91 dias.
+
+**Lead quente:** nenhum. `prospects.status='replied'` segue em **8** — as
+mesmas 8 linhas de sempre (revenda ×4, consultoria ×3, software ×1),
+nenhuma produtor, nenhuma virou parceiro pagante. Reconfirmei os campos de
+qualificação: a mais recente (`updated_at` 30/set) é a mesma linha já
+identificada no memo anterior como toque de teste do experimento de voz
+(08/ago), não resposta nova. O único contato externo real (Gaia Tech)
+segue sem resposta há 87 dias.
+
+**Mudou no repo:** nada de engenharia — 0 commits novos desde 05/out
+(confirmado: o único commit na janela de 7 dias é o próprio memo anterior,
+ver Tripwire acima). Tentei de novo o envs da Vercel
+(`mcp__Vercel__filter_project_envs` em `prj_8eTpJguJws6Eq2E0PAG3q9Xe0Gak`,
+projeto `roca`): **403 Forbidden** de novo, mesmo erro das duas últimas
+leituras — confirma que é permissão, não ferramenta. Não tentei de novo
+editar a Routine de cadência (`trig_01JFWNd7xgBCeJ2sydbZeiss`): já está
+documentado como bloqueado por ter sido criada via painel/API, e repetir a
+mesma chamada sem motivo novo não muda o resultado.
+
+**Decisões abertas** (dias parados a partir de hoje, 12/out):
+- **Reduzir a cadência desta rotina (mensal ou por evento)** — pedida em
+  14/set, 28/set e 05/out (**28 dias** desde o primeiro pedido), tentativa
+  de executar tecnicamente em 05/out ficou bloqueada (link de 1 clique:
+  `https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`). Esta é
+  a quarta vez que o memo sai sem dado novo desde o fechamento.
+- **Follow-up humano com Gaia Tech** — aberta desde 17/jul, **87 dias
+  parada**. A mais velha da casa.
+- **CNPJ** — aberta desde 25/jul, **79 dias parada**.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **79 dias parada**. `verified_by` = 0/38, reconfirmado
+  linha a linha agora.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **79 dias parada**, reconfirmado hoje: 403 Forbidden
+  via Vercel MCP, sem permissão de leitura neste papel.
+
+**As 3 prioridades da semana:**
+1. **Decidir a cadência desta rotina — é a única coisa nova e a mais barata
+   de resolver.** A Routine semanal foi criada fora do alcance de um agente
+   para editar; só o Stefano consegue, em 1 clique, no link acima. Rodar
+   esta rotina pela quinta vez sem dado novo é o próprio tipo de ruído que
+   o tripwire existe para travar — a diferença desta semana é que nem
+   houve tráfego de teste, só o commit do memo anterior entrando na janela.
+2. **Gaia Tech/Michel — 87 dias parada, decisão em voz alta.** Ligar/visitar
+   ou declarar a parceria encerrada. Mesma peça há 5 memos consecutivos;
+   silêncio não é decisão.
+3. **CNPJ e assinatura do golden set — 79 dias cada, zero dependência de
+   código.** Duas assinaturas puramente humanas, sem nenhuma linha de
+   engenharia no caminho.
+
+**O que NÃO fazer:** nenhuma linha de código, nenhuma iteração de produto,
+nenhum disparo de prospecção, e nenhum memo semanal cheio a mais neste
+ritmo — a prioridade 1 de hoje é justamente parar de gerar este documento
+toda semana sobre um sistema que não mudou. Se a cadência não for reduzida
+até a próxima leitura, direi isso de novo, mais forte.
+
+---
+
 ## Semana de 05/out — dia 84 de 60 (24 dias após o fechamento)
 
 *Nota de processo, à frente de tudo: esta é a QUARTA leitura desde o
