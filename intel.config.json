@@ -44,7 +44,8 @@
     "a Stevi nunca se apresenta como robô por rótulo; honestidade é reativa (593b041, ed832c7, 66c7db3 — ago/2026)",
     "aceite não é entrega — o wamid é gravado e o callback da Meta carimba a entrega (migration 20260803192238)",
     "produção é master + Vercel; o banco de produção é somente leitura para agentes (.claude/agents/stevi-guardiao.md)",
-    "produtor que escaneia o QR em FEIRA conta como vouchado na coorte do gate (Stefano, 01/09) — a feira tem a voz de quem voucha, ao contrário de cartão/armazém. Cartaz escaneado SEM conversa segue população separada, e a separação vive no token: #fecon x #fecon-cartaz. O memo do dia 60 declara a decisão, a data e as duas colunas"
+    "produtor que escaneia o QR em FEIRA conta como vouchado na coorte do gate (Stefano, 01/09) — a feira tem a voz de quem voucha, ao contrário de cartão/armazém. Cartaz escaneado SEM conversa segue população separada, e a separação vive no token: #fecon x #fecon-cartaz. O memo do dia 60 declara a decisão, a data e as duas colunas",
+    "o voo de 60 dias (13/jul-11/set/2026) fechou em 11/09 com veredito qualitativo MATAR/PIVOTAR — N insuficiente pelo piso literal do scorecard (coorte D7 nunca saiu de n=1), mas todos os critérios booleanos (PIX de parceiro, parceiro pagando, indicação espontânea) ficaram em zero absoluto nos 60 dias (.claude/plans/memos-scorecard/README.md, commit a01212c). Três memos de acompanhamento desde então (14/09, 28/09, 05/10) confirmam zero mudança: zero commit de produto, zero conversa de produtor"
   ],
   "deprecated": [
     "bump D+3 na prospecção — desligado após 23 envios com zero humanos respondendo (b8b05fa, 2026-08-05)",
