@@ -38,8 +38,125 @@
 > excesso não é nem feature, é design. A pergunta da Fecon (aberta 24/08) fechou sozinha —
 > a feira aconteceu 1–3/09 e gerou zero cadastros via `#fecon`/`#fecon-cartaz` — e foi
 > movida pro Arquivo como resultado, não como decisão.
+>
+> **Quinta passada (2026-09-14) — o voo já fechou.** O feed veio vazio de novo
+> (mesmo JSON de 22/08). Cinco scouts, ~44 candidatos brutos; passada barata de
+> G4 descartou 15 sem análise completa (duplicatas de raise de infra de
+> inferência, changelogs genéricos da Vercel, notícias de safra sem mecanismo);
+> 21 candidatos foram a um `intel-analyst` cada. **Zero PROTOTIPAR, zero
+> IMPLEMENTAR — sétima rodada seguida sem spike.** Quatro DISCUTIR novos
+> (Plantix, Farmerline/Darli AI, Nestlé Cocoa Plan/Theo, Tucano 2 Cool) e uma
+> atualização a um DISCUTIR já aberto (cobrança de service messages no
+> WhatsApp, score sobe de 10 para 12 com a doc oficial da Meta confirmando o
+> Brasil na lista de 01/10). O achado que muda a leitura da rodada inteira não
+> veio da busca: **o voo de 60 dias do flight-plan encerrou em 11/09/2026**
+> (`.claude/plans/memos-scorecard/README.md`, memo de FECHAMENTO) com veredito
+> qualitativo de MATAR/PIVOTAR — N insuficiente pelo piso literal do
+> scorecard, mas todos os critérios booleanos (parceiros pagando, indicação
+> espontânea) ficaram em zero absoluto nos 60 dias. A recomendação do memo é
+> explícita: nenhuma linha de código nova até os founders decidirem entre
+> recomeçar do zero ou encerrar. Isso girou a `verdict_note` de "trava contra
+> capacidade nova" para "reforço de uma pausa total já decidida" — três dos
+> quatro itens DISCUTIR desta rodada (Farmerline, Nestlé, Tucano) são
+> comparáveis estratégicos que servem exatamente à decisão que os founders têm
+> pela frente, não pedidos de mais engenharia. Ver `docs/intel/STATE.md` para
+> a leitura completa do fechamento e do tripwire desta semana (5 commits × 0
+> conversas — mas por resíduo administrativo, não por excesso de construção).
 
 ## Em aberto — precisa de decisão do Stefano
+
+### [DISCUTIR 11/15] Farmerline levou 10+ anos e capital institucional para escalar o mesmo desenho — isso muda o recomeço?
+**Data:** 2026-09-14 · **Eixos:** P3 A1 D3 E1 L3
+**Fonte:** [Farmerline "Darli AI" — TIME Best Inventions 2024](https://time.com/collections/best-inventions-2024/7094874/farmerline-darli-ai/)
+
+**O que é:** o comparável global mais próximo do mecanismo e da tese da Stevi que existe:
+WhatsApp + voz, tradução para 27 idiomas locais, diagnóstico multimodal, fertilizante e
+rotação de cultura — para pequenos agricultores de Gana. Monetização B2B2C institucional
+(governos, ONGs, agroindústria pagam pela plataforma Mergdata; o produtor não paga), o
+mesmo desenho que a Stevi fechou como tese em 27/jul. Números citados por imprensa e
+agregadores (não fonte primária auditável): TIME reporta 110 mil agricultores em 2024;
+buscas subsequentes sugerem ~1 milhão hoje, plataforma-mãe cobrindo 2,2-3 milhões em 50-60
+países, receita anual de ~US$300 mil.
+
+**Por que toca este projeto:** valida o `bets[0]` (WhatsApp é a única interface viável) e a
+tese B2B2C institucional em outro mercado emergente — mas levou mais de dez anos e
+captação institucional relevante (US$20M+) para chegar lá, e a receita direta reportada
+ainda é pequena frente à base de usuários.
+
+**A pergunta:** o mecanismo está validado globalmente e o problema real é só tempo/capital
+de canal institucional (Coocafé, ATeG, governo) — ou o dado honesto é que US$300 mil/ano de
+receita sobre milhões de agricultores prova que este modelo nunca vira negócio rápido, e por
+isso pivotar de monetização é mais honesto que repetir o mesmo caminho institucional com mais
+tempo? Isso pesa diretamente na decisão de recomeçar do zero pós-fechamento do voo.
+
+---
+
+### [DISCUTIR 9/15] Plantix já resolve foto→diagnóstico de graça desde 2020 — a Stevi ainda aposta certo em não competir aí?
+**Data:** 2026-09-14 · **Eixos:** P3 A1 D2 E1 L2
+**Fonte:** [Plantix — plant disease detection via WhatsApp](https://plantix.net/en/blog/plant-disease-detection-whatsapp/)
+
+**O que é:** chatbot gratuito de diagnóstico por foto via WhatsApp, ativo desde 2020,
+identificando mais de 400 problemas em 40+ culturas — mesmo mecanismo central (foto →
+diagnóstico) que o `api/_lib/pipeline.ts` da Stevi implementa. Não é notícia nova; é fato de
+mercado estabelecido, mas nunca tinha entrado no ledger de dedup deste projeto.
+
+**Por que toca este projeto:** o backlog já decidiu em 25/jul não competir na foto e sim no
+grounding regulatório + handoff ao agrônomo + caderno (`.claude/plans/2026-07-16-brazil-fit-backlog/README.md`,
+`.claude/plans/2026-07-25-stevi-roadmap/auditoria-completa.md`) — essa diferenciação já
+está no código.
+
+**A pergunta:** o voo de 60 dias fechou em MATAR/PIVOTAR mesmo com essa diferenciação
+pronta e sem custo de engenharia adicional. Para um eventual recomeço: a aposta de moat
+(compliance + caderno em vez de vision) ainda é a tese certa, ou o aprendizado do voo é que
+o moat nunca esteve na foto de qualquer forma — o gargalo sempre foi distribuição, não
+capacidade técnica?
+
+---
+
+### [DISCUTIR 9/15] Existe um LLM aberto em português que poderia tirar a Stevi da dependência de gateway único?
+**Data:** 2026-09-14 · **Eixos:** P2 A1 D2 E2 L2
+**Fonte:** [Tucano 2 Cool: Better Open Source LLMs for Portuguese](https://arxiv.org/abs/2603.03543)
+
+**O que é:** suíte de LLMs abertos em português (0,5–3,7B parâmetros) construída sobre
+Qwen3, com código, receitas e pesos liberados, superando outros modelos abertos pequenos em
+benchmarks de PT-BR — mas sem nenhuma comparação contra modelos de fronteira (Claude,
+Gemini) nem contra fala coloquial de roça, que é o desafio real documentado no gap de
+cobertura de culturas.
+
+**Por que toca este projeto:** toca direto o `platform_dep` já sinalizado (dependência de
+LLM via OpenRouter, motivo da diversificação de gateway pós-aquisição pela Stripe) — seria
+uma escada de saída mais radical que o fallback direto já implementado, mas exige infra de
+self-host incompatível com o Vercel serverless atual.
+
+**A pergunta:** vale gastar um spike de avaliação (sem infra nova, só inferência hospedada
+no Hugging Face) comparando Tucano2-3.7B contra claude-haiku-4.5 em mensagens reais de
+produtor, como insumo para uma decisão de arquitetura pós-pivô — ou isso é exatamente o
+tipo de capacidade nova que o fechamento do voo mandou parar de construir agora?
+
+---
+
+### [DISCUTIR 8/15] A Nestlé já roda WhatsApp+IA para cacauicultor no Brasil com distribuição cativa — o gargalo da Stevi sempre foi canal, não produto?
+**Data:** 2026-09-14 · **Eixos:** P2 A1 D2 E1 L2
+**Fonte:** [Nestlé Brasil — chatbot "Theo" cresce ~300%](https://www.nestle.com.br/media/pressreleases/allpressreleases/nestle-ve-crescimento-de-cerca-de-300-em-chatbot-dedicado-cacauicultura)
+
+**O que é:** "Theo", bot da Nestlé Cocoa Plan no WhatsApp desde 2019 (atualizado 2023), com
+~600 pares de pergunta-resposta do Boletim Técnico CEPLAC, cotação de cacau e previsão do
+tempo. Release (01/08/2025) reporta crescimento de usuários recorrentes de 1.862 para 7.172
+entre 2023-2025, 98% de retenção — dentro de uma base de 7.000+ produtores já vinculados ao
+programa Cocoa Plan (BA/PA/ES/TO/RO/SP). Provavelmente árvore de decisão/regras, não LLM
+generativo — mas resolve o mesmo problema (WhatsApp + preço de commodity + clima + conselho
+técnico) com distribuição cativa herdada da relação comercial já existente.
+
+**Por que toca este projeto:** é o comparável brasileiro mais próximo com backing
+corporativo grande, diferente do App do Cacau da UESC (universitário/gratuito) já
+triado — e chegou a milhares de usuários sem o gargalo que a Stevi mais sentiu em 60 dias
+(tração zero), porque a distribuição já vinha embutida antes do bot existir.
+
+**A pergunta:** no pivot pós-11/09, faz sentido considerar ir atrás de um distribuidor com
+base cativa (cooperativa, trading, programa de sustentabilidade de commodity específica)
+como canal primário, em vez de repetir aquisição produtor-a-produtor do zero?
+
+---
 
 ### [DISCUTIR 11/15] Prompt logging na OpenRouter está desligado nas duas contas?
 **Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E3 L2
@@ -163,9 +280,11 @@ três. Qual dos dois — e você aceita tomar essa decisão sem dado?
 
 ---
 
-### [DISCUTIR 10/15] A partir de 01/10 não sobra caminho gratuito no WhatsApp
-**Data:** 2026-08-24 · **Eixos:** P3 A2 D3 E2 L2
+### [DISCUTIR 12/15] A partir de 01/10 não sobra caminho gratuito no WhatsApp
+**Data:** 2026-08-24, atualizado 2026-09-14 · **Eixos:** P3 A2 D3 E2 L2
 **Fonte primária:** [Meta, "Pricing for non-template messages"](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages)
+
+**Atualização de 14/09:** duas fontes novas ([Brasil em Folhas](https://www.brasilemfolhas.com.br/2026/09/meta-cobra-por-mensagens-de-servico-no-whatsapp-business-api/), [Digisac](https://digisac.com.br/blog/whatsapp-tera-nova-cobranca-por-respostas-de-empresas)) e uma releitura da própria página da Meta **confirmam o Brasil na lista de 01/10**, com preço próximo de US$0,0068/mensagem — a página-mãe genérica (`/whatsapp/pricing`), que ainda diz "service conversations are free", está desatualizada, não errada sobre outra coisa; é a mesma fratura entre páginas já registrada em 24/08. O elemento que decide o risco real — uma franquia de 1.000 mensagens de serviço grátis por número/mês, citada por Digisac e por BSPs internacionais — **não aparece em nenhuma página oficial da Meta reaberta hoje**. Item **não resolvido**, score sobe de 10 para 12 pela confirmação direta do Brasil.
 
 **O que é:** a doc da Meta afirma verbatim que *"Effective October 1, 2026, Meta will
 charge for service messages, which have not been charged since November 2024"* e que
@@ -194,12 +313,26 @@ hoje, e alguém olha isso semanalmente? A tarifa BR que dimensiona tudo sai em 0
 dos 18 dias que restam. *(Rebaixado de PROTOTIPAR pela `verdict_note`: 01/10 cai vinte dias
 **depois** do fim do voo.)*
 
+**Pergunta atualizada (14/09):** o voo fechou em MATAR/PIVOTAR e a instrução é zero linha de
+código nova até decisão dos founders — mas checar o método de pagamento da WABA é ação de
+Business Manager, não de código, e leva 10 minutos. Vale fazer essa checagem agora,
+independente do veredito recomeçar-ou-encerrar (se a resposta for "encerrar", o item morre
+sozinho em 01/10 de qualquer forma), ou isso espera a decisão maior?
+
 ---
 
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Terceira rodada seguida (24/08,
-31/08, 07/09) e sexto veredito sem spike na campanha._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Sétimo veredito seguido sem
+spike na campanha (24/08, 31/08, 07/09, 14/09)._
+
+**Nota de 14/09:** o voo de 60 dias fechou em 11/09 (MATAR/PIVOTAR, ver `STATE.md` e
+`.claude/plans/memos-scorecard/README.md`) com recomendação explícita de nenhuma linha de
+código nova até decisão dos founders. Os quatro DISCUTIR desta rodada (Farmerline, Plantix,
+Tucano, Nestlé) são comparáveis estratégicos para essa decisão, não pedidos de spike — mesmo
+o de maior score (Farmerline, 11/15) é validação de modelo de negócio, sem artefato de
+código a testar. A fila continuar vazia nesta semana é o resultado mais alinhado possível com
+o que o próprio fechamento pediu.
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
 produtor** ou a **disparar alerta**. Dos seis itens lidos a fundo em 07/09, o item de maior
@@ -220,6 +353,18 @@ por que o código existe.
 
 ## Radar
 
+- `2026-09-14` **Supabase teve 3 incidentes entre 14/08 e 11/09 (JWT/401, lifecycle actions, projetos Nano irresponsivos).** O acesso real da Stevi usa `SUPABASE_SERVICE_ROLE_KEY` estática, não o fluxo de refresh de JWT afetado pelo incidente mais longo — risco provavelmente baixo, mas não há canário dedicado de saúde do Supabase/PostgREST. [status.supabase.com](https://status.supabase.com/) · 8/15
+- `2026-09-14` **Fim do vazio sanitário de MT (06/09) bate exatamente com `api/_lib/tools/calendar.ts`.** Confirmação pura, sem gap novo — MT já está coberto e a data está certa no código. [Cenário MT](https://cenariomt.com.br/mato-grosso/com-fim-do-vazio-sanitario-produtores-de-mato-grosso-pisam-no-freio-e-aguardam-chuvas-para-iniciar-plantio-da-soja/) · [CanaOeste](https://canaoeste.com.br/noticias/fim-do-vazio-sanitario-abre-plantio-da-soja-2026-27/) · 6/15
+- `2026-09-14` **DG-EVAL/Golden Facts (Bihar): fine-tuning sobre fatos validados por especialista bate modelos de fronteira em recall factual** — mas não revela como escalaram a validação humana, e a Stevi não faz fine-tuning nem pode enquanto o voo estiver fechado. Toca de raspão o gap real do goldenset (`verified_by=null` em 38/38 casos), sem resolvê-lo. [arXiv](https://arxiv.org/abs/2603.03294) · 6/15
+- `2026-09-14` **Solinftec lança "Alice" multiagente com alertas proativos incluindo WhatsApp — mas para usina sucroenergética com telemetria embarcada, segmento oposto ao beachhead sem hardware da Stevi.** Mais um dado confirmando que notificação proativa é tendência de indústria (mesmo padrão do item Daz já registrado), não ameaça de segmento. [Mais Soja](https://maissoja.com.br/solinftec-apresenta-alice-ia-multiagente-na-agrishow-2026-e-inaugura-nova-era-da-operacao-agricola-autonoma/) · 6/15
+- `2026-09-14` **Claude Fable 5.1 corta preço de cache reads em 75%.** Não é o modelo que a Stevi usa (claude-sonnet-5/haiku-4.5), mas pode presagiar movimento de preço mais amplo da Anthropic em cache. [Anthropic](https://www.anthropic.com/claude-fable-and-mythos-5-1) · 6/15
+- `2026-09-14` **Governo federal levou 4G a 2.826 localidades rurais e 1,7mi de pessoas em 2 anos (R$4bi, leilão do 5G).** Confirma com número oficial o gap de conectividade do produtor que o known_gap de operação offline já assumia; nenhum arquivo muda por causa disso. [gov.br/MCOM](https://www.gov.br/mcom/pt-br/noticias/2026/janeiro/em-dois-anos-conectividade-avanca-nas-areas-rurais-e-leva-4g-a-1-7-milhao-de-brasileiros) · 6/15
+- `2026-09-14` **Monitora Caju (Embrapa): PWA offline e gratuito para pragas do cajueiro, mesmo padrão institucional do RAImundo** — anúncio bem coberto, zero número de adoção, cajueiro fora das 5 culturas que a Stevi ancora hoje. [A Lavoura](https://alavoura.com.br/pesquisa-inovacao/novo-aplicativo-identifica-e-orienta-manejo-de-pragas-e-doencas-do-cajueiro/) · 5/15
+- `2026-09-14` **Twilio abre beta público de vozes ElevenLabs dentro do `<Say>`** — mas é TTS de linha única para IVR simples; o agente de voz da Vitória já roda via API de Conversational AI da ElevenLabs sobre media streams, não via `<Say>`. Nenhum arquivo muda. [Twilio Changelog](https://www.twilio.com/en-us/changelog/elevenlabs-voices-for-say-is-now-public-beta) · 5/15
+- `2026-09-14` **OpenRouter lança "US in-region routing"** (só Business/Enterprise, bloqueia fallback cross-region) — colide em tese com a arquitetura de resgate em duas camadas (PRs #13/#14), mas exige tier que a conta atual não demonstra ter. [OpenRouter](https://openrouter.ai/blog/announcements/us-in-region-routing/) · 5/15
+- `2026-09-14` **Paper propõe "Downstream Principle": responsabilidade por dano de agente de IA recai em quem aceita a promessa, não em quem comanda.** Framework teórico sem validação empírica; reforça conceitualmente a postura já `settled` de "triagem, não prescrição", sem virar checklist acionável. [arXiv](https://arxiv.org/abs/2608.08022) · 5/15
+- `2026-09-14` **Paper mede alucinação de VLMs abertos (Gemma/LLaVA/Qwen/MiniCPM) em diagnóstico agrícola: 63-75% zero-shot, 86,8% few-shot, falsos positivos/negativos persistem** — mas nenhum modelo testado é o claude-sonnet-5 que a Stevi usa em `reason.ts` para visão. [arXiv](https://arxiv.org/abs/2605.27595) · 5/15
+- `2026-09-14` **AgriDoctor formaliza router+classifier+detector+retriever+LLM para diagnóstico agrícola multimodal** — mesmo padrão que `pipeline.ts`/`router.ts`/`reason.ts`/`agrofit.ts` já implementam, sem números de desempenho extraíveis da fonte. Preprint com quase 1 ano. [arXiv](https://arxiv.org/abs/2509.17044) · 5/15
 - `2026-09-07` **DigiFarmz relançou "Daz" — mas é feature dentro de SaaS B2B de soja/trigo, não concorrente direto.** A data original parecia 22/09/2026 (futura); confirmada no HTML: é notícia de **set/2025**, republicada. O Daz é a camada WhatsApp de uma plataforma paga (Cropper/Linkage) de uma agtech de Champaign-IL com operação BR/EUA/Paraguai, focada em manejo fitossanitário de soja/trigo em fazendas comerciais grandes — sem café, sem gratuidade, sem sobreposição de segmento com o beachhead. Valida que "alerta proativo por WhatsApp" é padrão de indústria, não ensina mecanismo novo. [Global Crop Protection](https://globalcropprotection.com/noticias/novas-tecnologias/digifarmz-apresenta-daz-assistente-virtual-que-leva-inteligencia-artificial-ao-dia-a-dia-do-produtor-rural/) · 7/15
 - `2026-09-07` **Agro Amazônia triplica conversas com o Meta Business Agent (via Zenvia) em uma semana.** Distribuidora de insumos (subsidiária Sumitomo) roda piloto do agente nativo da Meta no WhatsApp — de 420 para 1.400+ conversas/semana. É SDR de vendas, não conselho agronômico, mas mostra a velocidade com que fornecedores de insumo estão automatizando o mesmo canal — e que a Meta já oferece agente nativo, baixando a barreira para qualquer revenda/cooperativa montar o próprio bot. [RBTV](https://rbtv.com.br/noticia/7058/agroamazonia-triplica-conversas-com-agente-de-ia) · 5/15
 - `2026-09-07` **FAIRY: motor agentic orientado a evento para soja full-season, implantado numa fazenda real.** Orquestra maquinário/drone/sensor/clima sob paradigma "tudo é evento", avaliado com 9 controladores sobre 100 safras simuladas (SIGSPATIAL 2026). Não fala de timing de notificação a humano (não duplica o item já aberto sobre horário de alerta) e exige hardware que o Stevi não tem e não vai ter neste voo. [arXiv](https://arxiv.org/abs/2609.00106) · 6/15
