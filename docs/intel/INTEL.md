@@ -38,177 +38,188 @@
 > excesso não é nem feature, é design. A pergunta da Fecon (aberta 24/08) fechou sozinha —
 > a feira aconteceu 1–3/09 e gerou zero cadastros via `#fecon`/`#fecon-cartaz` — e foi
 > movida pro Arquivo como resultado, não como decisão.
+>
+> **Quinta passada (2026-10-19) — o voo fechou, e isso muda o que "intel relevante"
+> significa aqui.** No intervalo desde 07/09 (42 dias), o repositório não recebeu uma
+> linha de engenharia: o voo de 60 dias fechou em 11/09 com veredito qualitativo
+> MATAR/PIVOTAR (ver `docs/intel/STATE.md` e `.claude/plans/memos-scorecard/README.md`),
+> e os únicos 6 commits desde então são memos semanais do PM do Scorecard registrando o
+> mesmo silêncio toda semana — zero produtor conversando há 94 dias, zero mensagem de
+> qualquer tipo há 19 dias. Feed do resumo matinal veio vazio de novo (mesmo JSON de
+> 22/08); cinco scouts trouxeram ~45 candidatos brutos depois de deduplicar, oito foram
+> lidos a fundo por um analista cada. **Zero PROTOTIPAR, zero IMPLEMENTAR — sétima
+> rodada seguida sem spike**, e nesta rodada isso não é só a `verdict_note` funcionando:
+> é que não há mais engenharia ativa para um spike aterrissar. Quatro itens foram
+> arquivados por envelhecer sem decisão (>21 dias); dois outros foram superados por
+> desenvolvimento real e reabertos com evidência nova: a mudança de cobrança do
+> WhatsApp (estava só prevista em 24/08, agora é fato confirmado com tarifa BR) e o App
+> do Cacau da UESC (passou de "sem número divulgado" para ">1.000 usuários + parceria
+> Wageningen"). Dois itens novos genuínos entraram: um paper com dados reais de produção
+> do FarmerChat (Digital Green) medindo exatamente a classe de erro que o código de
+> triagem por foto do Stevi replica — mas nunca testada, porque nenhum produtor real
+> jamais mandou foto; e uma decisão do Cade que mantém o WhatsApp aberto a chatbots de
+> IA de terceiros no Brasil, favorável hoje mas já revertida três vezes em três meses.
 
 ## Em aberto — precisa de decisão do Stefano
 
-### [DISCUTIR 11/15] Prompt logging na OpenRouter está desligado nas duas contas?
-**Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E3 L2
-**Fonte primária:** [OpenRouter Terms of Service, Seção 6.1–6.5](https://openrouter.ai/terms)
+### [DISCUTIR 12/15] A cobrança do WhatsApp chegou — mas a pergunta mudou de "a conta está fundeada?" para "vale manter fundeada sem tráfego?"
+**Data:** 2026-10-19 · **Eixos:** P3 A1 D3 E3 L1
+**Fonte primária:** [Meta, WhatsApp Pricing](https://developers.facebook.com/docs/whatsapp/pricing) · [Diário do Comércio, tarifa BR](https://diariodocomercio.com.br/negocios/cobranca-whatsapp-business-outubro/)
+**Atualiza:** o item de 24/08 "A partir de 01/10 não sobra caminho gratuito no WhatsApp" (arquivado nesta rodada — a data chegou e o fato se confirmou).
 
-**O que é:** a Seção 6.2 do ToS, atualizada em 31/08, diz — citação literal — que **se**
-"prompt logging" estiver habilitado nas configurações da conta, a OpenRouter ganha
-licença mundial, perpétua e irrevogável para hospedar, reproduzir, adaptar e distribuir
-o conteúdo do usuário; a 6.1 estende isso a **venda em forma anonimizada**. É opt-in e
-desligado por padrão — não é uma reivindicação automática, ao contrário do que a
-manchete sugere.
+**O que é:** desde 01/10/2026 a Meta cobra por toda *service message* (franquia de
+1.000 entregas grátis por número/mês, sem acúmulo) e por toda *utility message*
+respondida dentro da janela aberta de 24h — antes grátis desde jul/2025. A divergência
+entre páginas da Meta que existia em 24/08 (uma dizia grátis, a outra paga) já não
+existe mais: as duas convergem na mesma data. A tarifa de exemplo da própria Meta para
+mensagem de utilidade/autenticação (US$0,0068 ≈ R$0,035) bate com o valor publicado
+pelo Diário do Comércio para o Brasil.
 
-**Por que toca este projeto:** o único ponto de chamada do gateway principal de LLM
-(`api/_lib/llm.ts`) não tem nenhum controle de política de dados — nenhuma referência a
-`logging`/`privacy`/`retention` no repo inteiro. E desde #14 existem **duas** contas
-OpenRouter em produção: a principal e a chave reserva (`OPENROUTER_FALLBACK_API_KEY`,
-do projeto twin-me), cada uma com sua própria configuração de conta. Mensagens reais de
-produtor passam por aqui — texto, foto descrita, dúvida agronômica.
+**Por que toca este projeto:** `alertSendPlan()` em `api/_lib/alerts.ts` só libera
+`freeform` se o produtor falou nas últimas 24h — todo alerta proativo real cai em
+`template`, que já era pago antes de 01/10. O que passa a custar é o caminho
+conversacional (`api/_lib/pipeline.ts`, `adapter.send()` por turno via
+`api/_lib/transport/cloud.ts`). Mas o repositório está em pausa pós-mortem desde 11/09
+(veredito MATAR/PIVOTAR, ver `docs/intel/STATE.md`): zero mensagem de qualquer tipo há
+19 dias, zero produtor conversando há 94. Não há tráfego para a nova tarifa incidir
+sobre.
 
-**Por que isso não vira código:** a mitigação inteira é entrar no dashboard de duas
-contas e confirmar (ou desligar) uma opção. Nenhuma linha de `api/_lib/llm.ts` muda por
-causa disso — por isso o veredito trava em DISCUTIR mesmo com score bruto de 11 (que
-cairia em PROTOTIPAR): a `verdict_note` exige que PROTOTIPAR/IMPLEMENTAR ajudem a
-CONVERSAR ou ALERTAR via mudança no repositório, e aqui não há o que mudar no repositório.
+**Por que isso não vira código:** é conferir um dashboard de billing, não mudar uma
+linha de `api/_lib/`. Trava em DISCUTIR pela mesma regra de 24/08.
 
-**A pergunta:** as duas contas OpenRouter (a principal do projeto e a reserva do
-twin-me usada como `OPENROUTER_FALLBACK_API_KEY`) têm "prompt logging" desligado? Se sim
-— que é o padrão — o risco já está mitigado e este item pode ir pro Arquivo na próxima
-rodada. Se não, foi checado quando a chave reserva foi configurada em #14, ou fica em
-aberto até alguém confirmar manualmente?
-
----
-
-### [DISCUTIR 9/15] Um projeto universitário gratuito já roda o mesmo mecanismo do Stevi — em cacau
-**Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E1 L2
-**Fonte:** [App do Cacau — Revista Cacau & Chocolate](https://www.cacauechocolate.com.br/v1/2026/08/26/app-do-cacau-a-inteligencia-artificial-aplicada-a-lavoura/)
-
-**O que é:** a UESC (Bahia), com parceiros do Peru e da Holanda e financiamento do
-Instituto Arapyaú, lançou na ExpoCacau 2026 um serviço gratuito por WhatsApp que recebe
-texto, áudio ou foto da lavoura de cacau e devolve diagnóstico preliminar de 8 doenças,
-11 pragas e deficiências nutricionais — com a mesma postura de triagem-não-prescrição da
-Stevi, no mesmo texto: "não substitui o trabalho do agrônomo ou técnico agrícola, mas
-ajuda a identificar problemas que exigem um profissional qualificado".
-
-**Por que toca este projeto:** é literalmente o mesmo mecanismo (`api/_lib/pipeline.ts`,
-`api/_lib/compliance.ts`, `api/_lib/reason.ts`) — WhatsApp, multimodal, triagem, sem dose
-— só que como projeto universitário gratuito financiado por fundação, hoje em cacau na
-Bahia. Nenhum número de usuários foi divulgado.
-
-**O que a fonte não prova:** se esse padrão institucional (universidade + fundação, sem
-necessidade de monetizar) já está se movendo para café em Minas.
-
-**A pergunta:** vale checar se algum programa estadual, EPAMIG ou a própria Embrapa tem
-um movimento equivalente nascendo para café? Se esse modelo (universidade financiada,
-gratuito pra sempre) se replicar no beachhead, muda como a Stevi precisa se posicionar
-ou monetizar — não é ameaça hoje, mas é o tipo de concorrente que nenhuma rodada
-`prospect/*` está olhando.
+**A pergunta:** a pergunta de 24/08 presumia uma campanha ativa; hoje não há. Dado que
+não existe tráfego a proteger agora, vale decidir explicitamente deixar o método de
+pagamento da WABA cair (aceitando que uma reativação futura, se houver, vai exigir
+reconfigurar billing do zero — e o precedente de #131042 mostra que essa falha já
+aconteceu sem aviso) — ou mantém-se fundeada como opcionalidade barata para quando/se a
+campanha reabrir? As duas opções têm custo zero hoje, mas "não decidir" também é uma
+escolha por omissão, e vale nomear qual.
 
 ---
 
-### [DISCUTIR 8/15] Um app pago com IA agronômica no seu beachhead tem 100 downloads — vale citar isso?
-**Data:** 2026-09-07 · **Eixos:** P2 A1 D1 E2 L2
-**Fonte:** [Café 360 Premium — Zavarise Apps](https://www.zavarise.com.br/cafe360/)
+### [DISCUTIR 10/15] O Cade mantém o WhatsApp aberto a chatbots de IA rivais — mas o caso já se reverteu três vezes em três meses
+**Data:** 2026-10-19 · **Eixos:** P3 A1 D2 E2 L2
+**Fonte:** [CNN Brasil](https://www.cnnbrasil.com.br/economia/negocios/cade-mantem-medida-preventiva-que-obriga-meta-a-permitir-chatbots-de-ia-no-whatsapp/) (corroborado por Canaltech e Olhar Digital)
 
-**O que é:** app pago (R$19,90/mês) de gestão de lavoura de café com "consultor
-agrônomo com IA" (manuais EPAMIG/EMATER, diagnóstico por foto de folha), cobrindo
-explicitamente Sul de Minas, Cerrado Mineiro, Matas de Minas, Mogiana — sobreposição
-geográfica direta com o beachhead. Confirmado na Play Store: **100+ downloads**. O
-desenvolvedor (Zavarise Apps) também publica "Fazenda 360", "Pecuária 360" e um app de
-áudio de conteúdo religioso — perfil de fábrica de apps de nicho pequena, não agtech
-financiada.
+**O que é:** em 04/03/2026 o Tribunal do Cade negou por unanimidade o recurso da Meta e
+manteve a medida preventiva que suspende novos termos de uso do WhatsApp Business que
+excluiriam chatbots de IA de terceiros (denúncia das startups Luzia e Zapia contra
+favorecimento à Meta AI). O caso já reverteu três vezes em três meses: liminar judicial
+suspendeu a medida em jan/2026, outra decisão a restabeleceu em mar/2026, a Meta tentou
+cobrar ~US$0,0625 por "mensagem não padronizada" de tráfego de IA a partir de 11/3, o
+Cade aplicou multa diária de R$250 mil por descumprimento, e em 29-30/4/2026 a Justiça
+Federal de SP suspendeu essa multa e determinou conciliação. Busca ativa por
+desenvolvimento de mai-out/2026 não encontrou nada além disso — o inquérito de mérito
+(abuso de posição dominante, processo 08700.012397/2025-63) segue sem decisão até onde
+esta rodada alcançou.
 
-**Por que toca este projeto:** o `README.md` do flight plan argumenta que apps de agro
-falham porque pedem que o produtor trabalhe (download, cadastro, dashboard vazio) — essa
-é exatamente a tese de `bets[0]` ("WhatsApp é a única interface viável — não construir
-app"). O Café 360 é esse padrão exato — e com IA embutida, cobertura geográfica idêntica
-e mensalidade baixa, ainda assim tração desprezível. É evidência de campo a favor da
-aposta, não contra.
+**Por que toca este projeto:** é a mesma dependência de plataforma única do produto —
+`api/_lib/transport/cloud.ts`, o cliente do Graph API que a Stevi usa como transporte
+ativo. Hoje o efeito é protetor (mantém acesso livre a chatbots de terceiros), não uma
+ameaça concretizada — mas nenhuma fonte testa a pergunta que importa: se os termos
+restritivos da Meta fossem reinstaurados, eles atingiriam um bot de nicho agronômico
+como a Stevi, ou só "assistentes de IA generalistas" que competem de frente com a Meta
+AI (como Luzia e Zapia)? Isso nunca é discutido nas fontes.
 
-**A pergunta:** vale citar o Café 360 (app pago, mesma região, IA embutida, 100+
-downloads) como exemplo concreto no README de posicionamento — ou n=1 concorrente
-pequeno é fraco demais pra virar argumento citável, e a melhor ação é só arquivar como
-mais um data point?
-
----
-
-### [DISCUTIR 10/15] O primeiro alerta sai às 08:00 para todo mundo?
-**Data:** 2026-08-24 · **Eixos:** P2 A2 D2 E2 L2
-**Fontes:** [STEPS — push auto-disparado, Douyin](https://arxiv.org/abs/2608.01949) · [Just-in-time adaptive interventions, OzCHI](https://arxiv.org/abs/2608.09294)
-
-**O que é:** o STEPS troca o paradigma de push por auto-disparo — dois agentes decidem
-*se* enviar e *quando* se reinvocar, com recompensa que penaliza explicitamente o usuário
-**desligar a permissão de push**. A/B online de 14 dias, aleatorizado por dispositivo,
-contra duas baselines nomeadas, sobre logs de 6+ meses de mais de 1 bilhão de usuários:
-+0,28% em dias ativos e **−1,91% na taxa de desativação da permissão**. O paper de OzCHI
-ataca o mesmo movimento pelo lado qualitativo e nomeia o "descompasso ecológico": slot
-vazio na agenda não é receptividade — participantes recusaram janelas algoritmicamente
-válidas por cansaço. Donde a heurística de pegar carona numa rotina existente em vez de
-criar horário próprio.
-
-**Por que toca este projeto:** a `bets[1]` diz que notificação proativa no momento certo
-vale mais que resposta boa sob demanda. Hoje o `vercel.json` tem `0 11 * * *` — que em UTC
-é **08:00 BRT para todo mundo**, os três tipos de alerta no mesmo horário. E a disciplina
-de horário **já existe neste repo, do lado errado do funil**:
-`api/_lib/prospect/core.ts` tem `BRT_OFFSET_MIN`, `HOURS_START = 9`, `HOURS_END = 18` e
-gate de dia útil — para falar com **empresa**. O produtor recebe geada e queimada às oito
-da manhã.
-
-**O que a fonte não prova:** o Douyin otimiza timing sobre trajetória de bilhões; a Stevi
-tem 1 usuário externo real que mandou 1 mensagem em 17/jul. O OzCHI é 16 participantes em
-laboratório, sem desfecho, em atividade física. **Nenhum dos dois mecanismos roda com esse
-n** — a transferência é um salto, não uma extensão.
-
-**A pergunta:** quando o canal destravar, o primeiro alerta de geada sai às 08:00 para
-todo mundo, ou você segura até saber a que hora **este** produtor lê o WhatsApp? Com n=1 e
-`messages.intent` vindo NULL — o que zera o cálculo de hábito em `api/_lib/cohort.ts` —
-aprender o horário é impossível. A escolha real é entre um horário **argumentado por tipo
-de alerta** (geada na véspera à noite, quando ainda dá pra cobrir o café; queimada na hora,
-sem janela; vazio sanitário em horário comercial) e continuar com um horário único para os
-três. Qual dos dois — e você aceita tomar essa decisão sem dado?
+**A pergunta:** vale só monitorar passivamente o desfecho do inquérito (sem data
+prevista), ou já é hora de confirmar que `api/_lib/transport/twilio.ts` (hoje
+legado/rollback) ainda sobe como transporte de emergência, caso a Meta volte a cobrar
+por mensagem de IA ou bloquear chatbots de terceiros antes da decisão de mérito?
 
 ---
 
-### [DISCUTIR 10/15] A partir de 01/10 não sobra caminho gratuito no WhatsApp
-**Data:** 2026-08-24 · **Eixos:** P3 A2 D3 E2 L2
-**Fonte primária:** [Meta, "Pricing for non-template messages"](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages)
+### [DISCUTIR 9/15] FarmerChat (Digital Green) mediu em produção o exato padrão de erro que o código de visão da Stevi replica — mas nunca testado, porque nunca chegou foto real
+**Data:** 2026-10-19 · **Eixos:** P2 A2 D1 E2 L1
+**Fonte:** [arXiv 2609.21651](https://arxiv.org/abs/2609.21651) (v2, 2026-09-21)
 
-**O que é:** a doc da Meta afirma verbatim que *"Effective October 1, 2026, Meta will
-charge for service messages, which have not been charged since November 2024"* e que
-passará a cobrar utility enviada dentro da janela aberta de 24h. Tarifas por país saem até
-**01/09/2026**.
+**O que é:** o paper analisa 1,16M fotos reais enviadas ao FarmerChat (Digital Green) em
+produção na Etiópia, Índia, Quênia e Nigéria: 46,8% das fotos são rejeitadas por um gate
+de qualidade; >25% das que passam voltam sem cultura identificada; e 35,8% dos rótulos
+"doença" eram, na verdade, praga. Uma rota especialista em três estágios (gate de
+qualidade MobileNetV3, classificador de cultura DaViT, detector YOLO26) chega a 95,41%
+de acurácia de cultura contra 91,46% da rota única de produção (VLM fine-tunado).
 
-**Nota de método:** dois scouts se contradisseram sobre isto. A explicação é que a
-**doc da Meta se contradiz em duas páginas vivas** — a página-mãe `/whatsapp/pricing` não
-foi atualizada e ainda diz que utility em janela aberta é grátis. Quem ler só ela conclui o
-oposto. Os fornecedores de BSP estão certos.
+**Por que toca este projeto:** `identifyFromPhoto` em `api/_lib/reason.ts` devolve
+praga/doença num campo só, sem separar categoria, e `api/_lib/pipeline.ts` só valida
+tamanho de arquivo da foto (`MEDIA_BASE64_CAP`), não qualidade ou relevância — a mesma
+classe de erro que o FarmerChat mediu existe estruturalmente no código. Mas nenhum
+produtor real jamais mandou uma foto documentada ao Stevi (nem o único externo, Gaia
+Tech) — é gargalo teórico, não observado. O projeto está em pausa pós-mortem desde
+11/09, sem engenharia ativa (`.claude/plans/memos-scorecard/README.md`).
 
-**O que a exposição realmente é, calculada no código:** o alerta **não encarece**.
-`alertSendPlan()` em `api/_lib/alerts.ts` só devolve `freeform` se o produtor falou nas
-últimas 24h; todo alerta proativo real cai em `template`, que já é pago hoje. Delta: zero.
-O que encarece é o caminho conversacional — `api/_lib/pipeline.ts` emite um `adapter.send`
-por turno. Pelo desenho, ~20 mensagens por produtor por mês; à tarifa utility BR corrente
-reportada por BSP, ~R$ 0,75 por produtor por mês. **Irrelevante como custo.**
+**A pergunta:** vale separar os campos praga/doença e endurecer o retry de baixa
+confiança como ajuste de prompt barato agora, mesmo sem dado de campo pra validar — ou
+isso é exatamente o padrão "capacidade sem onde aterrissar" que o tripwire do projeto
+existe pra bloquear, e deve esperar sinal real de produtor com foto?
 
-**O risco real não é preço, é continuidade de cobrança.** O `STATE.md` registra que o canal
-inteiro morreu por **billing** (#131042) em julho, não por engajamento. A partir de 01/10
-uma falha de pagamento deixa de silenciar só o alerta e passa a silenciar **toda** resposta
-da Stevi.
+---
 
-**A pergunta:** a conta de billing da WABA está com método de pagamento válido e fundeado
-hoje, e alguém olha isso semanalmente? A tarifa BR que dimensiona tudo sai em 01/09, dentro
-dos 18 dias que restam. *(Rebaixado de PROTOTIPAR pela `verdict_note`: 01/10 cai vinte dias
-**depois** do fim do voo.)*
+### [DISCUTIR 9/15] O lookup determinístico da Stevi já mitiga o que um paper novo testa — mas erro de digitação dentro do token continua sem cobertura
+**Data:** 2026-10-19 · **Eixos:** P2 A2 D2 E2 L1
+**Fonte:** [arXiv 2610.08205](https://arxiv.org/abs/2610.08205) (2026-10-06)
+
+**O que é:** o paper compara tool-calling (busca literal por chave) com vector RAG numa
+base agrícola grega/inglesa de 198 perguntas: 71,6% vs. 95,3% em grego canônico; sem
+normalização de acento/maiúscula o tool-calling cai ~20pp (RAG só até 2pp); grego em
+script latino ("Greeklish") custa 21-32pp a ambos; com busca insensível a acento +
+stemming o tool-calling sobe a 83,8%.
+
+**Por que toca este projeto:** é o ângulo inverso do paper já registrado em 24/08 (RAG
+denso falha em fala coloquial — decisão: não trocar por embeddings). Lendo o código
+real: `lookupPest` em `api/_lib/tools/agrofit.ts` já faz exatamente a mitigação que o
+paper testa como ablation (accent-insensitive + stemmed-token matching via `strip()` e
+`matchNorm()`), e `extractPestTarget` não é parser literal — é uma chamada de LLM
+(`api/_lib/reason.ts:44`) que já absorve abreviação e registro antes do lookup
+determinístico. O gap residual real é erro de digitação tipo teclado dentro do próprio
+token (ex. "catucho" por "cartucho"), que nenhuma dessas camadas cobre.
+
+**A pergunta:** dado que o voo fechou em MATAR/PIVOTAR e não há produtor conversando há
+mais de 90 dias (sem tráfego pra validar se isso resolve algo vivido), vale gastar um
+spike de 2-4h adicionando fuzzy-match por edit-distance a `lookupPest` agora, ou isso
+espera uma eventual decisão de retomada?
+
+---
+
+### [DISCUTIR 9/15] O App do Cacau (UESC) passa de 1.000 usuários — a tração do modelo "universidade financiada, grátis pra sempre" deixou de ser hipótese
+**Data:** 2026-10-19 · **Eixos:** P3 A1 D2 E1 L2
+**Fonte:** [Movimento Econômico](https://movimentoeconomico.com.br/agronegocio/2026/09/15/universidade-baiana-cria-app-com-ia-para-detectar-doencas-e-pragas-do-cacau/) (15/09/2026)
+**Atualiza:** o item de 07/09 "Um projeto universitário gratuito já roda o mesmo
+mecanismo do Stevi — em cacau" (arquivado nesta rodada; mesma pergunta, evidência nova).
+
+**O que é:** a leitura de 07/09 registrava o mecanismo (UESC, WhatsApp, triagem
+multimodal sem dose, Instituto Arapyaú financiando) sem número de usuários divulgado. A
+fonte nova traz dois dados novos, autodeclarados pela própria UESC em entrevista à
+imprensa, sem metodologia revelada: **mais de 1.000 usuários** e parceria formal com a
+**Universidade de Wageningen** (Holanda) no modelo de identificação por imagem.
+
+**Por que toca este projeto:** não resolve a pergunta original — a matéria não cita
+café, EPAMIG nem Embrapa, só fala em expansão para "outras regiões produtoras de
+cacau". Mas aumenta a urgência dela: >1.000 usuários grátis é evidência real de que o
+modelo "universidade financiada, grátis pra sempre" consegue tração de campo — não é
+mais só uma hipótese institucional sem prova de adoção.
+
+**A pergunta:** a mesma de 07/09, agora com peso maior — vale checar se algum programa
+estadual, EPAMIG ou a própria Embrapa tem um movimento equivalente nascendo para café?
+O projeto está em pausa pós-mortem desde 11/09, então isso é só posicionamento pra
+arquivar, ou motivo suficiente pra reabrir, antes de qualquer pivot, a pergunta de como
+monetizar se esse padrão chegar ao café?
 
 ---
 
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Terceira rodada seguida (24/08,
-31/08, 07/09) e sexto veredito sem spike na campanha._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Sétima rodada seguida sem
+spike na campanha (24/08, 31/08, 01/09, 07/09, e agora 19/10 depois do fechamento do voo)._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
-produtor** ou a **disparar alerta**. Dos seis itens lidos a fundo em 07/09, o item de maior
-score (OpenRouter ToS, 11/15) bateria PROTOTIPAR pelo score bruto — mas a única ação
-possível é checar uma configuração de conta, não mudar código, então trava em DISCUTIR por
-regra explícita. Os outros dois DISCUTIR são leitura de mercado (concorrentes), não spike de
-produto. Nesta semana em especial isso importa mais que de costume: o `STATE.md` mede 58
-commits contra zero mensagens de produtor — o projeto não precisa de mais uma fila de
-trabalho de código agora, precisa de conversa.
+produtor** ou a **disparar alerta**. Dos oito itens lidos a fundo em 19/10, o item de maior
+score (cobrança do WhatsApp, 12/15) bateria PROTOTIPAR pelo score bruto — mas a única ação
+possível é checar billing fora do repositório, não mudar código, então trava em DISCUTIR
+por regra explícita. Os outros quatro DISCUTIR (Cade, FarmerChat, App do Cacau, tool-calling
+vs. RAG) são leitura de mercado/paper, não spike de produto pronto para rodar. Nesta rodada
+isso importa mais que nunca: o voo fechou em 11/09 com veredito MATAR/PIVOTAR e, desde
+então, 42 dias e zero linha de engenharia (ver `STATE.md`) — não há mais campanha ativa para
+um spike de código aterrissar em.
 
 **Adendo de 01/09:** os quatro itens de 31/08 foram decididos pelo Stefano no mesmo dia e
 viraram código — três PRs mesclados (#13, #14, #15). Estão no Arquivo, cada um com o que
@@ -220,6 +231,10 @@ por que o código existe.
 
 ## Radar
 
+- `2026-10-19` **Vertex aposentou Gemini 2.5 em 16/10 — a API pública que a Stevi usa não foi tocada, o pin de 01/09 estava certo.** Release notes oficiais do Vertex confirmam 16/10/2026 como data de retirement de Gemini 2.5 Pro/Flash/Flash-Lite nessa plataforma; o changelog oficial da Gemini Developer API (18/09) diz que os mesmos modelos na API pública "are not deprecated and will continue to be served until further notice". Confirmado no código (`api/_lib/env.ts`, `api/_lib/llmDirect.ts`): o Stevi só chama `generativelanguage.googleapis.com` (AI Studio), nunca Vertex. Zero arquivo muda. [Vertex release notes](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/release-notes) · [Gemini API changelog](https://ai.google.dev/gemini-api/docs/changelog) · 7/15
+- `2026-10-19` **Paper mostra vazamento de identidade de sessão em dataset de doença de folha — alerta metodológico, não ação.** Em dois datasets coreanos, 91,9% das imagens de teste têm duplicata exata de sensor/sessão no treino; um classificador que só lê timestamp empata com modelos multimodais de imagem+sensor. Relevante como lembrete para qualquer avaliação futura de modelo de visão do Stevi (hoje não treina nenhum), não para o grounding por chave já em produção. [arXiv](https://arxiv.org/abs/2610.06369) · 5/15
+- `2026-10-19` **InteliAgro (BR) diz ter captado US$8M de Série A — mas nem a empresa nem os investidores citados aparecem em qualquer outra fonte.** Plataforma de analytics preditivo (solo/clima) para produtor de médio porte na América Latina — segmento e canal (dashboard, não WhatsApp) diferentes do beachhead do Stevi; fonte única (af.net), sem corroboração, tratar com ceticismo. [af.net](https://af.net/realtime/brazilian-ai-startup-inteliagro-raises-8-million-to-advance-agricultural-productivity/) · 5/15
+- `2026-10-19` **"Theo", assistente da Nestlé por WhatsApp pra cacauicultor, triplicou de usuários entre 2023 e abril/2025.** Dicas de preço, cultivo e clima via WhatsApp para cacauicultor — mesmo canal, cultura perene adjacente (cacau, não café), crescimento de 1.862 para 7.172 usuários num relato de 2025. Novo no radar deste projeto (não estava entre os concorrentes já triados), mas sem desenvolvimento nesta janela — é descoberta de concorrente antigo, não notícia da semana. [Canal Rural](https://www.canalrural.com.br/agricultura/cresce-em-300-o-uso-de-assistente-virtual-que-da-dicas-de-preco-e-cultivo-de-cacau/) · 5/15
 - `2026-09-07` **DigiFarmz relançou "Daz" — mas é feature dentro de SaaS B2B de soja/trigo, não concorrente direto.** A data original parecia 22/09/2026 (futura); confirmada no HTML: é notícia de **set/2025**, republicada. O Daz é a camada WhatsApp de uma plataforma paga (Cropper/Linkage) de uma agtech de Champaign-IL com operação BR/EUA/Paraguai, focada em manejo fitossanitário de soja/trigo em fazendas comerciais grandes — sem café, sem gratuidade, sem sobreposição de segmento com o beachhead. Valida que "alerta proativo por WhatsApp" é padrão de indústria, não ensina mecanismo novo. [Global Crop Protection](https://globalcropprotection.com/noticias/novas-tecnologias/digifarmz-apresenta-daz-assistente-virtual-que-leva-inteligencia-artificial-ao-dia-a-dia-do-produtor-rural/) · 7/15
 - `2026-09-07` **Agro Amazônia triplica conversas com o Meta Business Agent (via Zenvia) em uma semana.** Distribuidora de insumos (subsidiária Sumitomo) roda piloto do agente nativo da Meta no WhatsApp — de 420 para 1.400+ conversas/semana. É SDR de vendas, não conselho agronômico, mas mostra a velocidade com que fornecedores de insumo estão automatizando o mesmo canal — e que a Meta já oferece agente nativo, baixando a barreira para qualquer revenda/cooperativa montar o próprio bot. [RBTV](https://rbtv.com.br/noticia/7058/agroamazonia-triplica-conversas-com-agente-de-ia) · 5/15
 - `2026-09-07` **FAIRY: motor agentic orientado a evento para soja full-season, implantado numa fazenda real.** Orquestra maquinário/drone/sensor/clima sob paradigma "tudo é evento", avaliado com 9 controladores sobre 100 safras simuladas (SIGSPATIAL 2026). Não fala de timing de notificação a humano (não duplica o item já aberto sobre horário de alerta) e exige hardware que o Stevi não tem e não vai ter neste voo. [arXiv](https://arxiv.org/abs/2609.00106) · 6/15
@@ -233,6 +248,11 @@ por que o código existe.
 
 ## Arquivo
 
+- `2026-10-19` **[era DISCUTIR 10/15] "A partir de 01/10 não sobra caminho gratuito" — a data chegou, o fato se confirmou, superado por desenvolvimento.** Não é arquivamento por idade: a mudança de cobrança do WhatsApp que em 24/08 era só previsão virou fato em 01/10, com tarifa BR confirmada. Pergunta atualizada reaberta em "Em aberto" (19/10) com o contexto novo: não há mais tráfego para a tarifa incidir sobre, já que o projeto fechou em MATAR/PIVOTAR.
+- `2026-10-19` **[era DISCUTIR 9/15] "Um projeto universitário gratuito já roda o mesmo mecanismo — em cacau" — superado por desenvolvimento, não por idade.** A leitura de 07/09 não tinha número de usuários; a de 19/10 confirma >1.000 e parceria com Wageningen. Pergunta original (café/EPAMIG/Embrapa) continua sem resposta — reaberta em "Em aberto" (19/10) com a evidência nova.
+- `2026-10-19` **[era DISCUTIR 11/15] Prompt logging na OpenRouter — envelheceu sem decisão.** Aberto em 07/09, 42 dias sem confirmação de nenhuma das duas contas (principal e `OPENROUTER_FALLBACK_API_KEY`). Nenhum scout desta rodada tocou o tema de novo. Se a configuração nunca mudou (o padrão é desligado), o risco provavelmente já estava mitigado — mas isso nunca foi confirmado em voz alta.
+- `2026-10-19` **[era DISCUTIR 8/15] Café 360 Premium — envelheceu sem decisão.** Aberto em 07/09 como evidência de campo a favor de `bets[0]` (apps de agro falham mesmo com IA embutida e cobertura idêntica). Ninguém decidiu se vale citar no README de posicionamento; sem desenvolvimento novo nesta rodada.
+- `2026-10-19` **[era DISCUTIR 10/15] "O primeiro alerta sai às 08:00 para todo mundo?" — envelheceu sem decisão.** Aberto em 24/08 (56 dias), sem produtor real para aprender horário de leitura e sem decisão do Stefano sobre horário único vs. argumentado por tipo de alerta. Continua teoricamente correto, mas o projeto está em pausa pós-mortem (zero produtor conversando) — não há como testar isso agora, e não há sinal de que vá haver em breve.
 - `2026-09-07` **[era DISCUTIR 10/15] A Fecon aconteceu 1–3/09 — e gerou zero cadastros, apesar do kit pronto.** O kit (`64152d6`) e a regra de vouch (`527120b`, token `#fecon` vs. `#fecon-cartaz`) foram shipados dias antes da feira. Medição de 07/09 no banco: `users.source ilike '%fecon%'` retorna **zero linhas**; só 1 usuário novo entrou no banco desde 31/08 (`kind='empresa'`, não produtor). O repositório não registra se o Stefano foi e não usou o kit, ou não foi — mas o resultado é o mesmo: a única janela de campo dentro do voo de 60 dias não converteu ninguém. Movido pro Arquivo como resultado, não como decisão pendente — a pergunta original ("você vai?") não faz mais sentido perguntar, a janela fechou.
 - `2026-09-01` **[era DISCUTIR 10/15] A OpenRouter virou parte da Stripe — decidido: diversificar em duas camadas, sem esperar mudança de termos.** O Stefano mandou ir fundo e liberou trocar modelo. Confirmado com as fontes primárias que a aquisição foi anunciada pelas DUAS partes em 19/08 ("same product, same roadmap", closing pendente) — promessa, não contrato. Entraram: fallback direto por chave (`api/_lib/llmDirect.ts`, Anthropic Messages API e endpoint OpenAI-compat do Google AI Studio) em #13, e chave RESERVA do OpenRouter — conta separada, a do projeto twin-me — como camada 1 em #14, já configurada em produção (`OPENROUTER_FALLBACK_API_KEY`) com redeploy feito. O gateway deixou de ser ponto único. [Stripe](https://stripe.com/newsroom/news/stripe-agrees-to-acquire-openrouter) · [OpenRouter](https://openrouter.ai/blog/announcements/openrouter-is-joining-stripe/)
 - `2026-09-01` **[era DISCUTIR 10/15] O Google já tem data pra desligar o Gemini 2.5 — decidido: pinar `google-ai-studio` agora, sem esperar a data oficial.** A checagem nas páginas do Google fechou a dúvida das duas datas: 16/10/2026 está confirmado nos release notes do **Vertex**; a página de model-versions cita 20/10 e o Google não resolveu a contradição (planejamos pelo 16). O que decide é outra coisa: a **API pública segue "no shutdown date announced"**, então o pin desacopla a transcrição do prazo do Vertex inteiro. Implementado em #13 (`ROCA_TRANSCRIBE_PROVIDER`, default `google-ai-studio`, `any` desliga), com o canário pingando o tier de transcrição pelo MESMO pin — senão validaria caminho que o produtor não usa. Modelo mantido: `gemini-2.5-flash-lite` seria mais barato em áudio (US$0,30/M vs 1,00) mas ninguém mediu transcrição PT-BR de voz de roça nele; trocar default sem golden de transcrição fica em aberto. [Vertex release notes](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/release-notes) · [deprecations da API pública](https://ai.google.dev/gemini-api/docs/deprecations)
