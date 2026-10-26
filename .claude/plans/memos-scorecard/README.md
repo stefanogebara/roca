@@ -5,6 +5,96 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 26/out — dia 105 de 60 (45 dias após o fechamento)
+
+*Nota de processo, à frente de tudo, pela sétima vez: esta é a SÉTIMA leitura
+desde o FECHAMENTO (11/set, veredito MATAR/PIVOTAR qualitativo) e a sexta
+semana consecutiva (14/set, 28/set, 05/out, 12/out, 19/out, hoje) pedindo a
+mesma coisa sem resposta — reduzir a cadência desta rotina para mensal ou por
+evento. Bloqueio técnico de sempre: a Routine foi criada via painel/API
+(`created_via: "http_api"`, confirmado agora lendo o próprio trigger), e
+alterar seu cron/prompt é decisão do Stefano, não algo que este agente deve
+fazer por conta própria — link de 1 clique:
+`https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`. Já se
+passaram **42 dias** desde o primeiro pedido (14/set). Query fresca rodada
+mesmo assim, por regra da casa — nunca herdar número de memo anterior.*
+
+**Tripwire — não disparado.** `git log --since="7 days ago" --oneline | wc -l`
+devolve **0** — pela primeira vez em semanas, nem o commit do próprio memo
+anterior caiu dentro da janela (19/out ficou fora dos 7 dias por poucas
+horas). `produtores_conversados_7d` (query do baseline, só externos reais):
+**0**. **0 commits × 0 conversas → tripwire não disparado**, sem nuance
+nenhuma desta vez: zero engenharia, zero campo, os dois lados mudos.
+
+**Calendário:** dia **105 de 60** · **45 dias** depois de 11/set (janela
+encerrada) · gate S4 (~10/ago) passou há **77 dias**. Não há voo em curso.
+
+**Tração (total / externos reais):** `users` total **30** (mesma leitura de
+sempre, estável desde início de agosto). Produtor externo real: **1** (Gaia
+Tech, vouchado pelo Michel, `source='michel'`) — ainda exatamente 1 inbound +
+1 outbound, ambos de 17/jul, **0 mensagens novas em 101 dias**. Ativos 7d:
+**0**. `select count(*) from messages where created_at > now() - interval
+'14 days'` devolve **zero linhas** de novo — nem produtor, nem teste, nem
+founder mandou nada nas últimas duas semanas. Última mensagem inbound de
+toda a base continua sendo **30/set** (de Stefano, testando) — **26 dias de
+silêncio total** desde então. Caderno de aplicações: **0** (vida toda).
+`farmer_alerts`: **2** (`kind='teste'`, 14/08, inalterado). `triage_events`:
+**0**. `ndvi_readings`: **2** (inalterado). `dispatch_pauses`: **0**.
+Referrals (`referral_requests`): **5** paradas (`partner_notified_at`
+nulo), mesmas 5 de teste interno de sempre. Prospecção: **136 discovered /
+113 ready / 64 stale / 46 discarded / 8 replied** (367 total) — **idêntico**
+ao baseline de 05/out, 12/out e 19/out; zero movimento de novo, disparo
+continua parado. Golden set: **0/38 casos com `verified_by`**
+(`knowledge/goldenset/goldenset.jsonl`, reconfirmado linha a linha:
+`grep -o '"verified_by":[^,}]*' ... | sort | uniq -c` → 38× `null`).
+
+**Lead quente:** nenhum. `prospects.status='replied'` segue em **8** —
+mesmas linhas de sempre (revenda/consultoria/software, nenhum produtor). O
+único contato externo real (Gaia Tech) segue sem resposta há 101 dias.
+
+**Mudou no repo:** nada — **0 commits** desde 19/out (confirmado acima).
+Não repeti a tentativa de editar a Routine de cadência via API: já
+confirmei hoje, lendo o trigger direto, que ela foi criada via
+`http_api` (não por um agente), e decidi não forçar uma mudança de cadência
+por conta própria — é decisão do Stefano, mesmo tendo a ferramenta técnica
+em mãos agora. Não repeti a checagem dos envs da Vercel
+(`FOUNDER_NOTIFY_TO`/`WHATSAPP_TEMPLATE_ALERT`) — 403 Forbidden confirmado
+em três leituras anteriores (28/set, 05/out, 12/out), é bloqueio de
+permissão, insistir de novo não traz dado novo.
+
+**Decisões abertas** (dias parados a partir de hoje, 26/out):
+- **Reduzir a cadência desta rotina (mensal ou por evento)** — pedida pela
+  primeira vez em 14/set, **42 dias** sem execução, repetida em 28/set,
+  05/out, 12/out, 19/out e agora pela sétima vez consecutiva. Link de 1
+  clique para o Stefano: `https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`.
+  Esta é a sétima vez que o memo sai sem dado novo desde o fechamento.
+- **Follow-up humano com Gaia Tech** — aberta desde 17/jul, **101 dias
+  parada**. A mais velha da casa.
+- **CNPJ** — aberta desde 25/jul, **93 dias parada**.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **93 dias parada**. `verified_by` = 0/38.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **93 dias parada**, não medido de novo nesta rodada
+  (403 já confirmado, ver acima).
+
+**As 3 prioridades da semana:**
+1. **Decidir a cadência desta rotina — 42 dias pedindo a mesma coisa de
+   graça, agora pela sétima vez.** É um clique do Stefano e encerra sete
+   semanas seguidas de memo repetindo os mesmos zeros. O sistema não recebeu
+   UMA mensagem em 26 dias; continuar medindo isso toda semana é o próprio
+   ruído que o tripwire foi desenhado para impedir.
+2. **Gaia Tech/Michel — 101 dias parada, decisão em voz alta.** Ligar/visitar
+   ou declarar a parceria encerrada. Sétimo memo pedindo a mesma coisa.
+3. **CNPJ e assinatura do golden set — 93 dias cada, zero dependência de
+   código.**
+
+**O que NÃO fazer:** nenhuma linha de código, nenhuma iteração de produto,
+nenhum disparo de prospecção. E, pela sétima vez, nenhum memo semanal cheio
+a mais neste ritmo — a prioridade 1 segue sendo parar de gerar este
+documento toda semana sobre um sistema sem uma mensagem há 26 dias.
+
+---
+
 ## Semana de 19/out — dia 99 de 60 (38 dias após o fechamento)
 
 *Nota de processo, à frente de tudo, pela sexta vez: esta é a SEXTA leitura
