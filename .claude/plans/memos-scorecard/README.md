@@ -5,6 +5,113 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 02/nov — dia 113 de 60 (52 dias após o fechamento)
+
+*Nota de processo, à frente de tudo, pela oitava vez: esta é a OITAVA leitura
+desde o FECHAMENTO (11/set, veredito MATAR/PIVOTAR qualitativo) e a sétima
+semana consecutiva (14/set, 28/set, 05/out, 12/out, 19/out, 26/out, hoje)
+pedindo a mesma coisa sem resposta — reduzir a cadência desta rotina para
+mensal ou por evento. Confirmei agora, lendo o trigger direto
+(`get_trigger`): `cron_expression: "0 12 * * 1"`, inalterado desde
+25/jul/2026 23:14 (`updated_at`) — a rotina continua semanal, não foi tocada.
+Já se passaram **49 dias** desde o primeiro pedido (14/set). Link de 1 clique
+para o Stefano: `https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`.
+Query fresca rodada mesmo assim, por regra da casa.*
+
+**Tripwire — não disparado, mesma nuance de sempre.** `git log --since="7
+days ago" --oneline` devolve **1** commit: `f2ce6da`, o próprio commit do
+memo de 26/out, que caiu dentro da janela de 7 dias por calendário. Nenhum
+commit de engenharia novo. `produtores_conversados_7d` (só externos reais):
+**0**. Pelo espírito da regra (engenharia real × conversa de produtor
+externo): **0 × 0 → tripwire não disparado.** Lido ao pé da letra (1
+commit > 0 conversas), seria disparado — registro os dois, como nas semanas
+anteriores.
+
+**Calendário:** dia **113 de 60** · **52 dias** depois de 11/set (janela
+encerrada) · gate S4 (~10/ago) passou há **84 dias**. Não há voo em curso.
+
+**Tração (total / externos reais):** `users` total **30** (estável desde
+início de agosto). Produtor externo real: **1** (Gaia Tech, vouchado pelo
+Michel, `source='michel'`) — ainda exatamente 1 inbound + 1 outbound, ambos
+de 17/jul, **0 mensagens novas em 108 dias**. Ativos 7d: **0**.
+`produtores_conversados_7d`: **0**. `messages` nos últimos 14 dias: **0**
+linhas — zero produtor, teste ou founder mandou qualquer coisa. Última
+mensagem inbound de toda a base continua sendo **30/set** (Stefano
+testando). Caderno de aplicações: **0** (vida toda). `farmer_alerts`: **2**
+(inalterado). `triage_events`: **0**. `ndvi_readings`: **2** (inalterado).
+Referrals (`referral_requests`): **5** paradas, mesmas de teste interno de
+sempre. Prospecção: **136 discovered / 113 ready / 64 stale / 46
+discarded / 8 replied** (367 total) — **idêntico** às últimas 4 semanas,
+disparo continua parado. Golden set: **0/38 casos com `verified_by`**
+(reconfirmado, `grep` linha a linha).
+
+**⚠️ Achado novo (não é tração, é risco de plataforma):** decompondo os 30
+`users` por identidade (regra da casa), achei **20 contatos "cloud" nunca
+antes destacados num memo** — nomes de empresas (revenda de trator, insumos
+agro, consultoria), `source=null`, sem vouch, quase todos 1-20 mensagens
+trocadas em 27/jul-06/ago. São resíduo da prospecção fria antiga, não
+produtor e não lead — já cobertos pelos "8 replied" de `prospects` que os
+memos anteriores já descontavam. **Mas um deles, `Corpal Tratores`, tem 836
+mensagens IN e 836 OUT**, todas entre 03/ago 13:01 e 17:22 (~4h15,
+par-a-par, a cada 10-25s) — ordem de grandeza muito acima de qualquer outro
+contato (o segundo maior tem 20). Isso tem a assinatura de um **loop de eco
+automático** (nosso bot e o número de destino respondendo um ao outro em
+sequência), não de conversa real — e parou sozinho, sem recorrência nos 3
+meses desde então. Não achei esse incidente registrado em nenhum memo
+anterior (`grep "Corpal"` na história deste arquivo: zero) nem em
+`tasks/lessons.md`. O risco real não é o custo (836 mensagens UTILITY/texto
+é centavos) — é que o flight-plan trata `quality_rating`/`messaging_limit_tier`
+da Meta como o precursor invisível de ban no número único do produto, e
+836 mensagens automáticas pra um único destinatário em 4h é exatamente o
+padrão que dispararia isso. Ninguém verificou se esse episódio deixou marca
+na reputação do número. Não investiguei a causa raiz (não é meu papel
+escrever código) — só decompus a identidade e sinalizo.
+
+**Lead quente:** nenhum. `prospects.status='replied'` segue em **8** —
+mesmas linhas de sempre (revenda/consultoria/software, nenhum produtor). O
+único contato externo real (Gaia Tech) segue sem resposta há 108 dias.
+
+**Mudou no repo:** nada de engenharia — o único commit na janela de 7 dias é
+o próprio memo de 26/out.
+
+**Decisões abertas** (dias parados a partir de hoje, 02/nov):
+- **Reduzir a cadência desta rotina (mensal ou por evento)** — pedida pela
+  primeira vez em 14/set, **49 dias** sem execução, repetida toda semana
+  desde então (esta é a oitava leitura pós-fechamento). Confirmado agora que
+  o cron não mudou. Link de 1 clique:
+  `https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`.
+- **Follow-up humano com Gaia Tech** — aberta desde 17/jul, **108 dias
+  parada**. A mais velha da casa.
+- **CNPJ** — aberta desde 25/jul, **100 dias parada**.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **100 dias parada**. `verified_by` = 0/38.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **100 dias parada**, não medido de novo nesta rodada
+  (403 Forbidden já confirmado em três leituras anteriores, insistir não
+  traz dado novo).
+
+**As 3 prioridades da semana:**
+1. **Decidir a cadência desta rotina — 49 dias pedindo a mesma coisa de
+   graça, pela oitava vez.** É um clique do Stefano e encerra oito semanas
+   seguidas de memo repetindo os mesmos zeros.
+2. **Checar a reputação do número depois do loop de eco com `Corpal
+   Tratores` (03/ago, 836×2 mensagens em 4h15) — achado novo desta semana,
+   nunca antes reportado.** 15 minutos no WhatsApp Manager: olhar o
+   histórico de `quality_rating`/`messaging_limit_tier` daquele dia. Se não
+   deixou marca, arquivar; se deixou, é o tipo de dado que muda a leitura de
+   "por que o número não escalou".
+3. **Gaia Tech, Michel e CNPJ — 100-108 dias cada, decisão em voz alta.**
+   Ligar/visitar o Gaia Tech ou declarar a tentativa encerrada; mesma lógica
+   para Michel.
+
+**O que NÃO fazer:** nenhuma linha de código, nenhuma iteração de produto,
+nenhum disparo de prospecção, e nenhuma tentativa de "reengajar" o
+`Corpal Tratores` — não é lead, é ruído de bug encerrado sozinho. E, pela
+oitava vez, parar de gerar este memo semanal sobre um sistema sem mensagem
+nova há mais de um mês é a própria prioridade 1, não uma nota de rodapé.
+
+---
+
 ## Semana de 26/out — dia 105 de 60 (45 dias após o fechamento)
 
 *Nota de processo, à frente de tudo, pela sétima vez: esta é a SÉTIMA leitura
