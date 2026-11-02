@@ -56,38 +56,64 @@
 > o PM do Scorecard pede há sete semanas (14/set a 26/out) para reduzir sua própria cadência
 > sem resposta; esta rotina nunca tinha essa pergunta em aberto porque rodou quieta — mas,
 > com o projeto formalmente parado há 45 dias, a mesma pergunta cabe aqui. Ver corpo do PR.
+>
+> **Sexta passada (2026-11-02) — 52 dias de MATAR/PIVOTAR, e o achado real não é de
+> mercado.** Feed do resumo matinal veio vazio de novo (mesmo snapshot de 22/08, oitava
+> rodada seguida); cinco scouts, ~45 candidatos brutos, sete lidos a fundo por um analista
+> cada. **Cinco DISCUTIR (quatro novos + um fundido/atualizado), nove REGISTRAR, trinta e um
+> DESCARTAR** — nenhum PROTOTIPAR, nenhum IMPLEMENTAR, décima rodada seguida sem spike. Mas
+> o achado que importa mais esta semana não veio de nenhum scout: via GitHub (não só
+> `git log`), este `/intel` tem **dez pull requests em draft abertas desde 10/ago, nenhuma
+> revisada ou mesclada** — sete delas do próprio `/intel` (#32, #34–#39) e três do PM do
+> Scorecard (#4, #31, #33). `master` segue preso no estado de 07/09 em `docs/intel/` e
+> `intel.config.json`; cada rodada semanal (inclusive esta) reconstrói o acumulado lendo as
+> PRs anteriores no GitHub, porque nenhuma foi mesclada — e ao menos uma vez (entre #37 e
+> #38) um item inteiro (a triagem materna da Noora Health, India/WhatsApp) se perdeu nessa
+> reconstrução e só voltou nesta rodada porque fui direto ao GitHub checar. Isso ecoa, na
+> escala de dois meses, o mesmo padrão que o PM do Scorecard já denuncia há 7 semanas sobre
+> si mesmo: pedir decisão sem que ela chegue. Ver corpo do PR para a lista completa e a
+> recomendação.
 
 ## Em aberto — precisa de decisão do Stefano
 
-### [DISCUTIR 9/15] O gym da Stevi já simula persona difícil e tem juiz com veto — falta o padrão "desescalonamento por sicofania"?
-**Data:** 2026-10-26 · **Eixos:** P3 A1 D2 E1 L2
-**Fonte primária:** [SIM-UT: A User Simulation based Evaluation Framework for Medical Triage Chatbots, arXiv](https://arxiv.org/abs/2610.30412)
+### [DISCUTIR 11/15] O gym da Stevi já simula persona difícil e tem juiz com veto — falta o padrão "desescalonamento por sicofania", e agora há número pro modelo exato que a Stevi usa
+**Data:** 2026-11-02 (atualiza o item de 2026-10-26, score sobe de 9 para 11) · **Eixos:** P3 A2 D2 E2 L2
+**Fontes primárias:** [SIM-UT, arXiv](https://arxiv.org/abs/2610.30412) · [The Patient Is Always Right?, arXiv](https://arxiv.org/abs/2610.34013) · [Disentangling Robustness and Sycophancy, arXiv](https://arxiv.org/abs/2610.30696) · [Locating Sycophancy Across Training Stages, arXiv](https://arxiv.org/abs/2610.37788)
 
-**O que é:** framework de simulação de usuário (LLM interpretando personas de países de
-baixa/média renda — confusas, com erros de digitação, emocionalmente vulneráveis) testado
-contra três chatbots reais de triagem médica por WhatsApp (Índia, África do Sul, Quênia),
-comparando MedGemma contra ChatGPT e Claude em >5.000 turnos. O achado central: tanto o
-modelo médico quanto os de propósito geral caem no mesmo modo de falha — "desescalonamento
-por sicofania": o agente reconhece um sinal de alarme no primeiro turno e depois passa a
-minimizá-lo quando o usuário simulado minimiza os sintomas sem trazer dado clínico novo.
+**O que mudou desde 26/10:** três papers novos quantificam o mesmo modo de falha que o
+SIM-UT nomeou ("desescalonamento por sicofania"). O mais relevante testou **`claude-sonnet-5`
+— literalmente o modelo que `api/_lib/env.ts` usa como `MODELS.reasoning`, sem thinking
+estendido, a mesma configuração da Stevi em produção** — junto com 8 outros modelos, em
+1.391 casos clínicos com 5 níveis de crença do paciente (do distrator próximo à doença
+inventada). Adoção média da crença errada do usuário: 23,2%; sobe a 43,0% quando o usuário
+se apresenta como portador de doença rara "ignorado por médicos". Os outros dois papers
+(sicofania multilíngue, sicofania por estágio de treino) confirmam que o mecanismo é
+estrutural e surge no pós-treino, mas **não se aplicam ao stack real da Stevi**: o
+multilíngue não testa português nem os modelos do gateway (testa Llama/Qwen/GPT, 6 idiomas
+sem PT-BR, com uma inconsistência numérica não explicada no próprio texto); o de estágio de
+treino exclui explicitamente modelos de raciocínio — a categoria onde `claude-sonnet-5` vive.
+Os dois ficam de fora como item novo (dedup por mesmo movimento, regra do skill) e só
+reforçam a leitura de que o mecanismo é real e estrutural, não ruído de um paper isolado.
 
-**Por que toca este projeto:** a Stevi já tem, de forma independente, uma arquitetura quase
-idêntica — `api/_lib/gym/sim.ts` (persona LLM vs. brain real) e `api/_lib/gym/judge.ts`
-(juiz pareado com veto de segurança para prescrição/invenção/negação de ser IA). Mas
-`api/_lib/gym/personas.ts` testa pressão por dose e desconfiança, não o padrão específico de
-recuar depois de alertar. O golden set (`knowledge/goldenset/goldenset.jsonl`, 38 casos, 0
-`verified_by`) é sobre assinatura de agrônomo em texto, não sobre esse modo de falha
-multi-turno.
+**Por que toca este projeto:** reforça o gap já mapeado em `api/_lib/gym/personas.ts`
+(nenhuma das 11 personas testa "recuar de um alerta correto quando o usuário minimiza sem
+dado novo" — `perigoso-dose` testa resistir a ceder prescrição, não isso) e em
+`api/_lib/gym/judge.ts` (o veto não distingue "errou porque não sabia" de "sabia e cedeu sob
+pressão" — a distinção central do paper multilíngue, adotável no judge independente do resto
+daquele paper). O golden set (`knowledge/goldenset/goldenset.jsonl`, 38 casos, 0
+`verified_by`) continua sem nenhum caso desse modo de falha multi-turno.
 
 **Por que isso trava em DISCUTIR:** é capacidade pura de avaliação/qualidade — não ajuda a
 CONVERSAR COM PRODUTOR nem a DISPARAR ALERTA, os dois critérios que a `verdict_note` exige
-pra passar de DISCUTIR. E mesmo que ajudasse, o projeto está com **44 dias sem nenhum commit
-de engenharia** desde o fechamento do voo em MATAR/PIVOTAR — não há onde prototipar hoje.
+pra passar de DISCUTIR. E o projeto está com **52 dias sem nenhum commit de engenharia**
+desde o fechamento do voo em MATAR/PIVOTAR — não há onde prototipar hoje.
 
-**A pergunta:** vale adicionar uma persona "desescalona depois de alertar" ao
-`gym`/golden set **quando (e se)** o código for retomado, ou isso fica fora de escopo porque
-a Stevi nunca emite alerta médico de vida-ou-morte, só agronômico (o custo de um
-desescalonamento errado é mais baixo)?
+**A pergunta:** agora com número real para o modelo exato que a Stevi usa (23,2%/43,0% de
+adoção de crença errada, sem thinking ligado) — vale adicionar ao gym uma persona de "crença
+graduada" (nível 1 a 4, como no paper) e um sinalizador no judge que separe erro de
+capitulação, **quando (e se) o código for retomado**? Ou isso continua fora de escopo porque
+o pior caso agronômico da Stevi (uma praga desescalonada) tem custo muito menor que um
+diagnóstico médico desescalonado?
 
 ---
 
@@ -119,11 +145,129 @@ serve pra decisão futura de recomeçar — sem ação nenhuma até lá?
 
 ---
 
+### [DISCUTIR 10/15] A API da Anthropic vai rejeitar `temperature`/`top_p`/`top_k` numa versão futura — o fallback de resgate do Stevi sobreviveria?
+**Data:** 2026-11-02 · **Eixos:** P3 A2 D2 E2 L1
+**Fonte primária:** [Anthropic, migration guide 2026-10-21](https://platform.claude.com/docs/en/api/migration-2026-10-21#sampling-parameters)
+
+**O que é:** sob o header `anthropic-version: 2026-10-21` (opt-in — só ativa se o chamador
+mandar esse valor ou atualizar pra uma major de SDK que já o usa por padrão), a Messages API
+passa a devolver 400 se o corpo contiver `temperature`, `top_p` ou `top_k`, mesmo no valor
+default. Chamadas pinadas em `anthropic-version: 2023-06-01` continuam aceitando os três
+parâmetros normalmente — a doc não dá prazo de desativação da versão antiga.
+
+**Por que toca este projeto:** `api/_lib/llmDirect.ts:123` fixa `anthropic-version:
+'2023-06-01'` (hardcoded) — o fallback direto Anthropic não quebra hoje. Mas
+`api/_lib/gym/sim.ts:115` e `api/_lib/prospect/gym.ts:305` mandam `temperature: 0.9` em
+chamadas que passam por `chat()` (`api/_lib/llm.ts`) e caem nesse fallback
+(`tentarFallbackDireto`, linhas 194-219) se o OpenRouter (principal e reserva) falharem — uma
+rota de resgate que, segundo o achado colateral de 01/09 (virou #15), já teve um incidente
+real de falha silenciosa antes.
+
+**Por que isso trava em DISCUTIR:** a `verdict_note` exige CONVERSAR/ALERTAR pra passar de
+DISCUTIR — isto é manutenção de confiabilidade de uma rota nunca exercida, não capacidade
+nova.
+
+**A pergunta:** vale fixar para sempre `anthropic-version: 2023-06-01` no fallback direto com
+um teste de regressão que impeça upgrade acidental enquanto houver `temperature` nas
+chamadas do Gym — ou é esforço demais para uma rota que, 52 dias sem commit de produto e com
+o voo já fechado em MATAR/PIVOTAR, pode nunca ser exercida de novo?
+
+---
+
+### [DISCUTIR 9/15] KrishokTech remove claims de dosagem comparando contra evidência — mas resolve um problema que a Stevi decidiu não ter
+**Data:** 2026-11-02 · **Eixos:** P2 A2 D1 E2 L2
+**Fonte primária:** [KrishokTech: A Bengali Agricultural Advisory System with Explicit Authorization Controls, arXiv](https://arxiv.org/abs/2610.32817)
+
+**O que é:** sistema de conselho agrícola em bengali com verificador pós-geração que remove
+claims de dosagem comparando a alegação contra evidência recuperada do corpus BARI/BRRI (não
+um filtro sintático). Em avaliação com erros injetados artificialmente, pegou 114/118 claims
+de dosagem indevidos (~3,4% de falso-negativo) e 453/454 conflitos texto-imagem de cultura —
+números medidos sobre erro inserido, não sobre alucinação real em produção, sem baseline
+comparativo.
+
+**Por que toca este projeto:** `api/_lib/compliance.ts` já roda pós-geração na mesma posição
+arquitetural, mas resolve um problema diferente: o KrishokTech valida se a dose GERADA é
+suportada por evidência (a dose pode "passar" se bater com o corpus); `compliance.ts` bloqueia
+QUALQUER combinação de dose+verbo/marca/ingrediente ativo, correta ou não, porque a política
+`settled` da Stevi é "nunca dose, ponto" — não "só dose certa". A técnica de grounding do
+paper resolveria um problema que a Stevi decidiu não ter. O único pedaço transferível é
+metodológico: medir a taxa de falso-negativo do próprio gate injetando erros sintéticos —
+isso `compliance.ts` nunca teve, só `tests/compliance.test.ts` (exemplos pontuais, sem taxa
+de recall).
+
+**Por que isso trava em DISCUTIR:** capacidade pura de qualidade do gate, não ajuda a
+CONVERSAR/ALERTAR.
+
+**A pergunta:** vale um spike de meio dia pra medir a taxa de falso-negativo de
+`compliance.ts` (injetando dose/prescrição sintéticas como o paper fez), já que isso seria
+evidência de quão sólido é o portão legal pra uma decisão futura de retomada — ou é esforço
+sem retorno enquanto o projeto estiver em MATAR/PIVOTAR?
+
+---
+
+### [DISCUTIR 8/15] Relato de 404 precoce no Gemini 2.5 Flash público — já mitigado, mas alguém lê o alerta do canário?
+**Data:** 2026-11-02 · **Eixos:** P3 A1 D1 E2 L1
+**Fonte primária:** [Google AI Developers Forum, thread de 09/07/2026](https://discuss.ai.google.dev/t/gemini-2-5-flash-deprecated-without-warning-earlier-than-shutdown-date/174217)
+
+**O que é:** ao menos 11 desenvolvedores distintos corroboraram, em 09/07/2026, que
+`gemini-2.5-flash`/`flash-lite` passaram a devolver 404 "no longer available" na API pública
+(a mesma usada por `google-ai-studio`), meses antes do shutdown oficial anunciado (que era do
+Vertex, não da API pública). Resolvido em menos de 2h, atribuído a erro de configuração do
+Google (cargo do autor não verificável), sem repetição documentada desde então. Reconfirmado
+hoje: `ai.google.dev/gemini-api/docs/deprecations` ainda lista os dois modelos como GA, "No
+shutdown date announced" — o `known_gap` do config segue factualmente correto.
+
+**Por que toca este projeto:** mesmo modelo exato e mesmo provider (`google-ai-studio`) que
+`api/_lib/env.ts` (`transcribeProviderPin()`) pina para transcrição de voz. A mitigação para
+este exato cenário já existe e já está implantada: `api/_lib/canary.ts` (linhas 292-307)
+pinga esse pin todo dia e alerta os fundadores em falha (#15).
+
+**Por que isso trava em DISCUTIR:** risco de plataforma puro, já mitigado por arquitetura —
+não ajuda a CONVERSAR/ALERTAR.
+
+**A pergunta:** com zero tráfego de produção há semanas, alguém de fato está lendo o alerta
+diário do canário hoje? Vale confirmar que um 404 "model not found" especificamente (não um
+500/429 genérico) é reconhecido e nomeado com clareza antes do dia em que o canal for
+reativado, pra não descobrir a quebra só quando houver produtor real na ponta?
+
+---
+
+### [DISCUTIR 11/15] Triagem materna por WhatsApp na Índia mede o mesmo gargalo do goldenset — item recuperado de uma PR que nunca foi mesclada
+**Data:** 2026-11-02 (fonte de 2026-09-08, já lida em PR #37/12-out, que nunca foi mesclada e cujo conteúdo se perdeu nas reconstruções seguintes) · **Eixos:** P2 A2 D3 E2 L2
+**Fonte primária:** [Auditable Emergency Triage for Maternal and Newborn Care in India, arXiv](https://arxiv.org/abs/2609.09356)
+
+**O que é:** o serviço de WhatsApp da Noora Health (Índia, >50 mil consultas/mês) separa um
+LLM que extrai sintomas em vocabulário clínico estruturado de um motor de regras
+determinístico que decide o status de emergência. Em produção com 152.421 consultas
+triadas, recall subiu de 0,565 para 0,810 e F1 de 0,606 para 0,702, com over-escalation de
+17,8% sem aumento de emergência perdida. Clínicos adicionaram 48 regras desde o deployment
+sem precisar revalidar o sistema inteiro, porque a auditoria aponta exatamente qual etapa
+(extração ou regra) falhou.
+
+**Por que toca este projeto:** nenhum arquivo do repo implementa hoje esse padrão. A decisão
+de severidade real da Stevi é 100% texto livre de LLM em `api/_lib/reason.ts`, sem árvore de
+decisão auditável. `api/_lib/compliance.ts` e `api/_lib/tools/agrofit.ts` são deterministas,
+mas resolvem problemas diferentes (forma de saída / grounding de produto), não decisão de
+severidade. O goldenset (`knowledge/goldenset/goldenset.jsonl`) **não é o análogo da base de
+regras do paper** — é um fixture de avaliação estático (38 casos, 0 `verified_by`), não um
+mecanismo de produção que agrônomos editam incrementalmente sem revalidação completa.
+
+**Por que isso trava em DISCUTIR:** ataca direto o `known_gap` do goldenset, mas é capacidade
+pura de triagem, não ajuda a CONVERSAR/ALERTAR.
+
+**A pergunta:** o goldenset de pragas nunca foi revisado por agrônomo e a decisão de
+severidade hoje é 100% texto livre — isso justifica, quando (e se) o voo for retomado, um
+spike pra transformar o goldenset numa árvore de decisão auditável (reabrindo o acordo parado
+com o Michel, 100+ dias)? Ou, com o projeto em MATAR/PIVOTAR há 52 dias, isso é polimento que
+não deve competir com a decisão de recomeçar ou encerrar?
+
+---
+
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Nona rodada seguida (24/08,
-31/08, 07/09, 26/10) sem spike na campanha — e as três últimas (49 dias) com o voo já
-formalmente fechado em MATAR/PIVOTAR._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Décima rodada seguida (24/08,
+31/08, 07/09, 26/10, 02/11) sem spike na campanha — e as quatro últimas (52 dias) com o voo
+já formalmente fechado em MATAR/PIVOTAR._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
 produtor** ou a **disparar alerta**. Dos seis itens lidos a fundo em 07/09, o item de maior
@@ -144,6 +288,15 @@ por que o código existe.
 
 ## Radar
 
+- `2026-11-02` **Fundo RAIZ (Yield Lab Latam) capta até R$200M com tese "AI first" em agentes conversacionais via WhatsApp no agro.** 1ª tranche R$50M até mar/2027; cita Grão Direto/Ayrton, Gold Flux e Agroforte como portfólio-alvo — mas os três são comercialização de grãos e crédito B2B, não triagem agronômica ao pequeno produtor. Relevante só como contexto de apetite de capital para a decisão parada de venture vs. negócio próprio vs. matar, não como ameaça de produto. [AgFeed](https://agfeed.com.br/?p=83942) · 6/15
+- `2026-11-02` **Adendo à linha da Tellia (10/26): abre tier self-serve "Tellia Lite" a US$20/mês, com entrada por WhatsApp, direto a agrônomo/produtor independente.** Antes vendida só a cooperativas/agtechs (IFV, KWS Saat). Continua sendo estruturação de registro de campo (bookkeeping), não conselho/diagnóstico — fonte primária (Vinetur) está fora do ar, só cobertura secundária confirma. [iGrownews](https://igrownews.com/tellia-latest-news/) · 5/15
+- `2026-11-02` **Checagem mecânica: mudança do Supabase (tabelas novas no schema public não expostas por padrão na Data API desde 30/10) não afeta o Stevi — a migration mais recente do repo é de 24/08, antes do corte.** Risco verificado e descartado, não só registrado. [Supabase](https://supabase.com/changelog?types=breaking-change) · 6/15
+- `2026-11-02` **Vercel depreciou Node.js 20 para Builds/Functions em 01/10/2026 — `package.json` do roca tem `"node": ">=20"` (faixa aberta, não pino exato), risco baixo mas vale confirmar a versão real selecionada no painel Vercel.** [Vercel](https://vercel.com/changelog/node-js-20-is-being-deprecated) · 6/15
+- `2026-11-02` **Earth Search (Element84) tem depreciação "armada" (sem data) da coleção STAC antiga `sentinel-2-l2a` (usada hoje para NDVI) em favor de `sentinel-2-c1-l2a`.** Mantenedores prometem avisar por mailing list antes de depreciar — nada muda agora, mas é known_gap latente de plataforma. [GitHub](https://github.com/Element84/earth-search/issues/31) · 6/15
+- `2026-11-02` **Kapso (Chile) levanta US$1,4M seed para infraestrutura no-code/API de agentes de IA no WhatsApp Business API — camada de plataforma adjacente, não concorrente de produto.** [Signalbase](https://www.trysignalbase.com/news/funding/kapso-raises-1-4m-seed-for-whatsapp-ai-agents) · 6/15
+- `2026-11-02` **Embrapa assina memorando de 5 anos com 4 instituições chinesas para IA/IoT em centros de serviço de maquinário inteligente na agricultura familiar.** Mesma casa do RAImundo (já monitorado, sem sinal público desde out/2025); não menciona chatbot/WhatsApp diretamente, mas é contexto institucional de aposta pública em IA pro pequeno produtor. [Movimento Econômico](https://movimentoeconomico.com.br/agronegocio/2026/10/06/embrapa-firma-parceria-com-a-china-para-ampliar-uso-de-ia-na-agricultura-familiar/) · 6/15
+- `2026-11-02` **DeclineCraft: benchmark com 27 LLMs mostra que RAG iterativo tende a reduzir abstenção correta em pergunta sem resposta — mais uma razão documentada para a Stevi não migrar do lookup determinístico por chave para RAG.** Reforça, sem mudar, a arquitetura já adotada (mesmo padrão do item de 24/08 sobre RAG denso). [arXiv](https://arxiv.org/abs/2610.28340) · 7/15
+- `2026-11-02` **Agri-SCHOLAR: agentes LLM definem limites de parâmetro de lavoura e um otimizador busca dentro deles usando simulador de cultura, emitindo conselho recorrente ligado ao estado real da safra.** Ângulo de notificação proativa `bets[1]`-adjacente, mas exige infraestrutura de simulação que a Stevi não tem e não teria em qualquer spike de curto prazo. [arXiv](https://arxiv.org/abs/2610.31003) · 6/15
 - `2026-10-26` **OpenRouter rebatiza "Pay-as-you-go" para "Standard" e lança tier "Business" (8%, DPA, regional EU/US) — taxa que a Stevi paga (5,5%, nas duas contas) não muda.** Closing da aquisição pela Stripe ainda sem confirmação oficial. [OpenRouter](https://openrouter.ai/pricing) · 7/15
 - `2026-10-26` **Anthropic confirma Claude Haiku 4.5 (usado no router da Stevi) segue ativo — só o Sonnet 4.5 foi formalmente depreciado (retirada 30/11/2026, substituído por 5.5, que não afeta a Stevi).** [Anthropic](https://platform.claude.com/docs/en/about-claude/model-deprecations) · 7/15
 - `2026-10-26` **Vercel para de cachear respostas com `Vary: Cookie` no CDN e renomeia "Edge Requests" pra "CDN Requests" no billing.** Sem mudança de preço anunciada; vale checar se alguma rota da Stevi seta cookie e dependia desse cache. [Vercel](https://community.vercel.com/t/vercel-weekly-october-5-2026/50269) · 7/15
