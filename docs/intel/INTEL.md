@@ -38,168 +38,236 @@
 > excesso não é nem feature, é design. A pergunta da Fecon (aberta 24/08) fechou sozinha —
 > a feira aconteceu 1–3/09 e gerou zero cadastros via `#fecon`/`#fecon-cartaz` — e foi
 > movida pro Arquivo como resultado, não como decisão.
+>
+> **Quinta passada (2026-10-26) — 49 dias de silêncio no `/intel`, e o projeto fechou no
+> meio deles.** O voo de 60 dias terminou em 11/set/2026 (dia 60) com veredito qualitativo
+> **MATAR/PIVOTAR** (memo de FECHAMENTO do PM do Scorecard, `a01212c`) — a coorte D7 nunca
+> saiu de n=1, e todo critério booleano do scorecard (parceiro pagando, indicação espontânea,
+> 10 leads pro teste de matar) ficou em zero absoluto pelos 60 dias. Desde então, **44 dias
+> sem um commit de engenharia de produto** — só memos semanais de status, todos confirmando
+> os mesmos zeros. Feed do resumo matinal veio vazio de novo para este projeto (mesmo
+> snapshot de 22/08); cinco scouts, ~43 candidatos brutos, seis lidos a fundo por um analista
+> cada. **Dois DISCUTIR, dezenove REGISTRAR, dezoito DESCARTAR — nenhum PROTOTIPAR, nenhum
+> IMPLEMENTAR**, nona rodada seguida sem spike. Os cinco itens que estavam em "Em aberto"
+> (dois desde 24/08, três desde 07/09) envelheceram além de 21 dias sem decisão do Stefano e
+> foram movidos pro Arquivo nesta rodada, por regra mecânica — um deles (a cobrança de
+> mensagem de serviço no WhatsApp a partir de 1/out) se confirmou exatamente como previsto,
+> mas sem efeito prático hoje porque o sistema não processa tráfego real. **Nota de processo:**
+> o PM do Scorecard pede há sete semanas (14/set a 26/out) para reduzir sua própria cadência
+> sem resposta; esta rotina nunca tinha essa pergunta em aberto porque rodou quieta — mas,
+> com o projeto formalmente parado há 45 dias, a mesma pergunta cabe aqui. Ver corpo do PR.
+>
+> **Sexta passada (2026-11-02) — 52 dias de MATAR/PIVOTAR, e o achado real não é de
+> mercado.** Feed do resumo matinal veio vazio de novo (mesmo snapshot de 22/08, oitava
+> rodada seguida); cinco scouts, ~45 candidatos brutos, sete lidos a fundo por um analista
+> cada. **Cinco DISCUTIR (quatro novos + um fundido/atualizado), nove REGISTRAR, trinta e um
+> DESCARTAR** — nenhum PROTOTIPAR, nenhum IMPLEMENTAR, décima rodada seguida sem spike. Mas
+> o achado que importa mais esta semana não veio de nenhum scout: via GitHub (não só
+> `git log`), este `/intel` tem **dez pull requests em draft abertas desde 10/ago, nenhuma
+> revisada ou mesclada** — sete delas do próprio `/intel` (#32, #34–#39) e três do PM do
+> Scorecard (#4, #31, #33). `master` segue preso no estado de 07/09 em `docs/intel/` e
+> `intel.config.json`; cada rodada semanal (inclusive esta) reconstrói o acumulado lendo as
+> PRs anteriores no GitHub, porque nenhuma foi mesclada — e ao menos uma vez (entre #37 e
+> #38) um item inteiro (a triagem materna da Noora Health, India/WhatsApp) se perdeu nessa
+> reconstrução e só voltou nesta rodada porque fui direto ao GitHub checar. Isso ecoa, na
+> escala de dois meses, o mesmo padrão que o PM do Scorecard já denuncia há 7 semanas sobre
+> si mesmo: pedir decisão sem que ela chegue. Ver corpo do PR para a lista completa e a
+> recomendação.
 
 ## Em aberto — precisa de decisão do Stefano
 
-### [DISCUTIR 11/15] Prompt logging na OpenRouter está desligado nas duas contas?
-**Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E3 L2
-**Fonte primária:** [OpenRouter Terms of Service, Seção 6.1–6.5](https://openrouter.ai/terms)
+### [DISCUTIR 11/15] O gym da Stevi já simula persona difícil e tem juiz com veto — falta o padrão "desescalonamento por sicofania", e agora há número pro modelo exato que a Stevi usa
+**Data:** 2026-11-02 (atualiza o item de 2026-10-26, score sobe de 9 para 11) · **Eixos:** P3 A2 D2 E2 L2
+**Fontes primárias:** [SIM-UT, arXiv](https://arxiv.org/abs/2610.30412) · [The Patient Is Always Right?, arXiv](https://arxiv.org/abs/2610.34013) · [Disentangling Robustness and Sycophancy, arXiv](https://arxiv.org/abs/2610.30696) · [Locating Sycophancy Across Training Stages, arXiv](https://arxiv.org/abs/2610.37788)
 
-**O que é:** a Seção 6.2 do ToS, atualizada em 31/08, diz — citação literal — que **se**
-"prompt logging" estiver habilitado nas configurações da conta, a OpenRouter ganha
-licença mundial, perpétua e irrevogável para hospedar, reproduzir, adaptar e distribuir
-o conteúdo do usuário; a 6.1 estende isso a **venda em forma anonimizada**. É opt-in e
-desligado por padrão — não é uma reivindicação automática, ao contrário do que a
-manchete sugere.
+**O que mudou desde 26/10:** três papers novos quantificam o mesmo modo de falha que o
+SIM-UT nomeou ("desescalonamento por sicofania"). O mais relevante testou **`claude-sonnet-5`
+— literalmente o modelo que `api/_lib/env.ts` usa como `MODELS.reasoning`, sem thinking
+estendido, a mesma configuração da Stevi em produção** — junto com 8 outros modelos, em
+1.391 casos clínicos com 5 níveis de crença do paciente (do distrator próximo à doença
+inventada). Adoção média da crença errada do usuário: 23,2%; sobe a 43,0% quando o usuário
+se apresenta como portador de doença rara "ignorado por médicos". Os outros dois papers
+(sicofania multilíngue, sicofania por estágio de treino) confirmam que o mecanismo é
+estrutural e surge no pós-treino, mas **não se aplicam ao stack real da Stevi**: o
+multilíngue não testa português nem os modelos do gateway (testa Llama/Qwen/GPT, 6 idiomas
+sem PT-BR, com uma inconsistência numérica não explicada no próprio texto); o de estágio de
+treino exclui explicitamente modelos de raciocínio — a categoria onde `claude-sonnet-5` vive.
+Os dois ficam de fora como item novo (dedup por mesmo movimento, regra do skill) e só
+reforçam a leitura de que o mecanismo é real e estrutural, não ruído de um paper isolado.
 
-**Por que toca este projeto:** o único ponto de chamada do gateway principal de LLM
-(`api/_lib/llm.ts`) não tem nenhum controle de política de dados — nenhuma referência a
-`logging`/`privacy`/`retention` no repo inteiro. E desde #14 existem **duas** contas
-OpenRouter em produção: a principal e a chave reserva (`OPENROUTER_FALLBACK_API_KEY`,
-do projeto twin-me), cada uma com sua própria configuração de conta. Mensagens reais de
-produtor passam por aqui — texto, foto descrita, dúvida agronômica.
+**Por que toca este projeto:** reforça o gap já mapeado em `api/_lib/gym/personas.ts`
+(nenhuma das 11 personas testa "recuar de um alerta correto quando o usuário minimiza sem
+dado novo" — `perigoso-dose` testa resistir a ceder prescrição, não isso) e em
+`api/_lib/gym/judge.ts` (o veto não distingue "errou porque não sabia" de "sabia e cedeu sob
+pressão" — a distinção central do paper multilíngue, adotável no judge independente do resto
+daquele paper). O golden set (`knowledge/goldenset/goldenset.jsonl`, 38 casos, 0
+`verified_by`) continua sem nenhum caso desse modo de falha multi-turno.
 
-**Por que isso não vira código:** a mitigação inteira é entrar no dashboard de duas
-contas e confirmar (ou desligar) uma opção. Nenhuma linha de `api/_lib/llm.ts` muda por
-causa disso — por isso o veredito trava em DISCUTIR mesmo com score bruto de 11 (que
-cairia em PROTOTIPAR): a `verdict_note` exige que PROTOTIPAR/IMPLEMENTAR ajudem a
-CONVERSAR ou ALERTAR via mudança no repositório, e aqui não há o que mudar no repositório.
+**Por que isso trava em DISCUTIR:** é capacidade pura de avaliação/qualidade — não ajuda a
+CONVERSAR COM PRODUTOR nem a DISPARAR ALERTA, os dois critérios que a `verdict_note` exige
+pra passar de DISCUTIR. E o projeto está com **52 dias sem nenhum commit de engenharia**
+desde o fechamento do voo em MATAR/PIVOTAR — não há onde prototipar hoje.
 
-**A pergunta:** as duas contas OpenRouter (a principal do projeto e a reserva do
-twin-me usada como `OPENROUTER_FALLBACK_API_KEY`) têm "prompt logging" desligado? Se sim
-— que é o padrão — o risco já está mitigado e este item pode ir pro Arquivo na próxima
-rodada. Se não, foi checado quando a chave reserva foi configurada em #14, ou fica em
-aberto até alguém confirmar manualmente?
-
----
-
-### [DISCUTIR 9/15] Um projeto universitário gratuito já roda o mesmo mecanismo do Stevi — em cacau
-**Data:** 2026-09-07 · **Eixos:** P3 A1 D2 E1 L2
-**Fonte:** [App do Cacau — Revista Cacau & Chocolate](https://www.cacauechocolate.com.br/v1/2026/08/26/app-do-cacau-a-inteligencia-artificial-aplicada-a-lavoura/)
-
-**O que é:** a UESC (Bahia), com parceiros do Peru e da Holanda e financiamento do
-Instituto Arapyaú, lançou na ExpoCacau 2026 um serviço gratuito por WhatsApp que recebe
-texto, áudio ou foto da lavoura de cacau e devolve diagnóstico preliminar de 8 doenças,
-11 pragas e deficiências nutricionais — com a mesma postura de triagem-não-prescrição da
-Stevi, no mesmo texto: "não substitui o trabalho do agrônomo ou técnico agrícola, mas
-ajuda a identificar problemas que exigem um profissional qualificado".
-
-**Por que toca este projeto:** é literalmente o mesmo mecanismo (`api/_lib/pipeline.ts`,
-`api/_lib/compliance.ts`, `api/_lib/reason.ts`) — WhatsApp, multimodal, triagem, sem dose
-— só que como projeto universitário gratuito financiado por fundação, hoje em cacau na
-Bahia. Nenhum número de usuários foi divulgado.
-
-**O que a fonte não prova:** se esse padrão institucional (universidade + fundação, sem
-necessidade de monetizar) já está se movendo para café em Minas.
-
-**A pergunta:** vale checar se algum programa estadual, EPAMIG ou a própria Embrapa tem
-um movimento equivalente nascendo para café? Se esse modelo (universidade financiada,
-gratuito pra sempre) se replicar no beachhead, muda como a Stevi precisa se posicionar
-ou monetizar — não é ameaça hoje, mas é o tipo de concorrente que nenhuma rodada
-`prospect/*` está olhando.
+**A pergunta:** agora com número real para o modelo exato que a Stevi usa (23,2%/43,0% de
+adoção de crença errada, sem thinking ligado) — vale adicionar ao gym uma persona de "crença
+graduada" (nível 1 a 4, como no paper) e um sinalizador no judge que separe erro de
+capitulação, **quando (e se) o código for retomado**? Ou isso continua fora de escopo porque
+o pior caso agronômico da Stevi (uma praga desescalonada) tem custo muito menor que um
+diagnóstico médico desescalonado?
 
 ---
 
-### [DISCUTIR 8/15] Um app pago com IA agronômica no seu beachhead tem 100 downloads — vale citar isso?
-**Data:** 2026-09-07 · **Eixos:** P2 A1 D1 E2 L2
-**Fonte:** [Café 360 Premium — Zavarise Apps](https://www.zavarise.com.br/cafe360/)
+### [DISCUTIR 8/15] Café 360 e agora Instacrops: dois agtechs independentes abandonaram app por WhatsApp — é munição suficiente pro README de posicionamento?
+**Data:** 2026-10-26 · **Eixos:** P2 A1 D2 E1 L2
+**Fonte primária:** [Instacrops amplía su portafolio de agentes de IA que operan por WhatsApp, Diario Financiero](https://www.df.cl/df-lab/innovacion-y-startups/instacrops-ampliara-su-portafolio-de-agentes-de-ia-que-operan-por-whatsapp)
 
-**O que é:** app pago (R$19,90/mês) de gestão de lavoura de café com "consultor
-agrônomo com IA" (manuais EPAMIG/EMATER, diagnóstico por foto de folha), cobrindo
-explicitamente Sul de Minas, Cerrado Mineiro, Matas de Minas, Mogiana — sobreposição
-geográfica direta com o beachhead. Confirmado na Play Store: **100+ downloads**. O
-desenvolvedor (Zavarise Apps) também publica "Fazenda 360", "Pecuária 360" e um app de
-áudio de conteúdo religioso — perfil de fábrica de apps de nicho pequena, não agtech
-financiada.
+**O que é:** a agtech chilena Instacrops (IoT + satélite, ~3.000 usuários em 6 países
+latino-americanos, clientes como Westfalia/Dole/Nestlé) lançou dois agentes de IA só dentro
+do app próprio em 2023; um estudo interno achou que só 15% dos usuários usava o app, contra
+a afirmação do CEO de que "80% dos produtores da região gerenciam o negócio por WhatsApp" —
+os dois números não vêm do mesmo estudo, mas a empresa migrou os agentes pra WhatsApp e
+agora promete (meados de 2026, financiada por crédito AWS) uma plataforma onde o produtor
+cria os próprios agentes.
 
-**Por que toca este projeto:** o `README.md` do flight plan argumenta que apps de agro
-falham porque pedem que o produtor trabalhe (download, cadastro, dashboard vazio) — essa
-é exatamente a tese de `bets[0]` ("WhatsApp é a única interface viável — não construir
-app"). O Café 360 é esse padrão exato — e com IA embutida, cobertura geográfica idêntica
-e mensalidade baixa, ainda assim tração desprezível. É evidência de campo a favor da
-aposta, não contra.
+**Por que toca este projeto:** é o segundo caso independente (depois do Café 360, já
+registrado no Arquivo como "evidência de campo a favor da aposta, não contra") de uma
+empresa agtech abandonando app em favor de WhatsApp por adoção medida — corrobora
+`bets[0]` ("WhatsApp é a única interface viável — não construir app"), agora em escala muito
+maior (3.000 usuários vs. ~100 downloads do Café 360), ainda que com evidência mais fraca
+(números autodeclarados, sem auditoria externa como a contagem da Play Store) e zero overlap
+geográfico ou de cultura com o beachhead da Stevi (café, Sul de Minas — a Instacrops é
+fruticultura/commodities industrial na América Latina hispânica).
 
-**A pergunta:** vale citar o Café 360 (app pago, mesma região, IA embutida, 100+
-downloads) como exemplo concreto no README de posicionamento — ou n=1 concorrente
-pequeno é fraco demais pra virar argumento citável, e a melhor ação é só arquivar como
-mais um data point?
-
----
-
-### [DISCUTIR 10/15] O primeiro alerta sai às 08:00 para todo mundo?
-**Data:** 2026-08-24 · **Eixos:** P2 A2 D2 E2 L2
-**Fontes:** [STEPS — push auto-disparado, Douyin](https://arxiv.org/abs/2608.01949) · [Just-in-time adaptive interventions, OzCHI](https://arxiv.org/abs/2608.09294)
-
-**O que é:** o STEPS troca o paradigma de push por auto-disparo — dois agentes decidem
-*se* enviar e *quando* se reinvocar, com recompensa que penaliza explicitamente o usuário
-**desligar a permissão de push**. A/B online de 14 dias, aleatorizado por dispositivo,
-contra duas baselines nomeadas, sobre logs de 6+ meses de mais de 1 bilhão de usuários:
-+0,28% em dias ativos e **−1,91% na taxa de desativação da permissão**. O paper de OzCHI
-ataca o mesmo movimento pelo lado qualitativo e nomeia o "descompasso ecológico": slot
-vazio na agenda não é receptividade — participantes recusaram janelas algoritmicamente
-válidas por cansaço. Donde a heurística de pegar carona numa rotina existente em vez de
-criar horário próprio.
-
-**Por que toca este projeto:** a `bets[1]` diz que notificação proativa no momento certo
-vale mais que resposta boa sob demanda. Hoje o `vercel.json` tem `0 11 * * *` — que em UTC
-é **08:00 BRT para todo mundo**, os três tipos de alerta no mesmo horário. E a disciplina
-de horário **já existe neste repo, do lado errado do funil**:
-`api/_lib/prospect/core.ts` tem `BRT_OFFSET_MIN`, `HOURS_START = 9`, `HOURS_END = 18` e
-gate de dia útil — para falar com **empresa**. O produtor recebe geada e queimada às oito
-da manhã.
-
-**O que a fonte não prova:** o Douyin otimiza timing sobre trajetória de bilhões; a Stevi
-tem 1 usuário externo real que mandou 1 mensagem em 17/jul. O OzCHI é 16 participantes em
-laboratório, sem desfecho, em atividade física. **Nenhum dos dois mecanismos roda com esse
-n** — a transferência é um salto, não uma extensão.
-
-**A pergunta:** quando o canal destravar, o primeiro alerta de geada sai às 08:00 para
-todo mundo, ou você segura até saber a que hora **este** produtor lê o WhatsApp? Com n=1 e
-`messages.intent` vindo NULL — o que zera o cálculo de hábito em `api/_lib/cohort.ts` —
-aprender o horário é impossível. A escolha real é entre um horário **argumentado por tipo
-de alerta** (geada na véspera à noite, quando ainda dá pra cobrir o café; queimada na hora,
-sem janela; vazio sanitário em horário comercial) e continuar com um horário único para os
-três. Qual dos dois — e você aceita tomar essa decisão sem dado?
+**A pergunta:** dois data points externos (Café 360 + Instacrops) já são munição suficiente
+pra citar o padrão "app perde pra WhatsApp no agro" como argumento validado no README de
+posicionamento, ou o projeto segue dormente em MATAR/PIVOTAR e esse tipo de evidência só
+serve pra decisão futura de recomeçar — sem ação nenhuma até lá?
 
 ---
 
-### [DISCUTIR 10/15] A partir de 01/10 não sobra caminho gratuito no WhatsApp
-**Data:** 2026-08-24 · **Eixos:** P3 A2 D3 E2 L2
-**Fonte primária:** [Meta, "Pricing for non-template messages"](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages)
+### [DISCUTIR 10/15] A API da Anthropic vai rejeitar `temperature`/`top_p`/`top_k` numa versão futura — o fallback de resgate do Stevi sobreviveria?
+**Data:** 2026-11-02 · **Eixos:** P3 A2 D2 E2 L1
+**Fonte primária:** [Anthropic, migration guide 2026-10-21](https://platform.claude.com/docs/en/api/migration-2026-10-21#sampling-parameters)
 
-**O que é:** a doc da Meta afirma verbatim que *"Effective October 1, 2026, Meta will
-charge for service messages, which have not been charged since November 2024"* e que
-passará a cobrar utility enviada dentro da janela aberta de 24h. Tarifas por país saem até
-**01/09/2026**.
+**O que é:** sob o header `anthropic-version: 2026-10-21` (opt-in — só ativa se o chamador
+mandar esse valor ou atualizar pra uma major de SDK que já o usa por padrão), a Messages API
+passa a devolver 400 se o corpo contiver `temperature`, `top_p` ou `top_k`, mesmo no valor
+default. Chamadas pinadas em `anthropic-version: 2023-06-01` continuam aceitando os três
+parâmetros normalmente — a doc não dá prazo de desativação da versão antiga.
 
-**Nota de método:** dois scouts se contradisseram sobre isto. A explicação é que a
-**doc da Meta se contradiz em duas páginas vivas** — a página-mãe `/whatsapp/pricing` não
-foi atualizada e ainda diz que utility em janela aberta é grátis. Quem ler só ela conclui o
-oposto. Os fornecedores de BSP estão certos.
+**Por que toca este projeto:** `api/_lib/llmDirect.ts:123` fixa `anthropic-version:
+'2023-06-01'` (hardcoded) — o fallback direto Anthropic não quebra hoje. Mas
+`api/_lib/gym/sim.ts:115` e `api/_lib/prospect/gym.ts:305` mandam `temperature: 0.9` em
+chamadas que passam por `chat()` (`api/_lib/llm.ts`) e caem nesse fallback
+(`tentarFallbackDireto`, linhas 194-219) se o OpenRouter (principal e reserva) falharem — uma
+rota de resgate que, segundo o achado colateral de 01/09 (virou #15), já teve um incidente
+real de falha silenciosa antes.
 
-**O que a exposição realmente é, calculada no código:** o alerta **não encarece**.
-`alertSendPlan()` em `api/_lib/alerts.ts` só devolve `freeform` se o produtor falou nas
-últimas 24h; todo alerta proativo real cai em `template`, que já é pago hoje. Delta: zero.
-O que encarece é o caminho conversacional — `api/_lib/pipeline.ts` emite um `adapter.send`
-por turno. Pelo desenho, ~20 mensagens por produtor por mês; à tarifa utility BR corrente
-reportada por BSP, ~R$ 0,75 por produtor por mês. **Irrelevante como custo.**
+**Por que isso trava em DISCUTIR:** a `verdict_note` exige CONVERSAR/ALERTAR pra passar de
+DISCUTIR — isto é manutenção de confiabilidade de uma rota nunca exercida, não capacidade
+nova.
 
-**O risco real não é preço, é continuidade de cobrança.** O `STATE.md` registra que o canal
-inteiro morreu por **billing** (#131042) em julho, não por engajamento. A partir de 01/10
-uma falha de pagamento deixa de silenciar só o alerta e passa a silenciar **toda** resposta
-da Stevi.
+**A pergunta:** vale fixar para sempre `anthropic-version: 2023-06-01` no fallback direto com
+um teste de regressão que impeça upgrade acidental enquanto houver `temperature` nas
+chamadas do Gym — ou é esforço demais para uma rota que, 52 dias sem commit de produto e com
+o voo já fechado em MATAR/PIVOTAR, pode nunca ser exercida de novo?
 
-**A pergunta:** a conta de billing da WABA está com método de pagamento válido e fundeado
-hoje, e alguém olha isso semanalmente? A tarifa BR que dimensiona tudo sai em 01/09, dentro
-dos 18 dias que restam. *(Rebaixado de PROTOTIPAR pela `verdict_note`: 01/10 cai vinte dias
-**depois** do fim do voo.)*
+---
+
+### [DISCUTIR 9/15] KrishokTech remove claims de dosagem comparando contra evidência — mas resolve um problema que a Stevi decidiu não ter
+**Data:** 2026-11-02 · **Eixos:** P2 A2 D1 E2 L2
+**Fonte primária:** [KrishokTech: A Bengali Agricultural Advisory System with Explicit Authorization Controls, arXiv](https://arxiv.org/abs/2610.32817)
+
+**O que é:** sistema de conselho agrícola em bengali com verificador pós-geração que remove
+claims de dosagem comparando a alegação contra evidência recuperada do corpus BARI/BRRI (não
+um filtro sintático). Em avaliação com erros injetados artificialmente, pegou 114/118 claims
+de dosagem indevidos (~3,4% de falso-negativo) e 453/454 conflitos texto-imagem de cultura —
+números medidos sobre erro inserido, não sobre alucinação real em produção, sem baseline
+comparativo.
+
+**Por que toca este projeto:** `api/_lib/compliance.ts` já roda pós-geração na mesma posição
+arquitetural, mas resolve um problema diferente: o KrishokTech valida se a dose GERADA é
+suportada por evidência (a dose pode "passar" se bater com o corpus); `compliance.ts` bloqueia
+QUALQUER combinação de dose+verbo/marca/ingrediente ativo, correta ou não, porque a política
+`settled` da Stevi é "nunca dose, ponto" — não "só dose certa". A técnica de grounding do
+paper resolveria um problema que a Stevi decidiu não ter. O único pedaço transferível é
+metodológico: medir a taxa de falso-negativo do próprio gate injetando erros sintéticos —
+isso `compliance.ts` nunca teve, só `tests/compliance.test.ts` (exemplos pontuais, sem taxa
+de recall).
+
+**Por que isso trava em DISCUTIR:** capacidade pura de qualidade do gate, não ajuda a
+CONVERSAR/ALERTAR.
+
+**A pergunta:** vale um spike de meio dia pra medir a taxa de falso-negativo de
+`compliance.ts` (injetando dose/prescrição sintéticas como o paper fez), já que isso seria
+evidência de quão sólido é o portão legal pra uma decisão futura de retomada — ou é esforço
+sem retorno enquanto o projeto estiver em MATAR/PIVOTAR?
+
+---
+
+### [DISCUTIR 8/15] Relato de 404 precoce no Gemini 2.5 Flash público — já mitigado, mas alguém lê o alerta do canário?
+**Data:** 2026-11-02 · **Eixos:** P3 A1 D1 E2 L1
+**Fonte primária:** [Google AI Developers Forum, thread de 09/07/2026](https://discuss.ai.google.dev/t/gemini-2-5-flash-deprecated-without-warning-earlier-than-shutdown-date/174217)
+
+**O que é:** ao menos 11 desenvolvedores distintos corroboraram, em 09/07/2026, que
+`gemini-2.5-flash`/`flash-lite` passaram a devolver 404 "no longer available" na API pública
+(a mesma usada por `google-ai-studio`), meses antes do shutdown oficial anunciado (que era do
+Vertex, não da API pública). Resolvido em menos de 2h, atribuído a erro de configuração do
+Google (cargo do autor não verificável), sem repetição documentada desde então. Reconfirmado
+hoje: `ai.google.dev/gemini-api/docs/deprecations` ainda lista os dois modelos como GA, "No
+shutdown date announced" — o `known_gap` do config segue factualmente correto.
+
+**Por que toca este projeto:** mesmo modelo exato e mesmo provider (`google-ai-studio`) que
+`api/_lib/env.ts` (`transcribeProviderPin()`) pina para transcrição de voz. A mitigação para
+este exato cenário já existe e já está implantada: `api/_lib/canary.ts` (linhas 292-307)
+pinga esse pin todo dia e alerta os fundadores em falha (#15).
+
+**Por que isso trava em DISCUTIR:** risco de plataforma puro, já mitigado por arquitetura —
+não ajuda a CONVERSAR/ALERTAR.
+
+**A pergunta:** com zero tráfego de produção há semanas, alguém de fato está lendo o alerta
+diário do canário hoje? Vale confirmar que um 404 "model not found" especificamente (não um
+500/429 genérico) é reconhecido e nomeado com clareza antes do dia em que o canal for
+reativado, pra não descobrir a quebra só quando houver produtor real na ponta?
+
+---
+
+### [DISCUTIR 11/15] Triagem materna por WhatsApp na Índia mede o mesmo gargalo do goldenset — item recuperado de uma PR que nunca foi mesclada
+**Data:** 2026-11-02 (fonte de 2026-09-08, já lida em PR #37/12-out, que nunca foi mesclada e cujo conteúdo se perdeu nas reconstruções seguintes) · **Eixos:** P2 A2 D3 E2 L2
+**Fonte primária:** [Auditable Emergency Triage for Maternal and Newborn Care in India, arXiv](https://arxiv.org/abs/2609.09356)
+
+**O que é:** o serviço de WhatsApp da Noora Health (Índia, >50 mil consultas/mês) separa um
+LLM que extrai sintomas em vocabulário clínico estruturado de um motor de regras
+determinístico que decide o status de emergência. Em produção com 152.421 consultas
+triadas, recall subiu de 0,565 para 0,810 e F1 de 0,606 para 0,702, com over-escalation de
+17,8% sem aumento de emergência perdida. Clínicos adicionaram 48 regras desde o deployment
+sem precisar revalidar o sistema inteiro, porque a auditoria aponta exatamente qual etapa
+(extração ou regra) falhou.
+
+**Por que toca este projeto:** nenhum arquivo do repo implementa hoje esse padrão. A decisão
+de severidade real da Stevi é 100% texto livre de LLM em `api/_lib/reason.ts`, sem árvore de
+decisão auditável. `api/_lib/compliance.ts` e `api/_lib/tools/agrofit.ts` são deterministas,
+mas resolvem problemas diferentes (forma de saída / grounding de produto), não decisão de
+severidade. O goldenset (`knowledge/goldenset/goldenset.jsonl`) **não é o análogo da base de
+regras do paper** — é um fixture de avaliação estático (38 casos, 0 `verified_by`), não um
+mecanismo de produção que agrônomos editam incrementalmente sem revalidação completa.
+
+**Por que isso trava em DISCUTIR:** ataca direto o `known_gap` do goldenset, mas é capacidade
+pura de triagem, não ajuda a CONVERSAR/ALERTAR.
+
+**A pergunta:** o goldenset de pragas nunca foi revisado por agrônomo e a decisão de
+severidade hoje é 100% texto livre — isso justifica, quando (e se) o voo for retomado, um
+spike pra transformar o goldenset numa árvore de decisão auditável (reabrindo o acordo parado
+com o Michel, 100+ dias)? Ou, com o projeto em MATAR/PIVOTAR há 52 dias, isso é polimento que
+não deve competir com a decisão de recomeçar ou encerrar?
 
 ---
 
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Terceira rodada seguida (24/08,
-31/08, 07/09) e sexto veredito sem spike na campanha._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Décima rodada seguida (24/08,
+31/08, 07/09, 26/10, 02/11) sem spike na campanha — e as quatro últimas (52 dias) com o voo
+já formalmente fechado em MATAR/PIVOTAR._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
 produtor** ou a **disparar alerta**. Dos seis itens lidos a fundo em 07/09, o item de maior
@@ -220,6 +288,33 @@ por que o código existe.
 
 ## Radar
 
+- `2026-11-02` **Fundo RAIZ (Yield Lab Latam) capta até R$200M com tese "AI first" em agentes conversacionais via WhatsApp no agro.** 1ª tranche R$50M até mar/2027; cita Grão Direto/Ayrton, Gold Flux e Agroforte como portfólio-alvo — mas os três são comercialização de grãos e crédito B2B, não triagem agronômica ao pequeno produtor. Relevante só como contexto de apetite de capital para a decisão parada de venture vs. negócio próprio vs. matar, não como ameaça de produto. [AgFeed](https://agfeed.com.br/?p=83942) · 6/15
+- `2026-11-02` **Adendo à linha da Tellia (10/26): abre tier self-serve "Tellia Lite" a US$20/mês, com entrada por WhatsApp, direto a agrônomo/produtor independente.** Antes vendida só a cooperativas/agtechs (IFV, KWS Saat). Continua sendo estruturação de registro de campo (bookkeeping), não conselho/diagnóstico — fonte primária (Vinetur) está fora do ar, só cobertura secundária confirma. [iGrownews](https://igrownews.com/tellia-latest-news/) · 5/15
+- `2026-11-02` **Checagem mecânica: mudança do Supabase (tabelas novas no schema public não expostas por padrão na Data API desde 30/10) não afeta o Stevi — a migration mais recente do repo é de 24/08, antes do corte.** Risco verificado e descartado, não só registrado. [Supabase](https://supabase.com/changelog?types=breaking-change) · 6/15
+- `2026-11-02` **Vercel depreciou Node.js 20 para Builds/Functions em 01/10/2026 — `package.json` do roca tem `"node": ">=20"` (faixa aberta, não pino exato), risco baixo mas vale confirmar a versão real selecionada no painel Vercel.** [Vercel](https://vercel.com/changelog/node-js-20-is-being-deprecated) · 6/15
+- `2026-11-02` **Earth Search (Element84) tem depreciação "armada" (sem data) da coleção STAC antiga `sentinel-2-l2a` (usada hoje para NDVI) em favor de `sentinel-2-c1-l2a`.** Mantenedores prometem avisar por mailing list antes de depreciar — nada muda agora, mas é known_gap latente de plataforma. [GitHub](https://github.com/Element84/earth-search/issues/31) · 6/15
+- `2026-11-02` **Kapso (Chile) levanta US$1,4M seed para infraestrutura no-code/API de agentes de IA no WhatsApp Business API — camada de plataforma adjacente, não concorrente de produto.** [Signalbase](https://www.trysignalbase.com/news/funding/kapso-raises-1-4m-seed-for-whatsapp-ai-agents) · 6/15
+- `2026-11-02` **Embrapa assina memorando de 5 anos com 4 instituições chinesas para IA/IoT em centros de serviço de maquinário inteligente na agricultura familiar.** Mesma casa do RAImundo (já monitorado, sem sinal público desde out/2025); não menciona chatbot/WhatsApp diretamente, mas é contexto institucional de aposta pública em IA pro pequeno produtor. [Movimento Econômico](https://movimentoeconomico.com.br/agronegocio/2026/10/06/embrapa-firma-parceria-com-a-china-para-ampliar-uso-de-ia-na-agricultura-familiar/) · 6/15
+- `2026-11-02` **DeclineCraft: benchmark com 27 LLMs mostra que RAG iterativo tende a reduzir abstenção correta em pergunta sem resposta — mais uma razão documentada para a Stevi não migrar do lookup determinístico por chave para RAG.** Reforça, sem mudar, a arquitetura já adotada (mesmo padrão do item de 24/08 sobre RAG denso). [arXiv](https://arxiv.org/abs/2610.28340) · 7/15
+- `2026-11-02` **Agri-SCHOLAR: agentes LLM definem limites de parâmetro de lavoura e um otimizador busca dentro deles usando simulador de cultura, emitindo conselho recorrente ligado ao estado real da safra.** Ângulo de notificação proativa `bets[1]`-adjacente, mas exige infraestrutura de simulação que a Stevi não tem e não teria em qualquer spike de curto prazo. [arXiv](https://arxiv.org/abs/2610.31003) · 6/15
+- `2026-10-26` **OpenRouter rebatiza "Pay-as-you-go" para "Standard" e lança tier "Business" (8%, DPA, regional EU/US) — taxa que a Stevi paga (5,5%, nas duas contas) não muda.** Closing da aquisição pela Stripe ainda sem confirmação oficial. [OpenRouter](https://openrouter.ai/pricing) · 7/15
+- `2026-10-26` **Anthropic confirma Claude Haiku 4.5 (usado no router da Stevi) segue ativo — só o Sonnet 4.5 foi formalmente depreciado (retirada 30/11/2026, substituído por 5.5, que não afeta a Stevi).** [Anthropic](https://platform.claude.com/docs/en/about-claude/model-deprecations) · 7/15
+- `2026-10-26` **Vercel para de cachear respostas com `Vary: Cookie` no CDN e renomeia "Edge Requests" pra "CDN Requests" no billing.** Sem mudança de preço anunciada; vale checar se alguma rota da Stevi seta cookie e dependia desse cache. [Vercel](https://community.vercel.com/t/vercel-weekly-october-5-2026/50269) · 7/15
+- `2026-10-26` **Manacá-1B-Instruct-2: segunda geração de um LLM nativo em português brasileiro (1,72B params, treinado do zero), com alinhamento de segurança reproduzível e resultados negativos de DPO documentados.** Ângulo de custo/soberania de dados — a Stevi hoje usa Claude/Gemini via OpenRouter, não um modelo nacional. [arXiv](https://arxiv.org/abs/2610.20570) · 7/15
+- `2026-10-26` **Focos de incêndio no Amazonas sobem 116% em 2026 (BDQueimadas/INPE) — confirma que a fonte de dados de queimada que a Stevi já consome (INPE Queimadas) está ativa e com sinal real na safra.** [Poder360](https://www.poder360.com.br/poder-sustentavel/focos-de-incendio-no-amazonas-crescem-116-em-2026/) · 6/15
+- `2026-10-26` **Pesquisa Faemg/Senar/UFLA projeta safra de café de MG em 33,4 Mi de sacas em 2026 (+23,6%), mas com 40% da área afetada por evento climático — direto no beachhead (Sul de Minas).** [Diário do Comércio](https://diariodocomercio.com.br/sindijori-mg/safra-de-cafe-em-minas-gerais-deve-alcancar-334-milhoes-de-sacas-em-2026/) · 6/15
+- `2026-10-26` **A100: modelo de visão agrícola pré-treinado em 3M de imagens não rotuladas de >100 culturas, mirando o gargalo de dado anotado em diagnóstico por foto.** Toca o known_gap de cobertura (`reason.ts`, só 5 culturas) mas é infraestrutura pesada demais pra replicar — sem peso/código liberado no abstract. [arXiv](https://arxiv.org/abs/2610.22991) · 6/15
+- `2026-10-26` **Myca levanta US$1,3M pre-seed pra transformar mensagem/foto/ligação do WhatsApp de equipe de campo agro em dado estruturado — clientes incluem Bayer e Olam.** Categoria adjacente (estruturação de operação B2B, não conselho ao pequeno produtor), mesmo padrão da Tellia. [AgFunderNews](https://agfundernews.com/myca-raises-1-3m-pre-seed-to-put-ai-agents-in-charge-of-agribusiness-field-operations) · 6/15
+- `2026-10-26` **Correção de data: o Vertex AI aposentou o `gemini-2.5-flash` em 20/10/2026, não 16/10 como o comentário em `api/_lib/env.ts` registra — e já passou.** Irrelevante na prática: o pin `google-ai-studio` (`transcribeProviderPin()`) protege a Stevi da rota Vertex independente da data exata; vale só corrigir o comentário se o código for tocado de novo. [Google Cloud](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions) · 6/15
+- `2026-10-26` **MAPA prorroga (90→180 dias) o prazo de migração ao SISPA (Portaria 1.676/2026) — confirmado que é instrumento separado da Portaria 1.579/2026 (vazio sanitário) que a Stevi já usa; zero arquivo do repo muda.** [AgriBrasilis](https://agribrasilis.com/?p=38525) · 5/15
+- `2026-10-26` **Benchmark australiano mostra LLM genérico errando grosseiramente estimativa de carbono orgânico do solo sem grounding — tema que a Stevi nem processa (`soil.ts` só lê pH/argila/areia), mas reforça a arquitetura já adotada de nunca deixar o LLM calcular número sozinho.** [arXiv](https://arxiv.org/abs/2610.18201) · 5/15
+- `2026-10-26` **Tellia (Paris/SF) levanta US$5M pra API de voz que estrutura observação de campo em registro georreferenciado — vendida a cooperativas/agtechs (IFV, KWS Saat), não ao pequeno produtor; não é conselho agronômico.** [StartupRise](https://startuprise.co.uk/tellia-secures-e4-3-mn/) · 5/15
+- `2026-10-26` **Anthropic remove `temperature`/`top_p`/`top_k` pra Claude Opus/Sonnet 4.7+ na versão de API 2026-10-21 — não afeta a Stevi, que usa `claude-sonnet-5`/`claude-haiku-4.5`, fora dessa faixa de versão.** [Anthropic](https://platform.claude.com/docs/en/api/migration-2026-10-21) · 5/15
+- `2026-10-26` **ElevenLabs lista Eleven v4/v4 Turbo (US$0,08 e US$0,04/1k chars) ao lado dos modelos v3 já usados pela Vitória — sem data de corte dos antigos.** [ElevenLabs](https://elevenlabs.io/pricing/api) · 5/15
+- `2026-10-26` **Supabase CLI v2.120.0 ganha logs persistentes por serviço e tracing OpenTelemetry opt-in — útil se algum dia for preciso depurar `cron/monitor.ts` sem reproduzir em produção.** [GitHub](https://github.com/supabase/cli/releases/tag/v2.120.0) · 5/15
+- `2026-10-26` **Yara (CVC) entra no segundo closing da Series B da Stenon (sensor de nitrogênio do solo + IA) — concorre conceitualmente com o papel que o SoilGrids cumpre hoje na Stevi, mas é hardware caro, não ameaça direta.** [AgNavigator](https://www.agnavigator.com/Article/2026/10/14/yara-backs-stenon-in-series-b-vote-of-confidence-for-soil-nitrogen-intelligence-platform/) · 5/15
+- `2026-10-26` **Cresol passa a notificar assinatura de contrato de crédito agro por WhatsApp (DocuSign) — fluxo de 7 dias pra 1, cooperativa cita baixa familiaridade com e-mail no campo.** Categoria diferente (crédito, não conselho), valida de leve o canal. [Baguete](https://www.baguete.com.br/noticias/cresol-digitaliza-assinaturas-com-docusign) · 5/15
+- `2026-10-26` **Paper sincroniza manual de operador de trator via CAN bus (ISO 11783) para manter grounding de LLM embarcado atualizado sem depender de conectividade — mecanismo de grounding offline, known_gap aberto de operação offline do produtor.** [arXiv](https://arxiv.org/abs/2610.31863) · 5/15
 - `2026-09-07` **DigiFarmz relançou "Daz" — mas é feature dentro de SaaS B2B de soja/trigo, não concorrente direto.** A data original parecia 22/09/2026 (futura); confirmada no HTML: é notícia de **set/2025**, republicada. O Daz é a camada WhatsApp de uma plataforma paga (Cropper/Linkage) de uma agtech de Champaign-IL com operação BR/EUA/Paraguai, focada em manejo fitossanitário de soja/trigo em fazendas comerciais grandes — sem café, sem gratuidade, sem sobreposição de segmento com o beachhead. Valida que "alerta proativo por WhatsApp" é padrão de indústria, não ensina mecanismo novo. [Global Crop Protection](https://globalcropprotection.com/noticias/novas-tecnologias/digifarmz-apresenta-daz-assistente-virtual-que-leva-inteligencia-artificial-ao-dia-a-dia-do-produtor-rural/) · 7/15
 - `2026-09-07` **Agro Amazônia triplica conversas com o Meta Business Agent (via Zenvia) em uma semana.** Distribuidora de insumos (subsidiária Sumitomo) roda piloto do agente nativo da Meta no WhatsApp — de 420 para 1.400+ conversas/semana. É SDR de vendas, não conselho agronômico, mas mostra a velocidade com que fornecedores de insumo estão automatizando o mesmo canal — e que a Meta já oferece agente nativo, baixando a barreira para qualquer revenda/cooperativa montar o próprio bot. [RBTV](https://rbtv.com.br/noticia/7058/agroamazonia-triplica-conversas-com-agente-de-ia) · 5/15
 - `2026-09-07` **FAIRY: motor agentic orientado a evento para soja full-season, implantado numa fazenda real.** Orquestra maquinário/drone/sensor/clima sob paradigma "tudo é evento", avaliado com 9 controladores sobre 100 safras simuladas (SIGSPATIAL 2026). Não fala de timing de notificação a humano (não duplica o item já aberto sobre horário de alerta) e exige hardware que o Stevi não tem e não vai ter neste voo. [arXiv](https://arxiv.org/abs/2609.00106) · 6/15
@@ -240,3 +335,8 @@ por que o código existe.
 - `2026-09-01` **[era DISCUTIR 8/15] O estudo da FDC — decidido: citar na CONVERSA, não no template. E o registro de 31/08 estava errado num ponto que mudava a ação.** O título daquele item dizia que o estudo "nomeia, com dirigente e faturamento". Abrindo o PDF: ele **anonimiza** — a Tabela 1 traz perfis (fundação, cidade, nº de associados, faturamento 2024) e o cargo do entrevistado, sem nome de cooperativa nem de dirigente. Dá pra inferir que o perfil de Guaxupé com R$10,7 bi é a Cooxupé, mas isso é inferência nossa, não citação; atribuir número do estudo a uma cooperativa nominal seria inventar fonte. Implementado em #13 com essa trava explícita no prompt da Vitória (`prospect/agent.ts`), junto da munição citável (15 dirigentes de MG, 22 barreiras, recomendação de parceria com startups e IA na interação com o cooperado) e da resposta pronta à objeção de propriedade de dados, que o estudo documenta na voz do cooperado ("eu não vou passar não, porque eu não sei para onde que vai isso"): consentimento LGPD + exclusão a pedido, caso técnico devolvido aos agrônomos da cooperativa, sem venda de dados, contrato escala pro Stefano. O template aprovado `stevi_parceria_coop_v1` **não muda** — bloco de texto em template frio morre no porteiro-robô (medição de 05/ago) e corpo aprovado exige re-submissão à Meta; a citação vive onde há humano lendo. [Zenodo (DOI 10.5281/zenodo.17604355)](https://zenodo.org/records/17604355)
 - `2026-09-01` **[achado colateral, virou #15] A rede de resgate era silenciosa — e o alerta de crédito não cobria o caso.** Simulando a queda da chave principal contra a API real (não mock), o OpenRouter devolveu `401 "User not found"`, que **não** é `isCreditError`: a reserva seguraria todo o tráfego sem nenhum alerta, só `log.error` na Vercel, enquanto o saldo do outro projeto escoava. Chave revogada é justamente o cenário de aquisição que motivou a reserva existir. #15 faz as duas camadas de resgate avisarem os fundadores (cooldown de 10 min, `fireAndForget`, texto nomeando camada/modelo/motivo). Não é item de intel — é o que a verificação achou, e fica aqui porque nasceu desta rodada.
 - `2026-08-31` **[era DISCUTIR 9/15] Em 30/08 o cron tenta o alerta de vazio de MT sozinho — resolvido por código, não por decisão do Stefano.** No mesmo dia em que o item foi aberto (24/08), `def021c` filtrou `listSojaFarmersByUf`/`listFarmsWithCoords` por `kind='produtor'`, e `7e891f5` completou a cobertura de UF. Medição de 31/08 no banco confirma: a única farm com soja em MT é `kind='teste'` e o filtro a exclui — o cron de 30/08 não vai contaminar `farmer_alerts`. Movido pra cá porque a pergunta original (disparar pra teste ou filtrar antes?) já tem resposta no código, não porque o Stefano decidiu.
+- `2026-10-26` **[era DISCUTIR 11/15, aberta 07/09] Prompt logging na OpenRouter — envelheceu sem decisão (49 dias).** O Stefano nunca confirmou se as duas contas (principal + reserva do twin-me) têm a opção desligada. Regra mecânica de 21 dias aplicada — nenhuma mudança no repo depende disso.
+- `2026-10-26` **[era DISCUTIR 9/15, aberta 07/09] App do Cacau (UESC/Bahia) — envelheceu sem decisão (49 dias).** A pergunta (vale checar se há movimento equivalente nascendo pra café em MG via EPAMIG/Embrapa?) nunca foi respondida. Regra mecânica de 21 dias.
+- `2026-10-26` **[era DISCUTIR 8/15, aberta 07/09] Café 360 (100+ downloads, mesma região) — envelheceu sem decisão (49 dias).** A pergunta (citar no README de posicionamento?) nunca foi respondida — mas esta rodada trouxe um segundo data point independente (Instacrops, ver "Em aberto"), o que torna a pergunta mais forte, não obsoleta.
+- `2026-10-26` **[era DISCUTIR 10/15, aberta 24/08] Horário único (08:00) pros três tipos de alerta proativo — envelheceu sem decisão (63 dias).** Fica sem efeito prático enquanto `farmer_alerts` continuar em 2 linhas de teste e zero produtor real tiver pin — mas a pergunta (horário por tipo de alerta vs. horário único) volta a valer no dia em que o canal reativar.
+- `2026-10-26` **[era DISCUTIR 10/15, aberta 24/08] Cobrança de mensagem de serviço no WhatsApp a partir de 01/10 — confirmada em vigor, envelheceu sem decisão sobre a pergunta original (63 dias).** A Meta passou a cobrar mensagens de serviço após franquia de 1.000/mês por número e voltou a cobrar utility dentro da janela de 24h, exatamente como previsto ([Meta](https://developers.facebook.com/docs/whatsapp/pricing), confirmado 2026-10-01). Efeito prático hoje: **zero** — o sistema está sem tráfego (0 mensagens em 7 dias). A pergunta original ("alguém olha o billing da WABA semanalmente?") nunca foi respondida e fica sem urgência enquanto durar a pausa, mas volta a importar se a campanha for retomada.
