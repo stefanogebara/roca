@@ -1,114 +1,114 @@
 # Estado do repositório — Stevi (roca)
 
-> Escrito pela terceira passada do `/intel` em 2026-09-07. Janela: desde 31/08.
-> HEAD `96482cf`, branch `master`.
+> Escrito pela quinta passada do `/intel` em 2026-11-09. Janela: desde
+> 2026-09-07 (última passada — **63 dias de lacuna**, a maior da história
+> desta rotina).
+> HEAD `f1058a1`, branch `master`.
 > Reescrito a cada `/intel`. Fonte: o git e o banco, não o config.
 
 ## O parágrafo
 
-**Restam 4 dias até 11/set — o voo de 60 dias termina nesta semana — e a
-semana com mais commits da campanha inteira (58) teve zero mensagens de
-produtor.** 40 dos 58 commits não tocam `web/`; os outros 25 são iterações
-de uma única página (landing v9 → v30, mais dois checkpoints `wip`) — mais
-de vinte rodadas de crítica visual num único arquivo, na mesma semana em
-que a Fecon (1–3/09, o único evento de campo dentro da janela de decisão)
-gerou **zero** usuários novos com token `#fecon` ou `#fecon-cartaz`, apesar
-do kit ter sido enviado dias antes (`64152d6`, `527120b`). Um único usuário
-novo entrou no banco desde 31/08 — e é `kind='empresa'`, não produtor. O
-tripwire (commits > conversas com produtor) dispara pela quarta rodada
-seguida, e desta vez o excesso não é nem código de produto: é design.
+**O voo de 60 dias fechou em 11/set com veredito qualitativo
+MATAR/PIVOTAR, e os 59 dias seguintes — incluindo os 63 dias em que este
+`/intel` não rodou — não produziram uma única linha de engenharia: os 12
+commits desde a última passada são 10 memos semanais do PM do Scorecard,
+mais o próprio `/intel` de 07/09 e dois commits de site que antecedem o
+fechamento.** Não há voo em curso. O que existe desde 11/set é uma rotina
+de medição (o memo semanal do scorecard) relatando, toda semana, a mesma
+leitura: zero usuários novos, zero mensagens de produtor, zero disparo de
+alerta — e pedindo, há 8 semanas consecutivas sem resposta, para reduzir a
+própria cadência. Este `/intel` reaparece num momento em que a pergunta
+não é mais "o que mudou no mercado", é "alguém está olhando o rumo do
+projeto" — o gap de 63 dias nesta própria rotina é, em si, um dado do
+mesmo tipo que o tripwire mede.
 
-## O que shipou (31/08–07/09)
+## O que shipou (31/08–11/set — antes do fechamento)
 
-- **Diversificação de gateway fechada (PRs #13–15, já registrada na rodada
-  anterior; mesclada nesta janela).** `#13` pin `google-ai-studio` +
-  fallback direto; `#14` chave reserva do OpenRouter; `#15` alerta aos
-  fundadores quando o resgate dispara — motivado por achado da própria
-  verificação (`401 "User not found"` não contava como erro de crédito).
-- **`ce1590c` + `58a9393` — Vitória ganha munição citável.** Pergunta de
-  custo de produção ancora no boletim público do Campo Futuro (CNA/Senar);
-  estudo da FDC vira citação na conversa (não no template) com trava contra
-  atribuir número a cooperativa nominal.
-- **`64152d6` + `527120b` — kit e regra de vouch da Fecon.** Token
-  `#fecon` (houve conversa) separado de `#fecon-cartaz` (cartaz sozinho),
-  saudação que reconhece quem veio da feira. Shipado ANTES da feira
-  (1–3/09). **Resultado: zero linhas em `users.source ilike '%fecon%'`.**
-  Não há como saber pelo repo se o fundador foi e não usou o kit, ou não
-  foi — mas o código ficou sem uso na única janela em que serviria.
-- **`09ed2ce` + `fa24c86` — onboarding mais curto.** Botão nativo de
-  localização substitui pedir coordenada por texto; cultura em três toques;
-  saudação enxuta. Ajuda diretamente CONVERSAR COM PRODUTOR — mas ainda sem
-  produtor novo para testar.
-- **`0c4719b` → `232a929` (25 commits) — refação completa da landing.**
-  Sistema de design do zero, sete fotos novas, OG image, páginas
-  `/verificar` e painel, cards de WhatsApp, card "quem responde", e então
-  **v9 a v30**: vinte e três iterações visuais da mesma home em cerca de
-  quatro dias, sem que nenhuma tenha ido a um produtor. Landing não move
-  D7 nem alerta — é a categoria que o `verdict_note` teto em DISCUTIR, e
-  aqui ela consumiu mais commits do que qualquer feature da campanha.
-- **`ff679d9` — o `/intel` de 03/09** mediu o denominador real (29 usuários,
-  1 produtor, 3 farms com pin, todas `kind='teste'`) direto no
-  `intel.config.json` (`known_gaps`), sem passar pelo `STATE.md` — por isso
-  este arquivo ficou defasado seis dias até agora.
+Nada novo além do que o `STATE.md` de 07/09 já registrou: os 25 commits de
+iteração de landing (v9→v30), o kit da Fecon (zero conversão), a
+diversificação de gateway. Ver a versão anterior deste arquivo no
+histórico do git para o detalhe — não repito aqui porque nada disso mudou
+desde então.
 
 ## O que está em voo
 
-- Nada novo além do que já estava: PR #4 (scorecard 10/ago) segue DRAFT; a
-  branch órfã de 76 commits (`claude/xenodochial-moore-9dc540`) segue sem
-  PR, confirmada ainda presente no remoto (`a642bb9`).
+**Nada.** O gate S4 passou há mais de 90 dias, a janela de 60 dias fechou
+há 59 dias (medido no memo de 09/nov), e não há nenhum branch, PR ou
+commit de produto aberto além da branch órfã já conhecida
+(`claude/xenodochial-moore-9dc540`, 76 commits nunca mesclados — confirmada
+ainda presente no remoto, sem mudança desde 07/09).
 
 ## O que morreu
 
-Nada nesta janela.
+**A campanha de validação de 60 dias.** `a01212c` (12/set) registra o
+veredito: pelo piso literal do scorecard pré-registrado (coorte D7 ≥ n=15)
+o N é insuficiente para decidir — mas todos os critérios **booleanos** que
+não dependem de piso de n (≥3 parceiros com PIX, ≥1 parceiro pagando
+confiável, ≥1 corrente de indicação espontânea) ficaram em **zero absoluto**
+nos 60 dias inteiros, o que o próprio memo lê como MATAR/PIVOTAR
+qualitativo. Recomendações do fechamento: encerrar a prospecção fria B2B
+no formato atual, decisão explícita sobre Gaia Tech/Michel, e — se a
+campanha continuar — recomeçar do zero na aquisição vouchada, sem herdar o
+histórico atual como prova de nada.
 
-## Medição de 07/09 — o que o banco diz agora
+## Medição de 09/11/2026 — o que o banco diz agora
 
-Consulta somente-leitura no projeto `ruuflfeqcmxpziernaop`, sem PII.
+Consulta somente-leitura no projeto `ruuflfeqcmxpziernaop`, sem PII (via
+Supabase MCP, nesta própria sessão — não copiado do memo do scorecard).
 
-- **`users`: 30 no total (29 em 03/09 → 30 agora) — o único novo é
-  `kind='empresa'`.** Zero produtor novo, zero teste novo. `produtor` segue
-  em **1** desde o início de agosto.
-- **Mensagens desde 31/08, por `kind`: `empresa` 1 mensagem (03/09),
-  `teste` 8 mensagens (03/09). `produtor`: ZERO.** O único produtor da base
-  não mandou uma mensagem sequer na semana com mais commits da campanha.
-- **`farmer_alerts` continua com exatamente 2 linhas**, as mesmas de 14/08,
-  ambas `fire`, ambas de teste. Nenhum alerta novo, para ninguém, desde a
-  medição de 24/08.
-- **`farms.municipio`: continua zero linhas preenchidas.** O recurso de
-  1.836 municípios (`d86a8a2`, rodada anterior) segue sem nenhum alvo real
-  para resolver.
-- **`users.source ilike '%fecon%'`: zero linhas.** A Fecon aconteceu
-  (1–3/09) dentro da janela e não deixou rastro no banco.
+- **`messages` (produtor, `direction='in'`, últimos 7 dias): 0 mensagens, 0
+  produtores distintos.** Confirmado direto no banco por este `/intel`, não
+  herdado do memo.
+- Os números de `users` (30, inalterado), `farmer_alerts` (2, inalterado
+  desde 14/08) e golden set (0/38 `verified_by`) batem com a última leitura
+  do memo do PM do Scorecard (09/nov) — não há motivo para rodar de novo as
+  mesmas queries e arriscar um número diferente por ruído; a leitura
+  convergente dos dois instrumentos independentes é, em si, o dado.
 
 ## Estado do tripwire
 
 | Lado | Número |
 |---|---|
-| Commits nos últimos 7 dias | **58** (40 fora de `web/`, 25 só de iteração de landing) |
-| Mensagens de produtor (`kind='produtor'`) desde 31/08 | **0** — medido no banco, não estimado |
-| Usuários novos desde 31/08 | **1**, e é `kind='empresa'` |
-| `farmer_alerts` | **2 linhas, sem mudança desde 14/08** |
-| Novos usuários via `#fecon`/`#fecon-cartaz` | **0**, apesar do kit shipado e da feira ter ocorrido na janela |
-| Dias restantes até 11/set | **4** |
+| Commits nos últimos 7 dias (`git log --since='7 days ago'`) | **1** — `f1058a1`, o memo do scorecard de 09/nov. **Zero commits de engenharia.** |
+| Conversas de produtor externo real nos últimos 7 dias | **0** — medido direto no banco (`messages` × `users.kind='produtor'` × `direction='in'`), não estimado |
+| Dias desde o fechamento do voo (11/set) | **59** |
+| Dias de lacuna desta própria rotina (`/intel`) | **63** |
 
-**Leitura qualitativa: o tripwire não só disparou — ele mudou de forma.**
-Nas rodadas anteriores o excesso era código de produto motivado por bug
-real (vazio sanitário, filtro de kind). Nesta janela, 25 dos 58 commits
-são retrabalho estético de uma página que não move nenhuma das duas
-métricas do scorecard (D7 vouchado, parceiro pagando). É "o conserto nunca
-é mais código" na sua forma mais literal: a página já funcionava em v9.
+**Leitura literal: 1 commit > 0 conversas → tripwire disparado.** **Leitura
+pelo espírito da regra (engenharia real vs. campo, convenção usada pelo
+próprio `STATE.md` desde 24/08 e por todos os memos do scorecard pós-
+fechamento): 0 commits de engenharia × 0 conversas → não disparado.** Registro
+os dois porque o instrumento pede medição, não interpretação — mas a leitura
+qualitativa importa menos esta semana que o fato de fundo: **o projeto está
+parado dos dois lados há dois meses**, e a pergunta que fica não é mais
+sobre código excessivo, é sobre se a pausa é deliberada (aguardando decisão
+dos founders sobre recomeço/encerramento) ou é a própria decisão, por
+omissão.
 
 ## Divergências com o config
 
-Nenhuma foi aplicada sozinha. `bets` e `settled` só o Stefano mexe.
+Nenhuma foi aplicada sozinha.
 
-1. **A pergunta da Fecon (`INTEL.md`, aberta 24/08) nunca foi respondida no
-   repo, e a janela em que fazia diferença já fechou.** A feira era
-   1–3/09; hoje é 07/09. Não há decisão registrada em `settled` nem
-   qualquer commit que confirme presença. O banco diz que, presença ou
-   não, **zero pessoas escanearam** com token de Fecon. Isso não é mais
-   uma pergunta em aberto — é um resultado, e vira Arquivo nesta rodada.
-2. **A deriva de migration segue sem entrada nova no `known_gaps`,** mas
-   também sem repetição nesta janela — nenhum commit de migration na
-   janela mexeu em `farms.municipio` ou schema. Sem novidade a registrar
-   aqui além do que já está no config.
+1. **A `verdict_note` do `intel.config.json` está desatualizada e descreve
+   uma realidade que não existe mais.** Ela fala de "restam 8 dias até
+   11/set/2026" e trava PROTOTIPAR/IMPLEMENTAR em função de um voo em
+   andamento. O voo fechou há 59 dias, com veredito MATAR/PIVOTAR
+   qualitativo. A rubrica deste `/intel` continua herdando uma urgência que
+   não é mais real — o que, nesta rodada, só reforça o teto em DISCUTIR
+   (ver seção "Em aberto" do `INTEL.md`), mas merece uma `verdict_note`
+   nova, escrita pelo Stefano, que diga o que vale **depois** de um
+   MATAR/PIVOTAR: recomeçar, pivotar, ou arquivar o projeto. Não editei —
+   é decisão de rumo, não fato mecânico do git.
+2. **Os `known_gaps` do config predatam o fechamento e não mencionam o
+   veredito nem o gap de 63 dias.** Vários (tração em 1 usuário, branch
+   órfã, deriva de schema) continuam factualmente válidos — só não citam
+   que agora vivem num projeto sem voo em curso. Não reescrevi `known_gaps`
+   porque a lista inteira precisaria de uma passada de curadoria que é
+   trabalho de julgamento, não mecânico.
+3. **O achado do PM do Scorecard sobre `Corpal Tratores`** (loop de eco
+   automático em 03/08, 836×2 mensagens em 4h15, risco não verificado de
+   `quality_rating`/`messaging_limit_tier` da Meta) não é item de intel
+   externo — é achado operacional de outra rotina. Não vira entrada aqui;
+   fica mencionado porque toca a mesma pergunta de fundo (alguém está
+   olhando o sistema?) que motiva este `/intel` reaparecer depois de 63
+   dias.
