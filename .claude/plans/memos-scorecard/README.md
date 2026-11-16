@@ -5,6 +5,97 @@ Append-only. Semana mais recente no topo. Cada seção segue o template do
 
 ---
 
+## Semana de 16/nov — dia 127 de 60 (66 dias após o fechamento)
+
+*Nota de processo, à frente de tudo, pela décima vez: esta é a DÉCIMA leitura
+desde o FECHAMENTO (11/set, veredito MATAR/PIVOTAR qualitativo) e a nona
+semana consecutiva (14/set, 28/set, 05/out, 12/out, 19/out, 26/out, 02/nov,
+09/nov, hoje) pedindo a mesma coisa sem resposta — reduzir a cadência desta
+rotina para mensal ou por evento. Reli o trigger direto (`list_triggers`):
+`cron_expression: "0 12 * * 1"`, `updated_at` ainda **25/jul/2026 23:14** —
+**114 dias** sem ser tocado, a rotina continua semanal. Já se passaram **63
+dias** desde o primeiro pedido (14/set). Link de 1 clique para o Stefano:
+`https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`. Query fresca
+rodada mesmo assim, por regra da casa.*
+
+**Tripwire — não disparado, mesma nuance de sempre.** `git log --since="7
+days ago" --oneline` devolve **1** commit: `f1058a1`, o próprio commit do
+memo de 09/nov, que cai dentro da janela de 7 dias contada a partir de agora.
+Nenhum commit de engenharia novo. `produtores_conversados_7d` (só externos
+reais): **0**. Pelo espírito da regra (engenharia real × conversa de
+produtor externo): **0 × 0 → tripwire não disparado.** Lido ao pé da letra
+(1 commit > 0 conversas), seria disparado — registro os dois, como nas
+semanas anteriores.
+
+**Calendário:** dia **127 de 60** · **66 dias** depois de 11/set (janela
+encerrada) · gate S4 (~10/ago) passou há **98 dias**. Não há voo em curso.
+
+**Tração (total / externos reais):** `users` total **30** (idêntico desde
+início de agosto — nenhum usuário novo em quase 110 dias). Produtor externo
+real: **1** (Gaia Tech, vouchado pelo Michel, `source='michel'`) — ainda
+exatamente 1 inbound + 1 outbound, ambos de 17/jul 21h07, **0 mensagens
+novas em 122 dias** (confirmado também pela rotina diária separada que
+vigia só essa resposta — segue sem disparar). Ativos 7d: **0**.
+`produtores_conversados_7d`: **0**. `messages` nos últimos 14 dias: **0**
+linhas — nenhum produtor, teste ou founder mandou qualquer coisa. Última
+mensagem inbound de toda a base continua sendo **30/set** (Stefano
+testando), **47 dias** de silêncio total desde então. Caderno de
+aplicações: **0** (vida toda). `farmer_alerts`: **2** (inalterado,
+`kind='teste'`, 14/08). `triage_events`: **0**. `ndvi_readings`: **2**
+(inalterado). Referrals (`referral_requests`): **5** paradas, mesmas de
+teste interno de sempre. Prospecção: **136 discovered / 113 ready / 64
+stale / 46 discarded / 8 replied** (367 total) — **idêntico** às últimas 6
+semanas, disparo continua parado. Golden set: **0/38 casos com
+`verified_by`** (reconfirmado, `grep` linha a linha, todas as 38 linhas com
+`"verified_by": null`).
+
+**Lead quente:** nenhum. `prospects.status='replied'` segue em **8** —
+mesmas linhas de sempre (revenda/consultoria/software, nenhum produtor). O
+único contato externo real (Gaia Tech) segue sem resposta há 122 dias.
+
+**Mudou no repo:** nada de engenharia — o único commit na janela de 7 dias é
+o próprio memo de 09/nov.
+
+**Decisões abertas** (dias parados a partir de hoje, 16/nov):
+- **Reduzir a cadência desta rotina (mensal ou por evento)** — pedida pela
+  primeira vez em 14/set, **63 dias** sem execução, repetida toda semana
+  desde então (esta é a décima leitura pós-fechamento, nona vez pedindo).
+  Confirmado de novo que o cron não muda há 114 dias. Link de 1 clique:
+  `https://claude.ai/code/routines/trig_01JFWNd7xgBCeJ2sydbZeiss`.
+- **Follow-up humano com Gaia Tech** — aberta desde 17/jul, **122 dias
+  parada**. A mais velha da casa. (Existe uma rotina diária separada que só
+  *detecta* se ele responder — não substitui o contato humano ativo, que
+  continua sem acontecer.)
+- **CNPJ** — aberta desde 25/jul, **114 dias parada**.
+- **Acordo escrito com Michel + assinatura dos 38 casos golden** — aberta
+  desde 25/jul, **114 dias parada**. `verified_by` = 0/38.
+- **Envs `FOUNDER_NOTIFY_TO` / `WHATSAPP_TEMPLATE_ALERT` na Vercel** —
+  aberta desde 25/jul, **114 dias parada**, não medido de novo nesta rodada
+  (403 Forbidden já confirmado em leituras anteriores, insistir não traz
+  dado novo).
+- **Checar reputação do número após o loop de eco com `Corpal Tratores`
+  (03/ago)** — sinalizado pela primeira vez no memo de 02/nov, **14 dias
+  parada**, sem confirmação de que alguém olhou o WhatsApp Manager.
+
+**As 3 prioridades da semana:**
+1. **Decidir a cadência desta rotina — 63 dias pedindo a mesma coisa de
+   graça, pela nona vez.** Continua sendo um clique do Stefano no link
+   acima. O sistema não recebe uma mensagem há 47 dias; manter o memo
+   semanal é o próprio ruído que o tripwire foi desenhado para impedir.
+2. **Gaia Tech, Michel e CNPJ — 114-122 dias cada, decisão em voz alta.**
+   Ligar/visitar o Gaia Tech ou declarar a tentativa encerrada; mesma lógica
+   para Michel e para o CNPJ.
+3. **Fechar o item do `Corpal Tratores` — 14 dias desde o achado, ainda sem
+   confirmação.** 15 minutos no WhatsApp Manager checando o histórico de
+   `quality_rating` em 03/ago.
+
+**O que NÃO fazer:** nenhuma linha de código, nenhuma iteração de produto,
+nenhum disparo de prospecção. E, pela décima vez, parar de gerar este memo
+semanal sobre um sistema sem mensagem nova há 47 dias é a própria prioridade
+1, não uma nota de rodapé.
+
+---
+
 ## Semana de 09/nov — dia 120 de 60 (59 dias após o fechamento)
 
 *Nota de processo, à frente de tudo, pela nona vez: esta é a NONA leitura
