@@ -59,8 +59,94 @@
 > 08/09/2026, e a base não recebe mensagem de produtor desde 30/09/2026 (47 dias de silêncio
 > total na leitura mais recente do `stevi-pm-scorecard`, `.claude/plans/memos-scorecard/README.md`).
 > Ver `docs/intel/STATE.md` para o estado completo.
+>
+> **Sexta passada (2026-11-23) — 73 dias desde o fechamento, décima rodada consecutiva sem
+> spike.** Feed do resumo matinal veio vazio de novo para o roca (mesmo snapshot de 22/08/2026).
+> Cinco scouts cobrindo a janela 07/09–23/11 (mais larga que o padrão, porque entre rodadas
+> mescladas o repo ficou mudo), ~45 candidatos brutos, seis lidos a fundo por um analista cada
+> depois de uma passada de G4 que descartou direto ~30 itens claramente fora de escopo ou
+> fracos demais pra justificar leitura completa (ver `seen.jsonl`). **Dois DISCUTIR, nove
+> REGISTRAR, o resto DESCARTAR — de novo zero PROTOTIPAR, zero IMPLEMENTAR.** Os dois DISCUTIR
+> novos são técnicos, não de mercado: a OpenRouter confirmou um incidente real de tratamento de
+> dados em provedores de inferência da sua rede (não autodeclaração de ToS como o item já
+> arquivado de 07/09 — um fato novo), e um paper (AgroGround) mede que fine-tuning de grounding
+> em VLM agrícola troca localização por reconhecimento/recusa, com um número que acende direto o
+> known_gap do goldenset sem `verified_by`: 28,6% de concordância indevida quando o produtor
+> sugere um nome de praga errado numa foto doente. Os dois itens "Em aberto" de 16/11 (Meta×CADE,
+> depreciação do Gemini) ainda não chegam a 21 dias — continuam abertos. **O achado que mais
+> importa de novo não é nenhum destes: é que esta rodada escolheu não abrir uma PR nova.** Em
+> vez da décima quarta PR de `/intel`/memo sem revisão, o incremento de hoje foi empilhado em
+> cima da PR #42 (16/11) — a recomendação nº2 do próprio corpo daquela PR. Ver `docs/intel/STATE.md`
+> para a tabela completa das treze PRs abertas e o motivo de cada uma estar parada.
 
 ## Em aberto — precisa de decisão do Stefano
+
+### [DISCUTIR 10/15] Um paper mede que o fine-tuning de grounding em VLM agrícola troca localização por recusa — e a Stevi não testa esse risco no goldenset
+**Data:** 2026-11-23 · **Eixos:** P2 A2 D2 E2 L2
+**Fonte primária:** [AgroGround (arXiv)](https://arxiv.org/abs/2610.04425)
+
+**O que é:** benchmark de 1.478 imagens agrícolas verificadas por humanos (F1 inter-anotador
+0,789) mais um dataset de 794.850 instruções com grounding automático, usado para testar o que
+muda quando um VLM agrícola é fine-tunado só para apontar ONDE está o problema na imagem.
+Achados com número: fine-tuning só-de-grounding derruba reconhecimento de 4 alternativas de
+51,7% para 29,2%; corrigir o formato da instrução recupera para 72,7% sem perder grounding;
+treinar com negativos de imagem saudável dá 94,1% de recusa correta numa foto sadia, mas só
+**28,6% de recusa quando o nome da praga sugerido pelo usuário está errado numa imagem doente**
+(ou seja, 71,4% das vezes o modelo concorda com o nome errado que o usuário propôs). RL ganha
+localização às custas de reconhecimento e recusa. Conclusão central: grounding redistribui erro
+entre localizar/nomear/recusar, não melhora os três juntos.
+
+**Por que toca este projeto:** `api/_lib/reason.ts:264` (`identifyFromPhoto`) manda a foto do
+produtor direto para `MODELS.reasoning()` (claude-sonnet-5 via OpenRouter) em zero-shot, sem
+grounding visual, sem bounding box, sem dataset de treino próprio — e sem teste explícito hoje
+de "o Stevi recusa corretamente numa foto saudável?" nem "o Stevi confirma um nome de praga
+errado que o produtor sugeriu?". O goldenset (`knowledge/goldenset/goldenset.jsonl`, 38 casos,
+`verified_by=null` em todos) não tem essas duas categorias. O número de 28,6% do paper é
+evidência externa — não prova direta sobre o modelo do Stevi — de que essa classe de erro
+(concordância indevida com sugestão do usuário) é real em VLMs de diagnóstico visual.
+
+**Por que isso não sobe de DISCUTIR:** um spike de ~4h adicionando casos de folha saudável e de
+nome sugerido errado ao goldenset, e medindo a taxa de concordância indevida do
+`identifyFromPhoto` atual, é exatamente o tipo de PROTOTIPAR que a `verdict_note` travaria —
+melhora capacidade de diagnóstico, não ajuda a CONVERSAR COM PRODUTOR nem a DISPARAR ALERTA. E
+com o canal sem produtor real há 54 dias, não há quem usaria esse diagnóstico mais seguro hoje.
+
+**A pergunta:** vale o spike de ~4h mesmo assim — testar se o Stevi confirma um nome de praga
+errado que o produtor sugere, hoje, enquanto o projeto está pausado e é barato verificar — ou
+isso é "capacidade" demais pro momento do voo (tripwire disparado, literal, há onze semanas) e
+deve esperar o Stevi ter alvo real de novo?
+
+---
+
+### [DISCUTIR 9/15] A OpenRouter confirmou um incidente real de tratamento de dados em provedores da sua rede — diferente do risco de ToS já arquivado
+**Data:** 2026-11-23 · **Eixos:** P3 A2 D2 E1 L1
+**Fonte primária:** [OpenRouter — Data Processing Incidents on Inference Providers](https://openrouter.ai/blog/announcements/data-processing-incidents-on-inference-providers/)
+
+**O que é:** pesquisadores de segurança externos encontraram provedores de inferência na rede
+da OpenRouter que não cumpriam as políticas de dados declaradas (a OpenRouter afirma não ter
+havido breach nela própria). Resposta: desligou 3 provedores não-nomeados, removeu 125
+endpoints da elegibilidade Zero Data Retention. Quatro provedores confirmaram publicamente o
+problema (Atlas Cloud, Novita, Phala, Together) — todos servem modelos open-weight de terceiros,
+não Claude nem Gemini. Isto é um FATO (incidente real, confirmado pela própria OpenRouter), não
+uma leitura de cláusula de ToS como o item já arquivado em 07/09 sobre prompt logging.
+
+**Por que toca este projeto:** OpenRouter é o gateway principal de LLM do Stevi
+(`api/_lib/llm.ts`). O mecanismo de pin de provider (`ProviderPrefs`, `api/_lib/llm.ts:33-37`)
+já existe e já é usado para a transcrição (`transcribeProviderPin()`, `api/_lib/env.ts:29-32`),
+mas **nenhuma chamada aos modelos Anthropic (`router()`/`reasoning()`) usa esse pin hoje** —
+roteamento livre, confirmado por grep em todos os call-sites. É o segundo evento de confiança na
+OpenRouter em três meses, depois da aquisição pela Stripe (19/08) que já motivou a
+diversificação em `api/_lib/llmDirect.ts`.
+
+**Por que isso trava em DISCUTIR:** é risco de vendor/infra, não conversa ou alerta — a
+`verdict_note` travaria de qualquer forma mesmo que o score batesse PROTOTIPAR.
+
+**A pergunta:** vale fechar `only: ['anthropic']` no router/reasoning (reaproveitando o
+`ProviderPrefs` que já existe, defesa preventiva barata) — ou é esforço num risco que a própria
+OpenRouter já mitigou, e que, pelos nomes públicos confirmados até agora, não bate nos modelos
+que o Stevi usa?
+
+---
 
 ### [DISCUTIR 11/15] A Meta tentou restringir bots de IA de terceiro no WhatsApp — e um bot de nicho como o Stevi nunca foi testado contra essa linha
 **Data:** 2026-11-16 · **Eixos:** P3 A1 D2 E2 L3
@@ -134,10 +220,10 @@ qualidade de transcrição de voz de roça (e o modelo-juiz default do gym) muda
 
 ## Fila de trabalho
 
-_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Quarta rodada seguida (24/08,
-31/08, 07/09, 16/11) e sétimo veredito sem spike na campanha — a mais longa das quatro em
-tempo de calendário, porque entre 07/09 e 16/11 não houve nenhuma rodada de `/intel`: o voo
-de 60 dias fechou (11/09, MATAR/PIVOTAR qualitativo) antes da próxima varredura._
+_vazio — nada passou de PROTOTIPAR/IMPLEMENTAR nesta rodada. Quinta rodada seguida (24/08,
+31/08, 07/09, 16/11, 23/11) e oitavo veredito sem spike na campanha. O item de maior score
+desta rodada (AgroGround, 10/15) bateria PROTOTIPAR pelo bruto, mas trava em DISCUTIR pela
+mesma regra de sempre: melhora capacidade de diagnóstico, não ajuda a conversar ou alertar._
 
 A `verdict_note` deste projeto exige que PROTOTIPAR e IMPLEMENTAR ajudem a **conversar com
 produtor** ou a **disparar alerta**. Dos sete itens lidos a fundo em 16/11, os dois de maior
@@ -160,6 +246,13 @@ por que o código existe.
 
 ## Radar
 
+- `2026-11-23` **Croppie (estimativa de safra de café por foto + SMS, Uganda) é avaliado para expansão ao Quênia — mecanismo diferente do Stevi (safra, não praga/doença), ainda exploratório.** CGIAR/Alliance Bioversity-CIAT e o KALRO-Coffee Research Institute do Quênia discutem (set/2026, sem piloto ainda) adaptar a ferramenta — nascida em Uganda, >2.300 fazendas autodeclaradas — ao setor cafeeiro queniano. Conta cerejas por foto, prevê produção por lote, manda previsão + conselho agronômico por SMS. Café + foto + canal de texto para smallholder é a mesma categoria do Stevi; estimativa de safra via SMS é mecanismo diferente de triagem de praga/doença via WhatsApp. [CGIAR](https://www.cgiar.org/news-events/news/bridging-gap-can-croppie-take-root-kenyas-coffee-sector) · 5/15
+- `2026-11-23` **Paper de conferência regional usa LLM genérico sem grounding para sugerir "tratamento básico" de doença de tomate, sem métrica nem disclaimer anti-prescrição.** Mistral/Llama 3.2 via LangChain, sem avaliação quantitativa divulgada, venue sem peer review forte (ICMR 2026). Contraste de postura com o compliance.ts do Stevi, mas evidência fraca demais para indicar tendência de mercado real — n=1, sem número. [arXiv](https://arxiv.org/abs/2611.10608) · 5/15
+- `2026-11-23` **ElevenLabs lança Scribe v3 — mesmo preço, 27% menos erro de transcrição.** Toca o platform_dep de voz do Stevi (ligações da Vitória), não o caminho de texto do produtor. Upgrade de qualidade sem mudança de custo. [ElevenLabs](https://elevenlabs.io/pricing/api) · 5/15
+- `2026-11-23` **Minerva Foods compra participação na Grão Direto, dona do assistente de IA "AIrton" no WhatsApp — valida WhatsApp+IA em escala B2B de commodity, categoria diferente do conselho agronômico ao produtor.** AIrton já atendeu ~2Mt dos 12Mt comercializados em 2025; outros investidores incluem Bayer, ADM, Cargill. [AgFeed](https://agfeed.com.br/agtech/exclusivo-minerva-foods-compra-participacao-e-se-torna-investidora-da-grao-direto) · 5/15
+- `2026-11-23` **Gran Mestre: assistente gratuito no WhatsApp calcula custo/ha para produtor de 200ha+ — mesmo canal, segmento e mecanismo diferentes do Stevi.** GRAN Soluções Agrícolas (Pato Branco, PR); sem triagem de praga/doença, foco em custo de insumo e cotação. Mais um data point de "WhatsApp+IA gratuito" como padrão de indústria no agro BR. [UAI](https://www.uai.com.br/?p=189966) · 5/15
+- `2026-11-23` **A100: modelo de visão fundacional agrícola pré-treinado sem rótulos em ~3M imagens de campo.** CNN+Transformer híbrido (self-distillation + reconstrução de patches mascarados); features congeladas servem para classificação e regressão. Contexto arquitetural — o Stevi não treina modelo próprio, diagnóstico é LLM multimodal zero-shot via OpenRouter. [arXiv](https://arxiv.org/abs/2610.22991) · 5/15
+- `2026-11-23` **Framework baseado em ontologia (regras de especialista, não treino em larga escala) para diagnóstico interpretável de doença de fruta — F1 85%, comparável a VGG16.** Arquitetura alternativa de baixo custo computacional; sem transferência clara para o pipeline do Stevi hoje. [arXiv](https://arxiv.org/abs/2611.00039) · 5/15
 - `2026-11-16` **Vereda captou R$30M para vender insumo via WhatsApp — e a própria aposta inicial no WhatsApp como funil de venda autossuficiente "não se confirmou".** Canary, Valor Capital Group e Speedrun/a16z. O agente "Vera" organiza pedido/proposta/financiamento de insumo entre produtor, indústria e os próprios vendedores da Vereda. Os fundadores mantiveram o WhatsApp como canal (não migraram para app) — só voltaram a pôr vendedor humano no meio de uma negociação de semanas que um bot sozinho não fechava. Fraco como ameaça a `bets[0]`: o uso do Stevi (triagem + alerta) é estruturalmente mais simples que fechar venda B2B financiada. [Startups.com.br](https://startups.com.br/negocios/agtech/vereda-capta-r-30m-para-conectar-industria-de-insumos-direto-ao-produtor/) · 4/15, descartado
 - `2026-11-16` **KyGround: busca literal (tool-calling) cai 20-32 pontos com acento/maiúscula/transliteração grega — e o Stevi já blinda esse ponto cego.** Benchmark 198 perguntas, assistente agrícola grego-inglês; normalização de acento+stemming recupera a 83,8% (ainda atrás do RAG, 95,3%). `lookupPest` em `api/_lib/tools/agrofit.ts` já faz NFD+lowercase+colapso de pontuação+token-overlap scoring — mais robusto que a correção que o paper recomenda. Reforça, não muda, a decisão de 24/08 contra RAG denso. [arXiv](https://arxiv.org/abs/2610.08205) · 7/15
 - `2026-11-16` **Digital Green/FarmerChat: gate de qualidade de imagem com modelo leve antes do LLM caro.** 1,16M fotos de produtores (Etiópia/Índia/Quênia/Nigéria); MobileNetV3 como filtro de qualidade bate GPT-4o em F1 (86,9%) a 12ms, pedindo foto melhor antes de gastar com o modelo grande. Técnica transferível ao caminho de foto do Stevi, mas sem known_gap nomeado que isso resolva hoje — contexto, não fila de trabalho. [arXiv](https://arxiv.org/abs/2609.21651) · 7/15
